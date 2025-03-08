@@ -1,6 +1,7 @@
 /// Debug executable
-use isq::quantity;
+use isq::unit;
 
 fn main() {
-    println!("{:?}", quantity::LENGTH);
+    let q = unit::M;
+    println!("{:?}", q);
 }
