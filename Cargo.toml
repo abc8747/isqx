@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["crates/isq", "python"]
+
+[profile.release]
+lto = true
+strip = true
+overflow-checks = true
