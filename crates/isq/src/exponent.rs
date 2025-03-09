@@ -28,14 +28,13 @@ impl IrreducibleFraction {
 /// An exponent should be a rational number.
 #[derive(Debug, Clone)]
 pub enum Exponent {
-    Zero,
-    Integer(NonZero<i16>),
+    Integer(i16),
     Fraction(IrreducibleFraction),
 }
 
 impl Exponent {
     pub const fn integer(value: i16) -> Self {
-        Self::Integer(NonZero::<i16>::new(value).expect("must be non-zero"))
+        Self::Integer(value)
     }
 
     pub const fn fraction(numerator: i16, denominator: u16) -> Self {

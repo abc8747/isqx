@@ -32,7 +32,7 @@ pub enum Unit<'base, 'group, 'name> {
     /// dimensionless but represent distinct quantities.
     SpecialSymbol {
         inner: &'base Unit<'base, 'group, 'name>,
-        symbol: &'name str,
+        symbol: Option<&'name str>,
     },
 }
 
@@ -48,7 +48,7 @@ impl<'base, 'group, 'name> Unit<'base, 'group, 'name> {
         Self::Derived { groups }
     }
 
-    pub const fn new_dimensionless(symbol: &'name str) -> Self {
+    pub const fn new_dimensionless(symbol: Option<&'name str>) -> Self {
         // "It is especially important to have a clear description of any quantity with the unit one
         // (see section 5.4.7) that is expressed as a ratio of quantities of the same kind (for
         // example length ratios or amount fractions) or as a number of entities (for example number
@@ -62,7 +62,7 @@ impl<'base, 'group, 'name> Unit<'base, 'group, 'name> {
     pub const fn with_special_symbol(&'base self, symbol: &'name str) -> Self {
         Self::SpecialSymbol {
             inner: &self,
-            symbol,
+            symbol: Some(symbol),
         }
     }
 
@@ -134,11 +134,12 @@ macro_rules! pow {
         }
     };
 }
+pub(crate) use pow;
 
 /// Plane angle. Not to be confused with m m⁻¹.
-pub const RAD: Unit = Unit::new_dimensionless("rad");
+pub const RAD: Unit = Unit::new_dimensionless(Some("rad"));
 /// Solid angle. Not to be confused with m² m⁻².
-pub const SR: Unit = Unit::new_dimensionless("sr");
+pub const SR: Unit = Unit::new_dimensionless(Some("sr"));
 /// Frequency. Shall only be used for periodic phenomena.
 pub const HZ: Unit = Unit::from_groups(&[pow!(KG)]).with_special_symbol("Hz");
 /// Force
@@ -168,6 +169,8 @@ pub const H: Unit = Unit::from_groups(&[pow!(WB), pow!(A, -1)]).with_special_sym
 /// Celsius temperature. The numerical value of a temperature difference is the same when expressed
 /// in either degrees Celsius or in Kelvins.
 pub const DEGC: Unit = Unit::from_groups(&[pow!(K)]).with_special_symbol("°C");
+// NOTE: The symbol `sr` for must be included to distinguish luminous flux (lumen) from
+// luminous intensity (candela)
 /// Luminous flux
 pub const LM: Unit = Unit::from_groups(&[pow!(CD), pow!(SR)]).with_special_symbol("lm");
 /// Illuminance
@@ -262,3 +265,9 @@ pub const W_PERSR: Unit = Unit::from_groups(&[pow!(W), pow!(SR, -1)]);
 pub const W_PERM2_PERSR: Unit = Unit::from_groups(&[pow!(W), pow!(M, -2), pow!(SR, -1)]);
 /// Catalytic activity concentration
 pub const KAT_PERM3: Unit = Unit::from_groups(&[pow!(KAT), pow!(M, -3)]);
+
+// macro_rules! rate_constant {
+//     ($order:expr) => {
+//         Unit::from_groups(&[pow!(MOL, 1 - order), pow!(L, order - 1), pow!(S, -1)])
+//     };
+// }

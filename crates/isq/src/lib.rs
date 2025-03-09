@@ -15,8 +15,14 @@
 ///
 /// [2] “NIST Handbook 44 - 2024 - Appendix C. General Tables of Units of Measurement,” NIST,
 ///     Available: https://www.nist.gov/document/nist-handbook-44-2024-appendix-c-pdf
-
-/// Dimensional exponents: an integer or a fraction
+///
+/// [3] C. C2, “C2: Commission on Symbols, Units, Nomenclature, Atomic Masses and Fundamental
+///     Constants - IUPAP: The International Union of Pure and Applied Physics,” Mar. 04, 2021.
+///     Available: https://archive2.iupap.org/wp-content/uploads/2014/05/A4.pdf    
 pub mod exponent;
-/// A unit.
+/// Prefix.
+pub mod prefix;
+/// Quantity.
+pub mod quantity;
+/// Unit.
 pub mod unit;
