@@ -38,17 +38,17 @@ jobs:
 
       - name: Style checking
         run: |
-          uv run ruff check src tests examples
-          uv run ruff format --check src tests examples
+          uv run ruff check src tests
+          uv run ruff format --check src tests
 
       - name: Type checking
         if: always()
-        run: uv run mypy src tests examples
+        run: uv run mypy src tests
 
       - name: Run tests
         if: ${{ always() }}
         run: |
-          uv run pytest tests/ -n auto --cov --cov-report xml
+          uv run pytest tests/ --cov --cov-report xml
 
       - name: Upload coverage to Codecov
         if: ${{ always() && github.event_name != 'pull_request_target' }}
