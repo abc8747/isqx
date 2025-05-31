@@ -16,9 +16,9 @@ def test_exp_eq() -> None:
 
 def test_mul_invalid() -> None:
     with pytest.raises(Exception):
-        _u0 = Mul(tuple())  # type: ignore
+        _u0 = Mul(tuple())
     with pytest.raises(Exception):
-        _u1 = Mul((Exp(METER, 1), Exp(METER.dimension, 1)))  # type: ignore
+        _u1 = Mul((Exp(METER, 1), Exp(METER.dimension, 1)))
 
 
 MPERS = Mul((Exp(METER, 1), Exp(SECOND, -1)))
