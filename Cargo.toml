@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/isq", "python"]
+members = ["crates/isq"]
 
 [profile.release]
 lto = true

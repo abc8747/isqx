@@ -1,0 +1,96 @@
+site_name: mfoil
+site_description: A system for representing physical units
+repo_name: cathaypacific8747/isq
+repo_url: https://github.com/cathaypacific8747/isq
+site_url: https://cathaypacific8747.github.io/isq/
+nav:
+  - "README.md"
+  - API Reference: "api.md"
+
+theme:
+  name: material
+  features:
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - navigation.expand
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+plugins:
+  - search
+  - social
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          inventories:
+            - https://docs.python.org/3/objects.inv
+            - https://numpy.org/doc/stable/objects.inv
+          options:
+            inherited_members: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            merge_init_into_class: true
+            docstring_section_style: table
+            signature_crossrefs: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            summary: true
+            show_submodules: true
+      enable_inventory: true
+markdown_extensions:
+  - abbr
+  - attr_list
+  - admonition
+  - footnotes
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.blocks.tab:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tilde
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      pygments_lang_class: true
+  - pymdownx.inlinehilite:
+      style_plain_text: py3
+  - pymdownx.magiclink
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - toc:
+      permalink: "¤"
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - assets/js/katex.js
+  - https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js
+  - https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js
+
+extra_css:
+  - https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css
