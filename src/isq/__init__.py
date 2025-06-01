@@ -51,6 +51,8 @@ class Expr:
                 if term_kind != "dimensionless":
                     return term_kind
             return "dimensionless"
+        elif isinstance(self, Scaled):
+            return self.reference.kind
         else:
             raise TypeError(
                 f"cannot determine kind for unknown expression type: {type(self)}"
@@ -117,30 +119,79 @@ class Mul(Expr):
         if len(unique_kinds) != 1:
             raise ValueError("terms must all be either `unit` or `dimension`")
 
-    def simplify(self) -> Mul | Dimensionless:
-        """Return the canonical-form of the expression. Flattens the tree-like
-        structure into products of powers of base units."""
+    def simplify(self) -> Mul | Dimensionless | Scaled:
+        """Flatten a tree-like structure of expressions into a product of
+        powers of base units or dimensions."""
         base_exponent_pairs: dict[Expr, Exponent] = {}
-        _insert_root_terms(self.terms, base_exponent_pairs)
-        # NOTE: Exp(..., 0) is not allowed, create a new one for disambiguation
-        if all(exponent == 0 for exponent in base_exponent_pairs.values()):
-            new_name = f"simplified_{hash(self)}"
-            return Dimensionless(new_name)
+        derived_conversions: list[tuple[Scaled, Exponent]] = []
+        _insert_root_terms(self.terms, base_exponent_pairs, derived_conversions)
+
+        output_name_hint = self.name or f"expr_{hash(self)}"
+
+        simplified_expr: Dimensionless | Mul
+        no_conversions_involved = not derived_conversions
+
+        # remove zero exponents and ensure canonical order by names
         base_exponent_pairs_sorted = sorted(
-            base_exponent_pairs.items(),
+            filter(lambda item: item[1] != 0, base_exponent_pairs.items()),
             key=lambda item: item[0].name,  # type: ignore
         )
-        return Mul(
-            tuple(
-                Exp(base, exponent)
-                for base, exponent in base_exponent_pairs_sorted
+        if not base_exponent_pairs_sorted:
+            simplified_expr = Dimensionless(
+                name=f"dimensionless_form_of_{output_name_hint}"
             )
+        else:
+            simplified_expr = Mul(
+                tuple(
+                    Exp(base, exponent)
+                    for base, exponent in base_exponent_pairs_sorted
+                ),
+                name=output_name_hint if no_conversions_involved else None,
+            )
+        if no_conversions_involved:
+            return simplified_expr
+
+        factor = 1.0
+        for derived, exponent in derived_conversions:
+            factor *= derived.factor**exponent
+
+        return Scaled(
+            name=output_name_hint,
+            reference=simplified_expr,
+            factor=factor,
         )
+
+
+@dataclass(frozen=True)
+class Scaled(Expr):
+    name: str
+    """Name of this unit or dimension."""
+    reference: Expr
+    """The unit or dimension that this unit or dimension is based on."""
+    factor: float | Fraction
+    """Multiplying this factor converts this value into the reference.
+    For example, `1 ft = 0.3048 m`, so the factor is 0.3048."""
+
+    def to_reference(self, value: Any) -> Any:
+        """Convert a value in this unit to the reference unit."""
+        return value * self.factor
+
+    def from_reference(self, value: Any) -> Any:
+        """Convert a value in the reference unit to this unit."""
+        return value / self.factor
+
+    def to(self, other: Expr) -> Callable[[Any], Any]:
+        """Return a function that converts a value in this unit to another unit.
+        :param other: The target unit or dimension to convert to.
+        :raises RuntimeError: if the other unit is not compatible with this one.
+        """
+        raise NotImplementedError
 
 
 def _insert_root_terms(
     terms: tuple[Exp, ...],
     base_exponent_pairs_mut: dict[Expr, Exponent],
+    derived_conversions_mut: list[tuple[Scaled, Exponent]],
 ) -> None:
     for term in terms:
         if isinstance(term.base, (BaseUnit, BaseDimension, Dimensionless)):
@@ -151,29 +202,32 @@ def _insert_root_terms(
                 Exp(term_inner.base, term_inner.exponent * term.exponent)
                 for term_inner in term.base.terms
             )
-            _insert_root_terms(terms_distributed, base_exponent_pairs_mut)
+            _insert_root_terms(
+                terms_distributed,
+                base_exponent_pairs_mut,
+                derived_conversions_mut,
+            )
         elif isinstance(term.base, Exp):
             term_inner = term.base
             term_distributed = Exp(
                 term_inner.base, term_inner.exponent * term.exponent
             )
-            _insert_root_terms((term_distributed,), base_exponent_pairs_mut)
-        elif isinstance(term.base, Derived):
-            raise NotImplementedError
+            _insert_root_terms(
+                (term_distributed,),
+                base_exponent_pairs_mut,
+                derived_conversions_mut,
+            )
+        elif isinstance(term.base, Scaled):
+            term_derived = term.base
+            derived_conversions_mut.append((term_derived, term.exponent))
+            ref_expr = Exp(term_derived.reference, term.exponent)
+            _insert_root_terms(
+                (ref_expr,),
+                base_exponent_pairs_mut,
+                derived_conversions_mut,
+            )
         else:
             raise ValueError(f"unknown expression {term}")
-
-
-@dataclass(frozen=True)
-class Derived(Expr):
-    name: str
-    """Name of the derived unit."""
-    reference_expr: Expr
-    """The unit or dimension that this derived unit is derived from."""
-    to_reference: Callable[[Any], Any]
-    """Converts a value from derived to reference unit."""
-    to_derived: Callable[[Any], Any]
-    """Converts a value from reference to derived unit."""
 
 
 #
@@ -258,10 +312,9 @@ SV = Mul((Exp(J, 1), Exp(KILOGRAM, -1)), "sievert")
 KAT = Mul((Exp(MOLE, 1), Exp(SECOND, -1)), "katal")
 """Catalytic activity (katal)"""
 
+MIN = Scaled("minute", SECOND, factor=60)
+HOUR = Scaled("hour", SECOND, factor=3600)
+DAY = Scaled("day", HOUR, factor=24)
+YEAR = Scaled("year", DAY, factor=365.25)  # on average
 
-FOOT = Derived(
-    "foot",
-    METER,
-    to_reference=lambda ft: ft * 0.3048,
-    to_derived=lambda m: m / 0.3048,
-)
+FEET = Scaled("feet", METER, factor=0.3048)
