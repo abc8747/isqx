@@ -2,7 +2,17 @@ from fractions import Fraction
 
 import pytest
 
-from isq import DAY, HOUR, METER, SECOND, Dimensionless, Exp, Mul, Scaled
+from isq import (
+    DAY,
+    HOUR,
+    METER,
+    SECOND,
+    BaseUnit,
+    Dimensionless,
+    Exp,
+    Mul,
+    Scaled,
+)
 
 
 def test_exp_invalid() -> None:
@@ -28,22 +38,28 @@ def test_simplify_basic() -> None:
     tg = Mul(
         (Exp(METER, 1), Exp(SECOND, -1), Exp(METER, 2), Exp(SECOND, -2))
     ).simplify()  # all root nodes
-    assert not isinstance(tg, (Dimensionless, Scaled))
+    assert isinstance(tg, Mul)
     assert len(tg.terms) == 2
     assert Exp(METER, 3) in tg.terms
     assert Exp(SECOND, -3) in tg.terms
 
 
 def test_simplify_nested() -> None:
-    expr0 = Mul((Exp(Exp(METER, 2), Fraction(1, 2)),)).simplify()
-    assert isinstance(expr0, Mul)
-    assert expr0.terms == Mul((Exp(METER, 1),)).terms
+    expr0 = Exp(Exp(METER, 2), Fraction(1, 2))
+    expr0s = expr0.simplify()
+    assert isinstance(expr0s, BaseUnit)
+    assert expr0s == METER
+    expr1 = Mul((expr0,))
+    expr1s = expr1.simplify()
+    assert isinstance(expr1s, BaseUnit)
+    assert expr1s == METER
+
     assert isinstance(
         Mul((Exp(MPERS, 1), Exp(MPERS, -1))).simplify(), Dimensionless
     )
 
 
-def test_simplify_eq() -> None:
+def test_simplify_ordering() -> None:
     PERSM = Mul((Exp(SECOND, -1), Exp(METER, 1))).simplify()
     assert isinstance(PERSM, Mul)
     assert PERSM.terms == MPERS.terms
@@ -85,29 +101,25 @@ def test_simplify_scaled2() -> None:
     MOUTHS_PERPOOP = Mul((Exp(MOUTH, 1), Exp(POOP, -1)))
     CM2_PERMOUTH = Mul((Exp(CM, 2), Exp(MOUTH, -1)))
 
-    PERIOD_S = Mul(
-        (
-            Exp(
-                Mul(
-                    (
-                        Exp(BIRD_PERKM2, 1),
-                        Exp(POOP_PERBIRD_PERHOUR, 1),
-                        Exp(HOURS_PERDAY, 1),
-                        Exp(MOUTHS_PERPOOP, 1),
-                        Exp(CM2_PERMOUTH, 1),
-                    ),
-                ),
-                -1,
+    PERIOD = Exp(
+        Mul(
+            (
+                Exp(BIRD_PERKM2, 1),
+                Exp(POOP_PERBIRD_PERHOUR, 1),
+                Exp(HOURS_PERDAY, 1),
+                Exp(MOUTHS_PERPOOP, 1),
+                Exp(CM2_PERMOUTH, 1),
             ),
-        )
+        ),
+        -1,
     ).simplify()  # = (km^2 * day) / cm^2
-    assert isinstance(PERIOD_S, Scaled)
-    assert PERIOD_S.factor == 100_000**2 * 86400
-    assert PERIOD_S.reference == Mul((Exp(SECOND, 1),))
+    assert isinstance(PERIOD, Scaled)
+    assert PERIOD.factor == 100_000**2 * 86400
+    assert PERIOD.reference == SECOND
 
     num_birds = 300e9
     earth_surface_area = 4 * pi * 6378**2
-    period_s = PERIOD_S.to_reference(
+    period_s = PERIOD.to_reference(
         1
         / (
             (num_birds / earth_surface_area)  # bird / km^2

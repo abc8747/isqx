@@ -101,6 +101,17 @@ class Exp(Expr):
         if self.exponent == 0:
             raise ValueError("exponent must not be zero, use `Dimensionless`")
 
+    def simplify(self) -> Expr:
+        """Flatten the tree-like structure into the simplest form."""
+        base_exponent_pairs: dict[Expr, Exponent] = {}
+        derived_conversions: list[tuple[Scaled, Exponent]] = []
+        _insert_root_term(self, base_exponent_pairs, derived_conversions)
+        return _get_canonical_expression(
+            base_exponent_pairs,
+            derived_conversions,
+            output_name_maybe=f"expr_{hash(self)}",
+        )
+
 
 @dataclass(frozen=True)
 class Mul(Expr):
@@ -119,46 +130,16 @@ class Mul(Expr):
         if len(unique_kinds) != 1:
             raise ValueError("terms must all be either `unit` or `dimension`")
 
-    def simplify(self) -> Mul | Dimensionless | Scaled:
-        """Flatten a tree-like structure of expressions into a product of
-        powers of base units or dimensions."""
+    def simplify(self) -> Expr:
+        """Flatten the tree-like structure into the simplest form."""
         base_exponent_pairs: dict[Expr, Exponent] = {}
         derived_conversions: list[tuple[Scaled, Exponent]] = []
-        _insert_root_terms(self.terms, base_exponent_pairs, derived_conversions)
-
-        output_name_hint = self.name or f"expr_{hash(self)}"
-
-        simplified_expr: Dimensionless | Mul
-        no_conversions_involved = not derived_conversions
-
-        # remove zero exponents and ensure canonical order by names
-        base_exponent_pairs_sorted = sorted(
-            filter(lambda item: item[1] != 0, base_exponent_pairs.items()),
-            key=lambda item: item[0].name,  # type: ignore
-        )
-        if not base_exponent_pairs_sorted:
-            simplified_expr = Dimensionless(
-                name=f"dimensionless_form_of_{output_name_hint}"
-            )
-        else:
-            simplified_expr = Mul(
-                tuple(
-                    Exp(base, exponent)
-                    for base, exponent in base_exponent_pairs_sorted
-                ),
-                name=output_name_hint if no_conversions_involved else None,
-            )
-        if no_conversions_involved:
-            return simplified_expr
-
-        factor = 1.0
-        for derived, exponent in derived_conversions:
-            factor *= derived.factor**exponent
-
-        return Scaled(
-            name=output_name_hint,
-            reference=simplified_expr,
-            factor=factor,
+        for term in self.terms:
+            _insert_root_term(term, base_exponent_pairs, derived_conversions)
+        return _get_canonical_expression(
+            base_exponent_pairs,
+            derived_conversions,
+            output_name_maybe=self.name or f"expr_{hash(self)}",
         )
 
 
@@ -188,46 +169,88 @@ class Scaled(Expr):
         raise NotImplementedError
 
 
-def _insert_root_terms(
-    terms: tuple[Exp, ...],
+def _insert_root_term(
+    term: Exp,
     base_exponent_pairs_mut: dict[Expr, Exponent],
     derived_conversions_mut: list[tuple[Scaled, Exponent]],
 ) -> None:
-    for term in terms:
-        if isinstance(term.base, (BaseUnit, BaseDimension, Dimensionless)):
-            base_exponent_pairs_mut.setdefault(term.base, 0)
-            base_exponent_pairs_mut[term.base] += term.exponent
-        elif isinstance(term.base, Mul):
-            terms_distributed = tuple(
-                Exp(term_inner.base, term_inner.exponent * term.exponent)
-                for term_inner in term.base.terms
-            )
-            _insert_root_terms(
-                terms_distributed,
+    if isinstance(term.base, (BaseUnit, BaseDimension, Dimensionless)):
+        base_exponent_pairs_mut.setdefault(term.base, 0)
+        base_exponent_pairs_mut[term.base] += term.exponent
+    elif isinstance(term.base, Mul):
+        terms_distributed = tuple(
+            Exp(term_inner.base, term_inner.exponent * term.exponent)
+            for term_inner in term.base.terms
+        )
+        for term in terms_distributed:
+            _insert_root_term(
+                term,
                 base_exponent_pairs_mut,
                 derived_conversions_mut,
             )
-        elif isinstance(term.base, Exp):
-            term_inner = term.base
-            term_distributed = Exp(
-                term_inner.base, term_inner.exponent * term.exponent
-            )
-            _insert_root_terms(
-                (term_distributed,),
-                base_exponent_pairs_mut,
-                derived_conversions_mut,
-            )
-        elif isinstance(term.base, Scaled):
-            term_derived = term.base
-            derived_conversions_mut.append((term_derived, term.exponent))
-            ref_expr = Exp(term_derived.reference, term.exponent)
-            _insert_root_terms(
-                (ref_expr,),
-                base_exponent_pairs_mut,
-                derived_conversions_mut,
-            )
-        else:
-            raise ValueError(f"unknown expression {term}")
+    elif isinstance(term.base, Exp):
+        term_inner = term.base
+        term_distributed = Exp(
+            term_inner.base, term_inner.exponent * term.exponent
+        )
+        _insert_root_term(
+            term_distributed,
+            base_exponent_pairs_mut,
+            derived_conversions_mut,
+        )
+    elif isinstance(term.base, Scaled):
+        term_derived = term.base
+        derived_conversions_mut.append((term_derived, term.exponent))
+        ref_expr = Exp(term_derived.reference, term.exponent)
+        _insert_root_term(
+            ref_expr,
+            base_exponent_pairs_mut,
+            derived_conversions_mut,
+        )
+    else:
+        raise ValueError(f"unknown expression {term}")
+
+
+def _get_canonical_expression(
+    base_exponent_pairs: dict[Expr, Exponent],
+    derived_conversions: list[tuple[Scaled, Exponent]],
+    *,
+    output_name_maybe: str,
+) -> Expr:
+    no_conversions_involved = not derived_conversions
+    simplified_expr: Expr
+    # remove zero exponents and ensure canonical order by names
+    base_exponent_pairs_sorted = sorted(
+        filter(lambda item: item[1] != 0, base_exponent_pairs.items()),
+        key=lambda item: item[0].name,  # type: ignore
+    )
+    if not base_exponent_pairs_sorted:
+        simplified_expr = Dimensionless(
+            name=f"dimensionless_form_of_{output_name_maybe}"
+        )
+    elif len(base_exponent_pairs_sorted) == 1:
+        base, exponent = base_exponent_pairs_sorted[0]
+        simplified_expr = base if exponent == 1 else Exp(base, exponent)
+    else:
+        simplified_expr = Mul(
+            tuple(
+                Exp(base, exponent)
+                for base, exponent in base_exponent_pairs_sorted
+            ),
+            name=output_name_maybe if no_conversions_involved else None,
+        )
+    if no_conversions_involved:
+        return simplified_expr
+
+    factor = 1.0
+    for derived, exponent in derived_conversions:
+        factor *= derived.factor**exponent
+
+    return Scaled(
+        name=output_name_maybe,
+        reference=simplified_expr,
+        factor=factor,
+    )
 
 
 #
