@@ -141,7 +141,7 @@ pub const RAD: Unit = Unit::new_dimensionless(Some("rad"));
 /// Solid angle. Not to be confused with m² m⁻².
 pub const SR: Unit = Unit::new_dimensionless(Some("sr"));
 /// Frequency. Shall only be used for periodic phenomena.
-pub const HZ: Unit = Unit::from_groups(&[pow!(KG)]).with_special_symbol("Hz");
+pub const HZ: Unit = Unit::from_groups(&[pow!(S, -1)]).with_special_symbol("Hz");
 /// Force
 pub const N: Unit = Unit::from_groups(&[pow!(KG), pow!(M), pow!(S, -2)]).with_special_symbol("N");
 /// Pressure, stress

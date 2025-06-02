@@ -11,6 +11,7 @@ from isq import (
     BaseUnit,
     Dimensionless,
     Exp,
+    LazyFactor,
     M,
     Mul,
     S,
@@ -126,7 +127,8 @@ def test_scaled_simplify_nested() -> None:
     expr3s = CENTURY.simplify()
     assert isinstance(expr3s, Scaled)
     assert expr3s.reference == S
-    assert expr3s.factor == 86400 * 365.25 * 100
+    assert isinstance(expr3s.factor, LazyFactor)
+    assert expr3s.factor.exact == 86400 * 365.25 * 100
 
 
 def test_scaled_simplify_mixed() -> None:
@@ -135,27 +137,27 @@ def test_scaled_simplify_mixed() -> None:
     ).simplify()
     assert isinstance(expr4s, Scaled)
     assert expr4s.reference == Mul((Exp(M, 3), Exp(S, 2)))
-    assert expr4s.factor == 2**3 * 3**2
+    assert isinstance(expr4s.factor, LazyFactor)
+    assert expr4s.factor.exact == 2**3 * 3**2
 
     expr4s = FT_PERMIN.simplify()
     assert isinstance(expr4s, Scaled)
     assert expr4s.reference == M_PERS
-    assert expr4s.factor == 0.3048 / 60
-    assert expr4s.to_reference(100) == 0.508  # meters per second
-    assert expr4s.from_reference(0.508) == 100  # feet per minute
+    assert isinstance(expr4s.factor, LazyFactor)
+    assert expr4s.factor.exact == Fraction(3048, 10000) / 60
 
 
 def test_scaled_simplify_dimensionless() -> None:
     expr5s = Mul((Exp(HOUR, 1), Exp(DAY, -1))).simplify()
     assert isinstance(expr5s, Scaled)
     assert isinstance(expr5s.reference, Dimensionless)
-    assert expr5s.factor == 1 / 24  # day per hour
-    assert expr5s.to_reference(24) == 1  # day
-    assert expr5s.from_reference(1) == 24  # hours per day
+    assert isinstance(expr5s.factor, LazyFactor)
+    assert expr5s.factor.exact == Fraction(1, 24)  # day per hour
 
 
 def test_scaled_simplify_complex() -> None:
     # https://what-if.xkcd.com/11/
+    from decimal import Decimal
     from math import pi
 
     from isq import BaseDimension, BaseUnit
@@ -163,8 +165,8 @@ def test_scaled_simplify_complex() -> None:
     BIRD = BaseUnit(BaseDimension("bird"), "bird")
     POOP = BaseUnit(BaseDimension("poop"), "poop")
     MOUTH = BaseUnit(BaseDimension("mouth"), "mouth")
-    CM = Scaled(M, 0.01, "centimeter")
-    KM = Scaled(M, 1000, "kilometer")
+    CM = Scaled(M, Decimal("0.01"), "centimeter")
+    KM = Scaled(M, Decimal("1000"), "kilometer")
 
     BIRD_PERKM2 = Mul((Exp(BIRD, 1), Exp(KM, -2)))
     POOP_PERBIRD_PERHOUR = Mul((Exp(POOP, 1), Exp(BIRD, -1), Exp(HOUR, -1)))
@@ -185,12 +187,13 @@ def test_scaled_simplify_complex() -> None:
         -1,
     ).simplify()  # = (km^2 * day) / cm^2
     assert isinstance(PERIOD, Scaled)
-    assert PERIOD.factor == 100_000**2 * 86400
+    assert isinstance(PERIOD.factor, LazyFactor)
+    assert PERIOD.factor.exact == 100_000**2 * 86400
     assert PERIOD.reference == S
 
     num_birds = 300e9
     earth_surface_area = 4 * pi * 6378**2
-    period_s = PERIOD.to_reference(
+    period_s = PERIOD.to(S)(
         1
         / (
             (num_birds / earth_surface_area)  # bird / km^2

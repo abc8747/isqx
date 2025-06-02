@@ -22,13 +22,31 @@ units as metadata for use in static analysis tools and documentation.
 
 from __future__ import annotations
 
+import decimal
 from dataclasses import dataclass
+from decimal import Decimal
 from fractions import Fraction
-from typing import Any, Literal, Protocol, Union, runtime_checkable
+from functools import lru_cache
+from typing import (
+    Any,
+    Literal,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    Protocol,
+    Sequence,
+    Union,
+    runtime_checkable,
+)
 
 from typing_extensions import TypeAlias
 
 _ExpressionKind: TypeAlias = Literal["dimensionless", "unit", "dimension"]
+_Factor: TypeAlias = Union[Decimal, Fraction, float, int]
+
+
+def _is_factor(value: Any) -> bool:
+    return isinstance(value, (Decimal, Fraction, float, int))
 
 
 @runtime_checkable
@@ -57,10 +75,10 @@ class Expr(Protocol):
           `Scaled(Dimensionless, 1 / 24)`
         """
         # TODO: add new parameter `keep_scaled: bool = False`
-        # if `keep_scaled`, ft² will not be simplified to m²
+        # if `keep_scaled`, ft² will not be simplified to 0.09290304 m²
         ...  # pragma: no cover
 
-    def to(self, target: Expr) -> _Converter:
+    def to(self, target: Expr) -> Converter:
         """Return a converter object, that when called with a value, converts it
         to the target unit or dimension.
 
@@ -69,6 +87,7 @@ class Expr(Protocol):
         """
         # NOTE: not using mixins because we want to track coverage
         # TODO: add new parameter `exact: bool = False` for money conversions
+        # or should we just use the `.to(*, exact: bool = False)`?
         ...  # pragma: no cover
 
 
@@ -88,8 +107,8 @@ class Dimensionless(Expr):
     def simplify(self) -> Expr:
         return self
 
-    def to(self, target: Expr) -> _Converter:
-        return _Converter.new(origin=self, target=target)
+    def to(self, target: Expr) -> Converter:
+        return Converter.new(origin=self, target=target)
 
 
 @dataclass(frozen=True)
@@ -108,8 +127,8 @@ class BaseDimension(Expr):
     def simplify(self) -> Expr:
         return self
 
-    def to(self, target: Expr) -> _Converter:
-        return _Converter.new(origin=self, target=target)
+    def to(self, target: Expr) -> Converter:
+        return Converter.new(origin=self, target=target)
 
 
 @dataclass(frozen=True)
@@ -130,8 +149,8 @@ class BaseUnit(Expr):
     def simplify(self) -> Expr:
         return self
 
-    def to(self, target: Expr) -> _Converter:
-        return _Converter.new(origin=self, target=target)
+    def to(self, target: Expr) -> Converter:
+        return Converter.new(origin=self, target=target)
 
 
 Exponent: TypeAlias = Union[int, Fraction]
@@ -171,11 +190,11 @@ class Exp(Expr):
         return _get_simplified_expression(
             base_exponent_pairs,
             derived_conversions,
-            output_name_maybe=f"expr_{hash(self)}",
+            name_hint=f"expr_{hash(self)}",
         )
 
-    def to(self, target: Expr) -> _Converter:
-        return _Converter.new(origin=self, target=target)
+    def to(self, target: Expr) -> Converter:
+        return Converter.new(origin=self, target=target)
 
 
 @dataclass(frozen=True)
@@ -220,39 +239,32 @@ class Mul(Expr):
         return _get_simplified_expression(
             base_exponent_pairs,
             derived_conversions,
-            output_name_maybe=self.name or f"expr_{hash(self)}",
+            name_hint=self.name or f"expr_{hash(self)}",
         )
 
-    def to(self, target: Expr) -> _Converter:
-        return _Converter.new(origin=self, target=target)
+    def to(self, target: Expr) -> Converter:
+        return Converter.new(origin=self, target=target)
 
 
 @dataclass(frozen=True)
 class Scaled(Expr):
     reference: Expr
     """The unit or dimension that this unit or dimension is based on."""
-    factor: float | Fraction
+    factor: _Factor | LazyFactor
     """Multiplying this factor converts this value into the reference.
     For example, `1 ft = 0.3048 m`, so the factor is 0.3048.
-    
-    !!! note
-        If the factor is a `Fraction`, the `to` method may compute conversions
-        exactly. However, using `numpy` arrays with `Fraction` will return dtype
-        `object`, which hurts performance. Furthermore, since `jax` and `torch`
-        do not support multiplication with `Fraction`, it is highly recommended
-        to use `float` for the factor.
     """
     name: str
     """Name of this unit or dimension."""
-    # TODO: remove add "exact factor" that is a `Decimal` or `Fraction`
 
-    def to_reference(self, value: Any) -> Any:
-        """Convert a value in this unit to the reference unit."""
-        return value * self.factor
-
-    def from_reference(self, value: Any) -> Any:
-        """Convert a value in the reference unit to this unit."""
-        return value / self.factor
+    @property
+    def factor_approx(self) -> float | int:
+        """Approximate factor to convert this unit or dimension to the
+        reference unit or dimension."""
+        factor = self.factor
+        if isinstance(factor, LazyFactor):
+            return factor.approx
+        return float(_fraction_to_decimal(_factor_to_fraction(factor)))
 
     @property
     def kind(self) -> _ExpressionKind:
@@ -263,31 +275,30 @@ class Scaled(Expr):
         return self.reference.dimension
 
     def simplify(self) -> Scaled:
-        expr, factor = _flatten_scaled_nested(self.reference, self.factor)
-        return Scaled(expr, factor, name=self.name)
+        products: list[tuple[_Factor, Exponent] | _Factor] = []
+        expr: Expr = self
+        while True:
+            if not isinstance(expr, Scaled):
+                expr = expr.simplify()
+                break
+            if isinstance(expr.factor, LazyFactor):  # by previous simplify()
+                products.extend(expr.factor.products)
+            else:
+                products.append(expr.factor)
+            expr = expr.reference
+        return Scaled(expr, LazyFactor(tuple(products)), self.name)
 
-    def to(self, target: Expr) -> _Converter:
-        return _Converter.new(origin=self, target=target)
+    def to(self, target: Expr) -> Converter:
+        return Converter.new(origin=self, target=target)
 
 
 #
 # simplification
 #
-
-
-def _flatten_scaled_nested(
-    expr: Scaled | Expr,
-    factor: float | Fraction,
-) -> tuple[Expr, float | Fraction]:
-    if not isinstance(expr, Scaled):
-        return expr.simplify(), factor
-    return _flatten_scaled_nested(expr.reference, factor * expr.factor)
-
-
 def _insert_root_expr(
     exp: Exp,
-    base_exponent_pairs_mut: dict[Expr, Exponent],
-    scaled_conversions_mut: list[tuple[Scaled, Exponent]],
+    base_exponent_pairs_mut: MutableMapping[Expr, Exponent],
+    scaled_conversions_mut: MutableSequence[tuple[Scaled, Exponent]],
 ) -> None:
     if isinstance(exp.base, (Dimensionless, BaseDimension, BaseUnit)):
         base_exponent_pairs_mut.setdefault(exp.base, 0)
@@ -319,10 +330,10 @@ def _insert_root_expr(
 
 
 def _get_simplified_expression(
-    base_exponent_pairs: dict[Expr, Exponent],
+    base_exponent_pairs: Mapping[Expr, Exponent],
     scaled_conversions: list[tuple[Scaled, Exponent]],
     *,
-    output_name_maybe: str,
+    name_hint: str,
 ) -> Expr:
     no_conversions_involved = not scaled_conversions
     simplified_expr: Expr
@@ -330,10 +341,10 @@ def _get_simplified_expression(
     base_exponent_pairs_sorted = sorted(
         filter(lambda item: item[1] != 0, base_exponent_pairs.items()),
         key=lambda item: item[0].name,  # type: ignore
-    )
+    )  # NOTE: `.name` is not required by `Expr` protocol!
     if not base_exponent_pairs_sorted:
         simplified_expr = Dimensionless(
-            name=f"dimensionless_form_of_{output_name_maybe}"
+            name=f"dimensionless_form_of_{name_hint}"
         )
     elif len(base_exponent_pairs_sorted) == 1:
         base, exponent = base_exponent_pairs_sorted[0]
@@ -344,22 +355,15 @@ def _get_simplified_expression(
                 Exp(base, exponent)
                 for base, exponent in base_exponent_pairs_sorted
             ),
-            name=output_name_maybe if no_conversions_involved else None,
+            name=name_hint if no_conversions_involved else None,
         )
     if no_conversions_involved:
         return simplified_expr
 
-    # NOTE: if `Scaled.factor` is a `Fraction`, the returned `Scaled.factor`
-    # will be a `float` and precison issues.
-    # TODO: return exact representation only if `use_exact = True` in the future
-    factor_final: float = 1.0
-    for scaled, exponent in scaled_conversions:
-        factor_final *= scaled.factor**exponent
-
     return Scaled(
         reference=simplified_expr,
-        factor=factor_final,
-        name=output_name_maybe,
+        factor=LazyFactor.from_derived_conversions(scaled_conversions),
+        name=name_hint,
     )
 
 
@@ -369,13 +373,13 @@ def _get_simplified_expression(
 
 
 @dataclass(frozen=True)
-class _Converter:
+class Converter:
     origin_simpl: Expr
     target_simpl: Expr
-    factor: float | Fraction
+    lazy_product: LazyFactor
 
     @classmethod
-    def new(cls, origin: Expr, target: Expr) -> _Converter:
+    def new(cls, origin: Expr, target: Expr) -> Converter:
         """Create a new unit converter from one unit to another."""
         origin_simpl = origin.simplify()
         target_simpl = target.simplify()
@@ -399,18 +403,34 @@ class _Converter:
                 f"expected origin and target to have the same dimension, "
                 f"but {dim_origin_simpl} != {dim_target_simpl}"
             )
+        products: list[tuple[_Factor, Exponent] | _Factor] = []
+        if isinstance(origin_factor, LazyFactor):
+            products.extend(origin_factor.products)
+        else:
+            products.append(origin_factor)
+        if isinstance(target_factor, LazyFactor):
+            for item in target_factor.products:
+                if isinstance(item, tuple):
+                    base, exponent = item
+                    products.append((base, -exponent))
+                else:
+                    products.append((item, -1))
+        else:
+            products.append((target_factor, -1))
         return cls(
             origin_simpl=origin_simpl,
             target_simpl=target_simpl,
-            factor=origin_factor / target_factor,
+            lazy_product=LazyFactor(tuple(products)),
         )
 
-    def __call__(self, value: Any) -> Any:
+    def __call__(self, value: Any, *, exact: bool = False) -> Any:
         """Convert a value in the origin unit to the target unit."""
-        return value * self.factor
+        return value * (
+            self.lazy_product.exact if exact else self.lazy_product.approx
+        )
 
 
-def _get_factor(expr_simpl: Expr) -> tuple[Expr, float | Fraction]:
+def _get_factor(expr_simpl: Expr) -> tuple[Expr, _Factor | LazyFactor]:
     """Get the inner expression and the factor of a simplified expression."""
 
     if isinstance(expr_simpl, (BaseUnit, BaseDimension, Dimensionless)):
@@ -429,6 +449,143 @@ def _get_factor(expr_simpl: Expr) -> tuple[Expr, float | Fraction]:
         return expr_simpl.reference, expr_simpl.factor
     else:  # pragma: no cover
         raise ValueError(f"unknown expression {expr_simpl}")
+
+
+def _factor_to_fraction(factor: _Factor) -> Fraction:
+    if isinstance(factor, (Decimal, float, int)):
+        factor = Fraction(factor)
+    elif not isinstance(factor, Fraction):
+        raise ValueError(f"unknown {type(factor)=}")  # pragma: no cover
+    return factor
+
+
+def _fraction_to_decimal(fraction: Fraction) -> Decimal:
+    return fraction.numerator / Decimal(fraction.denominator)
+
+
+@dataclass(frozen=True)
+class LazyFactor:
+    products: tuple[tuple[_Factor, Exponent] | _Factor, ...]
+
+    @classmethod
+    def from_derived_conversions(
+        cls,
+        derived_conversions: Sequence[tuple[Scaled, Exponent]],
+    ) -> LazyFactor:
+        products: list[tuple[_Factor, Exponent] | _Factor] = []
+        for scaled, exponent in derived_conversions:
+            if isinstance(scaled.factor, LazyFactor):  # by previous simplify()
+                for inner_item in scaled.factor.products:
+                    if isinstance(inner_item, tuple):
+                        base, inner_exp = inner_item
+                        products.append((base, inner_exp * exponent))
+                    else:
+                        products.append((inner_item, exponent))
+            else:
+                products.append((scaled.factor, exponent))
+        return cls(tuple(products))
+
+    @property
+    @lru_cache(maxsize=None)
+    def exact(self) -> Fraction | Decimal:
+        """Evaluate the lazy factor to an exact fraction or decimal.
+
+        The return type depends on the products:
+
+        ```
+                         +--------+-------+----------------+
+                         |  None  |  int  | Fraction(p, q) | <- exponent
+        +----------------+--------+-------+----------------+
+        | Decimal        |   .    |   .   |       x        |
+        | Fraction(a, b) |   .    |   .   |       *        |
+        | float          |   .    |   x   |       x        |
+        | int            |   .    |   .   |       ^        |
+        +----------------+--------+-------+----------------+
+          ^
+          |_ base
+
+        Can `base ** exponent` be represented exactly a `Fraction`?
+
+        . Yes
+        * Only if q > 0 and a^p and b^q are the perfect q-th power of an integer
+        ^ Sometimes, e.g. 4 ** (1/2)
+        x No, decimal only
+        ```
+
+        For simplicity, only cases that can definitively be represented as a
+        `Fraction` are returned as such. A `Decimal` is returned otherwise.
+        """
+        # NOTE: lru_cache doesn't invalidate with changes in Decimal context
+        # TODO: figure out how to handle that
+        ctx = decimal.getcontext()
+        # accumulate products in two streams: if the "tripwire" for decimal
+        # is hit, we must return Decimal.
+        product_fraction = Fraction(1)
+        product_decimal = Decimal(1)
+        for item in self.products:
+            if not isinstance(item, tuple):  # no exponent
+                product_fraction *= _factor_to_fraction(item)
+                continue
+            base, exponent = item
+            if base == 0:
+                if exponent == 0:
+                    continue
+                return Fraction(0)
+            if base == 1:
+                continue
+            if isinstance(exponent, int):
+                # most of the time, we can represent it as Fraction
+                if isinstance(base, float):
+                    base_decimal = ctx.create_decimal_from_float(base)
+                    product_decimal *= base_decimal**exponent
+                else:
+                    base_fraction = _factor_to_fraction(base)
+                    product_fraction *= base_fraction**exponent
+            elif isinstance(exponent, Fraction):
+                # but raising to a Fraction exponent requires decimal
+                if isinstance(base, Decimal):
+                    base_decimal = base
+                elif isinstance(base, Fraction):  # *
+                    base_decimal = _fraction_to_decimal(base)
+                elif isinstance(base, float):
+                    base_decimal = ctx.create_decimal_from_float(base)
+                elif isinstance(base, int):  # ^
+                    base_decimal = Decimal(base, context=ctx)
+                else:  # pragma: no cover
+                    raise ValueError(f"unknown {type(base)=}")
+                exponent_decimal = _fraction_to_decimal(exponent)
+                product_decimal *= ctx.power(base_decimal, exponent_decimal)
+            else:  # pragma: no cover
+                raise ValueError(f"unknown {type(exponent)=}")
+        if product_decimal == Decimal(1):
+            return product_fraction
+        return _fraction_to_decimal(product_fraction) * product_decimal
+
+    @property
+    @lru_cache(maxsize=None)
+    def approx(self) -> float:
+        product = 1.0
+        for item in self.products:
+            if isinstance(item, tuple):
+                base, exponent = item
+                if base == 0:
+                    if exponent == 0:
+                        continue
+                    return 0.0
+                if base == 1:
+                    continue
+                product *= float(base) ** float(exponent)
+            else:
+                if item == 0:
+                    return 0.0
+                if item == 1:
+                    continue
+                product *= float(item)
+        return product
+
+    # NOTE: not defining `__mul__` to avoid confusion.
+    def __float__(self) -> float:
+        return self.approx
 
 
 #
@@ -466,7 +623,7 @@ RAD = Dimensionless("radian")
 """Plane angle (radians). Not to be confused with m m⁻¹."""
 SR = Dimensionless("steradian")
 """Solid angle (steradians). Not to be confused with m² m⁻²."""
-HZ = Mul((Exp(KG, 1), Exp(M, -1), Exp(S, -1)), "hertz")
+HZ = Mul((Exp(S, -1),), "hertz")
 """Frequency (hertz). Shall only be used for periodic phenomena."""
 N = Mul((Exp(KG, 1), Exp(M, 1), Exp(S, -2)), "newton")
 """Force (newtons)"""
@@ -519,11 +676,11 @@ KAT = Mul((Exp(MOLE, 1), Exp(S, -1)), "katal")
 MIN = Scaled(S, 60, "minute")
 HOUR = Scaled(MIN, 60, "hour")
 DAY = Scaled(HOUR, 24, "day")
-YR = Scaled(DAY, 365.25, "year")  # on average
-DECADE = Scaled(YR, 10, "decade")
+YEAR = Scaled(DAY, Decimal("365.25"), "year")  # on average
+DECADE = Scaled(YEAR, 10, "decade")
 CENTURY = Scaled(DECADE, 10, "century")
 
-FT = Scaled(M, 0.3048, "feet")
+FT = Scaled(M, Decimal("0.3048"), "feet")
 
 
 @dataclass(frozen=True)
