@@ -4,7 +4,10 @@ import pytest
 
 from isq import (
     DAY,
+    FT,
     HOUR,
+    MIN,
+    RAD,
     BaseUnit,
     Dimensionless,
     Exp,
@@ -13,6 +16,10 @@ from isq import (
     S,
     Scaled,
 )
+
+#
+# Exp
+#
 
 
 def test_exp_invalid() -> None:
@@ -30,10 +37,20 @@ def test_exp_dimension() -> None:
 
 
 def test_exp_simplify() -> None:
-    expr0 = Exp(Exp(M, 2), Fraction(1, 2))
-    expr0s = expr0.simplify()
+    # distribute exponent
+
+    expr0s = Exp(Exp(M, 2), Fraction(1, 2)).simplify()
     assert isinstance(expr0s, BaseUnit)
     assert expr0s == M
+
+    expr0s = Exp(Exp(M, 2), 3).simplify()
+    assert isinstance(expr0s, Exp)
+    assert expr0s == Exp(M, 6)
+
+
+#
+# Mul
+#
 
 
 def test_mul_invalid() -> None:
@@ -43,71 +60,98 @@ def test_mul_invalid() -> None:
         _u1 = Mul((Exp(M, 1), Exp(M.dimension, 1)))
 
 
-MPERS = Mul((Exp(M, 1), Exp(S, -1)))
+M_PERS = Mul((Exp(M, 1), Exp(S, -1)))
+FT_PERMIN = Mul((Exp(FT, 1), Exp(MIN, -1)))
 
 
 def test_mul_dimension() -> None:
-    assert MPERS.dimension == Mul((Exp(M.dimension, 1), Exp(S.dimension, -1)))
+    assert M_PERS.dimension == Mul((Exp(M.dimension, 1), Exp(S.dimension, -1)))
 
 
 def test_mul_simplify_basic() -> None:
-    tg = Mul(
-        (Exp(M, 1), Exp(S, -1), Exp(M, 2), Exp(S, -2))
-    ).simplify()  # all root nodes
-    assert isinstance(tg, Mul)
-    assert len(tg.terms) == 2
-    assert Exp(M, 3) in tg.terms
-    assert Exp(S, -3) in tg.terms
+    # cancel terms
+    expr1s = Mul((Exp(M, 1), Exp(M, -1))).simplify()
+    assert isinstance(expr1s, Dimensionless)
+
+    # distribute inner
+    expr2s = Exp(M_PERS, 2).simplify()
+    assert isinstance(expr2s, Mul)
+    assert expr2s.terms == Mul((Exp(M, 2), Exp(S, -2))).terms
+
+    # combine terms with same base
+    expr_s = Mul((Exp(M, 1), Exp(S, -1), Exp(M, 2), Exp(S, -2))).simplify()
+    assert isinstance(expr_s, Mul)
+    assert expr_s.terms == Mul((Exp(M, 3), Exp(S, -3))).terms
+
+    # return lone term if it is raised to power of one
+    expr_s = Mul((Exp(M, 1),)).simplify()
+    assert isinstance(expr_s, BaseUnit)
+    assert expr_s == M
+
+    # NOTE: right now, `Mul` terms must be `Exp(base, exponent)` objects
+    # which means that the following with not simplify to `M * S`
+    # but in the future, we may want to change this
+    expr_ = Mul((Exp(M, 1), Exp(S, 1)))
+    expr_s = expr_.simplify()
+    assert isinstance(expr_s, Mul)
+    assert expr_s.terms == expr_.terms
 
 
 def test_mul_simplify_nested() -> None:
-    expr1 = Mul((Exp(M, 1),))
-    expr1s = expr1.simplify()
-    assert isinstance(expr1s, BaseUnit)
-    assert expr1s == M
-
     assert isinstance(
-        Mul((Exp(MPERS, 1), Exp(MPERS, -1))).simplify(), Dimensionless
+        Mul((Exp(M_PERS, 1), Exp(M_PERS, -1))).simplify(), Dimensionless
     )
 
 
 def test_mul_simplify_ordering() -> None:
     PERSM = Mul((Exp(S, -1), Exp(M, 1))).simplify()
     assert isinstance(PERSM, Mul)
-    assert PERSM.terms == MPERS.terms
+    assert PERSM.terms == M_PERS.terms
+
+
+#
+# Scaled
+#
 
 
 def test_scaled_dimension() -> None:
-    from isq import FT
-
     assert FT.dimension == M.dimension
 
 
 def test_scaled_simplify_nested() -> None:
     from isq import CENTURY
 
-    CENTURY_SIMPL = CENTURY.simplify()
-    assert isinstance(CENTURY_SIMPL, Scaled)
-    assert CENTURY_SIMPL.reference == S
-    assert CENTURY_SIMPL.factor == 86400 * 365.25 * 100
+    # century is defined w.r.t. to decade, and decade is defined w.r.t. year etc
+    # we want to "collapse" it so century is defined w.r.t. seconds
+    expr3s = CENTURY.simplify()
+    assert isinstance(expr3s, Scaled)
+    assert expr3s.reference == S
+    assert expr3s.factor == 86400 * 365.25 * 100
 
 
 def test_scaled_simplify_mixed() -> None:
-    from isq import FT, MIN
+    expr4s = Mul(
+        (Exp(Scaled(M, 2, "x"), 3), Exp(Scaled(S, 3, "y"), 2))
+    ).simplify()
+    assert isinstance(expr4s, Scaled)
+    assert expr4s.reference == Mul((Exp(M, 3), Exp(S, 2)))
+    assert expr4s.factor == 2**3 * 3**2
 
-    FPERM = Mul((Exp(FT, 1), Exp(MIN, -1))).simplify()
-    assert isinstance(FPERM, Scaled)
-    assert FPERM.reference == MPERS
-
-    assert FPERM.to_reference(100) == 0.508  # m per s
-    assert FPERM.from_reference(0.508) == 100  # feet per minute
+    expr4s = FT_PERMIN.simplify()
+    assert isinstance(expr4s, Scaled)
+    assert expr4s.reference == M_PERS
+    assert expr4s.factor == 0.3048 / 60
+    assert expr4s.to_reference(100) == 0.508  # meters per second
+    assert expr4s.from_reference(0.508) == 100  # feet per minute
 
 
 def test_scaled_simplify_dimensionless() -> None:
-    HOURS_PER_DAY = Mul((Exp(HOUR, 1), Exp(DAY, -1))).simplify()
-    assert isinstance(HOURS_PER_DAY, Scaled)
-    assert HOURS_PER_DAY.to_reference(24) == 1  # day
-    assert HOURS_PER_DAY.from_reference(1) == 24  # hours per day
+    expr5s = Mul((Exp(HOUR, 1), Exp(DAY, -1))).simplify()
+    assert isinstance(expr5s, Scaled)
+    assert isinstance(expr5s.reference, Dimensionless)
+    assert expr5s.factor == 1 / 24  # day per hour
+    assert expr5s.to_reference(24) == 1  # day
+    assert expr5s.from_reference(1) == 24  # hours per day
 
 
 def test_scaled_simplify_complex() -> None:
@@ -116,11 +160,11 @@ def test_scaled_simplify_complex() -> None:
 
     from isq import BaseDimension, BaseUnit
 
-    BIRD = BaseUnit("bird", BaseDimension("bird"))
-    POOP = BaseUnit("poop", BaseDimension("poop"))
-    MOUTH = BaseUnit("mouth", BaseDimension("mouth"))
-    CM = Scaled("centimeter", M, factor=0.01)
-    KM = Scaled("kilometer", M, factor=1000)
+    BIRD = BaseUnit(BaseDimension("bird"), "bird")
+    POOP = BaseUnit(BaseDimension("poop"), "poop")
+    MOUTH = BaseUnit(BaseDimension("mouth"), "mouth")
+    CM = Scaled(M, 0.01, "centimeter")
+    KM = Scaled(M, 1000, "kilometer")
 
     BIRD_PERKM2 = Mul((Exp(BIRD, 1), Exp(KM, -2)))
     POOP_PERBIRD_PERHOUR = Mul((Exp(POOP, 1), Exp(BIRD, -1), Exp(HOUR, -1)))
@@ -159,17 +203,89 @@ def test_scaled_simplify_complex() -> None:
     assert period_s / (365 * 24 * 3600) == pytest.approx(195, abs=0.5)
 
 
-def test_scaled_convert_invalid() -> None:
-    with pytest.raises(ValueError):  # dimension -> unit
-        _u1 = Scaled("s", S.dimension, 1).to(S)
-    with pytest.raises(ValueError):  # unit -> dimension
-        _u1 = HOUR.to(S.dimension)
-
-    # from isq import DEGC, K
+#
+# Unit conversions
+#
 
 
-def test_convert() -> None:
+def test_convert_dimensionless() -> None:
+    from isq import SR
+
+    assert RAD.to(RAD)(1) == 1  # -> Dimensionless
+
+    with pytest.raises(ValueError):
+        _fn = RAD.to(SR)  # incompatible dim
+
+
+def test_convert_base_dimension() -> None:
+    from isq import DIM_LENGTH, DIM_TIME
+
+    with pytest.raises(ValueError):
+        _fn = DIM_LENGTH.to(DIM_TIME)  # incompatible dim
+    with pytest.raises(ValueError):
+        _fn = DIM_LENGTH.to(RAD.dimension)  # -> Dimensionless
+    assert DIM_TIME.to(DIM_TIME)(1) == 1  # -> BaseDimension
+    with pytest.raises(ValueError):
+        _fn = Scaled(DIM_TIME, 1, "s").to(S)  # -> BaseUnit
+    DIM_TIME1 = Exp(DIM_TIME, 1)
+    assert DIM_TIME.to(DIM_TIME1)(1) == 1  # -> Exp
+    assert DIM_TIME.to(Mul((DIM_TIME1,), "dim_time1"))(1) == 1  # -> Mul
+    assert DIM_TIME.to(Scaled(DIM_TIME1, 2, "dim_time1"))(1) == 0.5  # -> Scaled
+
+
+def test_convert_base_unit() -> None:
+    with pytest.raises(ValueError):
+        _fn = S.to(M)  # incompatible dim
+    with pytest.raises(ValueError):
+        _fn = S.to(RAD)  # -> Dimensionless
+    assert S.to(S)(1) == 1  # -> BaseUnit
+    with pytest.raises(ValueError):
+        _fn = S.to(S.dimension)  # -> BaseDimension
+    S1 = Exp(S, 1)
+    assert S.to(S1)(1) == 1  # -> Exp
+    assert S.to(Mul((S1,), "s1"))(1) == 1  # -> Mul
+    assert S.to(Scaled(S1, 2, "2s1"))(1) == 0.5  # -> Scaled
+
+
+def test_convert_exp() -> None:
+    M2 = Exp(M, 2)
+    with pytest.raises(ValueError):
+        _fn = M2.to(M)  # incompatible dim
+    with pytest.raises(ValueError):
+        _fn = M2.to(RAD)  # -> Dimensionless
+    with pytest.raises(ValueError):
+        _fn = M2.to(M2.dimension)  # unit -> dimension
+    assert M2.to(M2)(1) == 1  # -> Exp
+    assert M2.to(Mul((M2,)))(1) == 1  # -> Mul
+    assert M2.to(Scaled(M2, 2, "2m^2"))(1) == 0.5  # -> Scaled
+
+
+def test_convert_mul() -> None:
+    with pytest.raises(ValueError):
+        _fn = M_PERS.to(M)  # incompatible dim
+    with pytest.raises(ValueError):
+        _fn = M_PERS.to(RAD)  # -> Dimensionless
+    assert M_PERS.to(M_PERS)(1) == 1  # -> Mul
+    assert M_PERS.to(Scaled(M_PERS, 2, "2m/s"))(1) == 0.5  # -> Scaled
+
+    M2_PERS2 = Exp(M_PERS, 2)  # would be simplified to Mul((Exp(...), ...))
+    FT2_PERMIN2 = Exp(FT_PERMIN, 2)
+    assert M2_PERS2.to(FT2_PERMIN2)(1) == 60**2 * 0.3048**-2
+    assert M2_PERS2.to(M2_PERS2)(1) == 1
+
+
+def test_convert_scaled() -> None:
     from isq import MIN
 
-    assert DAY.to(S)(1) == 86400  # seconds
-    assert MIN.to(HOUR)(60) == 1  # hour
+    with pytest.raises(ValueError):
+        _fn = DAY.to(M)  # incompatible dim
+    with pytest.raises(ValueError):
+        _fn = DAY.to(RAD)  # -> Dimensionless
+    assert DAY.to(S)(1) == 86400  # -> BaseUnit
+    with pytest.raises(ValueError):
+        _value = HOUR.to(S.dimension)  # -> BaseDimension
+    S1 = Exp(S, 1)
+    assert DAY.to(S1)(1) == 86400  # -> Exp
+    assert DAY.to(Mul((S1,), "s1"))(1) == 86400  # -> Mul
+    assert MIN.to(HOUR)(60) == 1  # -> Scaled
+    assert DAY.to(DAY)(1) == 1

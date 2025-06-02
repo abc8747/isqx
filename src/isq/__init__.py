@@ -24,15 +24,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, Literal, Protocol, Union
+from typing import Any, Literal, Protocol, Union, runtime_checkable
 
 from typing_extensions import TypeAlias
 
 _ExpressionKind: TypeAlias = Literal["dimensionless", "unit", "dimension"]
 
 
+@runtime_checkable
 class Expr(Protocol):
-    """Trait representing a unit or dimension expression."""
+    """Trait representing a tree-like unit or dimension expression."""
 
     @property
     def dimension(self) -> Expr: ...
@@ -40,7 +41,35 @@ class Expr(Protocol):
     @property
     def kind(self) -> _ExpressionKind: ...
 
-    def simplify(self) -> Expr: ...
+    def simplify(self) -> Expr:
+        """Flatten the tree-like structure into a canonical form.
+
+        Examples:
+
+        - `Exp(Exp(M, 2), 3)` → `Exp(M, 6)`
+        - `Mul((Exp(M, 2), Exp(M, -2)))` → `Dimensionless`
+        - `Exp(Mul((Exp(M, 1), Exp(S, -1))), 2)` →
+          `Mul((Exp(M, 2), Exp(S, -2)))`
+        - `Scaled(Scaled(M, 2), 3)` → `Scaled(M, 6)`
+        - `Scaled(Mul((Exp(Scaled(M, 2), 3), Exp(Scaled(S, 3), 2))), 6)` →
+          `Scaled(Mul((Exp(M, 3), Exp(S, 2)), 72))`
+        - `Mul((Exp(HOUR, 1), Exp(DAY, -1)))` →
+          `Scaled(Dimensionless, 1 / 24)`
+        """
+        # TODO: add new parameter `keep_scaled: bool = False`
+        # if `keep_scaled`, ft² will not be simplified to m²
+        ...  # pragma: no cover
+
+    def to(self, target: Expr) -> _Converter:
+        """Return a converter object, that when called with a value, converts it
+        to the target unit or dimension.
+
+        :param target: The target unit or dimension to convert to. Must have
+            compatible dimensions with the origin.
+        """
+        # NOTE: not using mixins because we want to track coverage
+        # TODO: add new parameter `exact: bool = False` for money conversions
+        ...  # pragma: no cover
 
 
 @dataclass(frozen=True)
@@ -49,7 +78,7 @@ class Dimensionless(Expr):
     """Name for the dimensionless number, e.g. `reynolds`, `stanton`"""
 
     @property
-    def dimension(self) -> Expr:
+    def dimension(self) -> Dimensionless:
         return self
 
     @property
@@ -59,6 +88,9 @@ class Dimensionless(Expr):
     def simplify(self) -> Expr:
         return self
 
+    def to(self, target: Expr) -> _Converter:
+        return _Converter.new(origin=self, target=target)
+
 
 @dataclass(frozen=True)
 class BaseDimension(Expr):
@@ -66,7 +98,7 @@ class BaseDimension(Expr):
     """Name for the base dimension, e.g. `L`, `M`, `T`"""
 
     @property
-    def dimension(self) -> Expr:
+    def dimension(self) -> BaseDimension:
         return self
 
     @property
@@ -76,16 +108,19 @@ class BaseDimension(Expr):
     def simplify(self) -> Expr:
         return self
 
+    def to(self, target: Expr) -> _Converter:
+        return _Converter.new(origin=self, target=target)
+
 
 @dataclass(frozen=True)
 class BaseUnit(Expr):
-    name: str
-    """Name for the unit, e.g. `m`, `kg`, `s`"""
     _dimension: BaseDimension
     """Reference to the base dimension"""
+    name: str
+    """Name for the unit, e.g. `m`, `kg`, `s`"""
 
     @property
-    def dimension(self) -> Expr:
+    def dimension(self) -> BaseDimension:
         return self._dimension
 
     @property
@@ -94,6 +129,9 @@ class BaseUnit(Expr):
 
     def simplify(self) -> Expr:
         return self
+
+    def to(self, target: Expr) -> _Converter:
+        return _Converter.new(origin=self, target=target)
 
 
 Exponent: TypeAlias = Union[int, Fraction]
@@ -123,18 +161,21 @@ class Exp(Expr):
         return self.base.kind
 
     @property
-    def dimension(self) -> Expr:
-        return _get_dimension(self)
+    def dimension(self) -> Exp:
+        return Exp(self.base.dimension, self.exponent)
 
     def simplify(self) -> Expr:
         base_exponent_pairs: dict[Expr, Exponent] = {}
         derived_conversions: list[tuple[Scaled, Exponent]] = []
         _insert_root_expr(self, base_exponent_pairs, derived_conversions)
-        return _get_canonical_expression(
+        return _get_simplified_expression(
             base_exponent_pairs,
             derived_conversions,
             output_name_maybe=f"expr_{hash(self)}",
         )
+
+    def to(self, target: Expr) -> _Converter:
+        return _Converter.new(origin=self, target=target)
 
 
 @dataclass(frozen=True)
@@ -155,8 +196,11 @@ class Mul(Expr):
             raise ValueError("terms must all be either `unit` or `dimension`")
 
     @property
-    def dimension(self) -> Expr:
-        return _get_dimension(self)
+    def dimension(self) -> Mul:
+        return Mul(
+            tuple(term.dimension for term in self.terms),
+            name=self.name,
+        )
 
     @property
     def kind(self) -> _ExpressionKind:
@@ -165,6 +209,7 @@ class Mul(Expr):
             term_kind = term.base.kind
             if term_kind != "dimensionless":
                 return term_kind
+        # everything left are dimensionless to the power of something
         return "dimensionless"
 
     def simplify(self) -> Expr:
@@ -172,22 +217,34 @@ class Mul(Expr):
         derived_conversions: list[tuple[Scaled, Exponent]] = []
         for term in self.terms:
             _insert_root_expr(term, base_exponent_pairs, derived_conversions)
-        return _get_canonical_expression(
+        return _get_simplified_expression(
             base_exponent_pairs,
             derived_conversions,
             output_name_maybe=self.name or f"expr_{hash(self)}",
         )
 
+    def to(self, target: Expr) -> _Converter:
+        return _Converter.new(origin=self, target=target)
+
 
 @dataclass(frozen=True)
 class Scaled(Expr):
-    name: str
-    """Name of this unit or dimension."""
     reference: Expr
     """The unit or dimension that this unit or dimension is based on."""
     factor: float | Fraction
     """Multiplying this factor converts this value into the reference.
-    For example, `1 ft = 0.3048 m`, so the factor is 0.3048."""
+    For example, `1 ft = 0.3048 m`, so the factor is 0.3048.
+    
+    !!! note
+        If the factor is a `Fraction`, the `to` method may compute conversions
+        exactly. However, using `numpy` arrays with `Fraction` will return dtype
+        `object`, which hurts performance. Furthermore, since `jax` and `torch`
+        do not support multiplication with `Fraction`, it is highly recommended
+        to use `float` for the factor.
+    """
+    name: str
+    """Name of this unit or dimension."""
+    # TODO: remove add "exact factor" that is a `Decimal` or `Fraction`
 
     def to_reference(self, value: Any) -> Any:
         """Convert a value in this unit to the reference unit."""
@@ -207,65 +264,15 @@ class Scaled(Expr):
 
     def simplify(self) -> Scaled:
         expr, factor = _flatten_scaled_nested(self.reference, self.factor)
-        return Scaled(name=self.name, reference=expr, factor=factor)
+        return Scaled(expr, factor, name=self.name)
 
-    def to(self, target: Expr) -> _UnitConverter:
-        """Return a function that converts a value in this unit to another unit.
-        :param other: The target unit or dimension to convert to.
-        """
-        return _UnitConverter.new(
-            origin=self,
-            target=target,
-        )
+    def to(self, target: Expr) -> _Converter:
+        return _Converter.new(origin=self, target=target)
 
 
-@dataclass(frozen=True)
-class _UnitConverter:
-    origin: Expr
-    target: Expr
-    factor: float | Fraction
-
-    @classmethod
-    def new(cls, origin: Expr, target: Expr) -> _UnitConverter:
-        """Create a new unit converter from one unit to another."""
-        origin_simpl = origin.simplify()
-        target_simpl = target.simplify()
-        if origin_simpl.kind == "dimension":
-            raise ValueError("cannot convert from a dimension")
-        if target_simpl.kind == "dimension":
-            raise ValueError("cannot convert to a dimension")
-        if origin_simpl.kind != target_simpl.kind:
-            raise ValueError(
-                "expected self and target to have the same kind, "
-                f"but {origin_simpl.kind} != {target_simpl.kind}"
-            )
-
-        def get_ref_factor(
-            expr: Scaled | Expr,
-        ) -> tuple[Expr, float | Fraction]:
-            if isinstance(expr, Scaled):
-                return expr.reference, expr.factor
-            elif isinstance(expr, (BaseUnit, BaseDimension, Dimensionless)):
-                return expr, 1.0
-            else:
-                raise ValueError(f"unknown expression {expr}")
-
-        origin_reference, origin_factor = get_ref_factor(origin_simpl)
-        target_reference, target_factor = get_ref_factor(target_simpl)
-        if origin_reference != target_reference:
-            raise ValueError(
-                f"expected self and target to have the same dimension, "
-                f"but {origin_simpl.dimension} != {target_reference.dimension}"
-            )
-        return cls(
-            origin=origin_simpl,
-            target=target_simpl,
-            factor=origin_factor / target_factor,
-        )
-
-    def __call__(self, value: Any) -> Any:
-        """Convert a value in the origin unit to the target unit."""
-        return value * self.factor
+#
+# simplification
+#
 
 
 def _flatten_scaled_nested(
@@ -280,7 +287,7 @@ def _flatten_scaled_nested(
 def _insert_root_expr(
     exp: Exp,
     base_exponent_pairs_mut: dict[Expr, Exponent],
-    derived_conversions_mut: list[tuple[Scaled, Exponent]],
+    scaled_conversions_mut: list[tuple[Scaled, Exponent]],
 ) -> None:
     if isinstance(exp.base, (Dimensionless, BaseDimension, BaseUnit)):
         base_exponent_pairs_mut.setdefault(exp.base, 0)
@@ -290,34 +297,34 @@ def _insert_root_expr(
         _insert_root_expr(
             Exp(exp_inner.base, exp_inner.exponent * exp.exponent),
             base_exponent_pairs_mut,
-            derived_conversions_mut,
+            scaled_conversions_mut,
         )
     elif isinstance(exp.base, Mul):
         for exp_inner in exp.base.terms:
             _insert_root_expr(
                 Exp(exp_inner.base, exp_inner.exponent * exp.exponent),
                 base_exponent_pairs_mut,
-                derived_conversions_mut,
+                scaled_conversions_mut,
             )
     elif isinstance(exp.base, Scaled):
         expr_derived = exp.base
-        derived_conversions_mut.append((expr_derived, exp.exponent))
+        scaled_conversions_mut.append((expr_derived, exp.exponent))
         _insert_root_expr(
             Exp(expr_derived.reference, exp.exponent),
             base_exponent_pairs_mut,
-            derived_conversions_mut,
+            scaled_conversions_mut,
         )
-    else:
+    else:  # pragma: no cover
         raise ValueError(f"unknown expression {exp}")
 
 
-def _get_canonical_expression(
+def _get_simplified_expression(
     base_exponent_pairs: dict[Expr, Exponent],
-    derived_conversions: list[tuple[Scaled, Exponent]],
+    scaled_conversions: list[tuple[Scaled, Exponent]],
     *,
     output_name_maybe: str,
 ) -> Expr:
-    no_conversions_involved = not derived_conversions
+    no_conversions_involved = not scaled_conversions
     simplified_expr: Expr
     # remove zero exponents and ensure canonical order by names
     base_exponent_pairs_sorted = sorted(
@@ -342,61 +349,116 @@ def _get_canonical_expression(
     if no_conversions_involved:
         return simplified_expr
 
-    factor = 1.0
-    for derived, exponent in derived_conversions:
-        factor *= derived.factor**exponent
+    # NOTE: if `Scaled.factor` is a `Fraction`, the returned `Scaled.factor`
+    # will be a `float` and precison issues.
+    # TODO: return exact representation only if `use_exact = True` in the future
+    factor_final: float = 1.0
+    for scaled, exponent in scaled_conversions:
+        factor_final *= scaled.factor**exponent
 
     return Scaled(
-        name=output_name_maybe,
         reference=simplified_expr,
-        factor=factor,
+        factor=factor_final,
+        name=output_name_maybe,
     )
 
 
-def _get_dimension(
-    expr: Expr,
-) -> Expr:
-    if isinstance(expr, (Dimensionless, BaseDimension, BaseUnit, Scaled)):
-        return expr.dimension
-    elif isinstance(expr, Exp):
-        return Exp(_get_dimension(expr.base), expr.exponent)
-    elif isinstance(expr, Mul):
-        return Mul(
-            tuple(_get_dimension(term) for term in expr.terms),  # type: ignore
-            name=expr.name,
+#
+# unit/dimension conversions
+#
+
+
+@dataclass(frozen=True)
+class _Converter:
+    origin_simpl: Expr
+    target_simpl: Expr
+    factor: float | Fraction
+
+    @classmethod
+    def new(cls, origin: Expr, target: Expr) -> _Converter:
+        """Create a new unit converter from one unit to another."""
+        origin_simpl = origin.simplify()
+        target_simpl = target.simplify()
+        if origin_simpl.kind != target_simpl.kind:
+            raise ValueError(
+                "expected self and target to have the same kind, "
+                f"but {origin_simpl.kind} != {target_simpl.kind}"
+            )
+
+        origin_inner_simpl, origin_factor = _get_factor(origin_simpl)
+        target_inner_simpl, target_factor = _get_factor(target_simpl)
+        dim_origin_simpl: Any = origin_inner_simpl.dimension
+        dim_target_simpl: Any = target_inner_simpl.dimension
+        # ensure `Mul` equality checks for terms, not including the name attr
+        if isinstance(dim_origin_simpl, Mul):
+            dim_origin_simpl = dim_origin_simpl.terms
+        if isinstance(dim_target_simpl, Mul):
+            dim_target_simpl = dim_target_simpl.terms
+        if dim_origin_simpl != dim_target_simpl:
+            raise ValueError(
+                f"expected origin and target to have the same dimension, "
+                f"but {dim_origin_simpl} != {dim_target_simpl}"
+            )
+        return cls(
+            origin_simpl=origin_simpl,
+            target_simpl=target_simpl,
+            factor=origin_factor / target_factor,
         )
-    else:
-        raise ValueError(f"unknown expression {expr}")
+
+    def __call__(self, value: Any) -> Any:
+        """Convert a value in the origin unit to the target unit."""
+        return value * self.factor
+
+
+def _get_factor(expr_simpl: Expr) -> tuple[Expr, float | Fraction]:
+    """Get the inner expression and the factor of a simplified expression."""
+
+    if isinstance(expr_simpl, (BaseUnit, BaseDimension, Dimensionless)):
+        return expr_simpl, 1.0
+    elif isinstance(expr_simpl, Exp):
+        # if expr is `Exp(Scaled(x, a), b)`, simplifying will result in
+        # `Scaled(Exp(x, b), a * b)` so it'll be handled by the `Scaled` case
+        return expr_simpl, 1.0
+    elif isinstance(expr_simpl, Mul):
+        # similarly, `Mul((Scaled(...),))` → `Scaled(Mul((...),),)`
+        return expr_simpl, 1.0
+    elif isinstance(expr_simpl, Scaled):
+        # so `Scaled` should always be pushed to outmost level.
+        # furthermore, since nested `Scaled(Scaled(x, c), d)` would simplify to
+        # `Scaled(x, c * d)`, we don't need to recursively get the factor.
+        return expr_simpl.reference, expr_simpl.factor
+    else:  # pragma: no cover
+        raise ValueError(f"unknown expression {expr_simpl}")
 
 
 #
-# Base units [1, page 130, section 2.3.3] [2, page 20, table 4]
+# base units [1, page 130, section 2.3.3] [2, page 20, table 4]
 #
 
 DIM_TIME = BaseDimension("T")
-S = BaseUnit("second", DIM_TIME)
+S = BaseUnit(DIM_TIME, "second")
 """Time (seconds)"""
 DIM_LENGTH = BaseDimension("L")
-M = BaseUnit("meter", DIM_LENGTH)
+M = BaseUnit(DIM_LENGTH, "meter")
 """Length (meters)"""
 DIM_MASS = BaseDimension("M")
-KG = BaseUnit("kilogram", DIM_MASS)
+KG = BaseUnit(DIM_MASS, "kilogram")
 """Mass (kilograms)"""
 DIM_CURRENT = BaseDimension("I")
-A = BaseUnit("ampere", DIM_CURRENT)
+A = BaseUnit(DIM_CURRENT, "ampere")
 """Electric Current (amperes)"""
 DIM_TEMPERATURE = BaseDimension("Θ")
-K = BaseUnit("kelvin", DIM_TEMPERATURE)
+K = BaseUnit(DIM_TEMPERATURE, "kelvin")
 """Thermodynamic Temperature (kelvins)"""
 DIM_AMOUNT = BaseDimension("N")
-MOLE = BaseUnit("mole", DIM_AMOUNT)
+MOLE = BaseUnit(DIM_AMOUNT, "mole")
 """Amount of Substance (moles)"""
 DIM_LUMINOUS_INTENSITY = BaseDimension("J")
-CD = BaseUnit("candela", DIM_LUMINOUS_INTENSITY)
+CD = BaseUnit(DIM_LUMINOUS_INTENSITY, "candela")
 """Luminous Intensity (candelas)"""
 
 #
-# Derived Units [1, page 137, section 2.3.4] [2, page 22, table 5]
+# derived Units [1, page 137, section 2.3.4] [2, page 22, table 5]
 # important and widely used, but which do not properly fall within the SI.
 #
 
@@ -433,7 +495,7 @@ H = Mul((Exp(WB, 1), Exp(A, -1)), "henry")
 """Inductance (henries)"""
 # NOTE: degree celsius is a special case: ℃² does not equal K² so we don't
 # define it as a scaled unit of kelvin.
-DEGC = BaseUnit("degree_celsius", DIM_TEMPERATURE)
+DEGC = BaseUnit(DIM_TEMPERATURE, "degree_celsius")
 """Celsius temperature (degrees Celsius).
 The numerical value of a temperature difference is the same when expressed
 in either degrees Celsius or in Kelvins."""
@@ -454,14 +516,14 @@ SV = Mul((Exp(J, 1), Exp(KG, -1)), "sievert")
 KAT = Mul((Exp(MOLE, 1), Exp(S, -1)), "katal")
 """Catalytic activity (katal)"""
 
-MIN = Scaled("minute", S, factor=60)
-HOUR = Scaled("hour", MIN, factor=60)
-DAY = Scaled("day", HOUR, factor=24)
-YR = Scaled("year", DAY, factor=365.25)  # on average
-DECADE = Scaled("decade", YR, factor=10)
-CENTURY = Scaled("century", DECADE, factor=10)
+MIN = Scaled(S, 60, "minute")
+HOUR = Scaled(MIN, 60, "hour")
+DAY = Scaled(HOUR, 24, "day")
+YR = Scaled(DAY, 365.25, "year")  # on average
+DECADE = Scaled(YR, 10, "decade")
+CENTURY = Scaled(DECADE, 10, "century")
 
-FT = Scaled("feet", M, factor=0.3048)
+FT = Scaled(M, 0.3048, "feet")
 
 
 @dataclass(frozen=True)
