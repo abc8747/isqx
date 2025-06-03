@@ -41,8 +41,8 @@ from typing import (
 
 from typing_extensions import TypeAlias
 
-_ExpressionKind: TypeAlias = Literal["dimensionless", "unit", "dimension"]
-_Factor: TypeAlias = Union[Decimal, Fraction, float, int]
+ExpressionKind: TypeAlias = Literal["dimensionless", "unit", "dimension"]
+Factor: TypeAlias = Union[Decimal, Fraction, float, int]
 
 
 def _is_factor(value: Any) -> bool:
@@ -57,7 +57,7 @@ class Expr(Protocol):
     def dimension(self) -> Expr: ...
 
     @property
-    def kind(self) -> _ExpressionKind: ...
+    def kind(self) -> ExpressionKind: ...
 
     def simplify(self) -> Expr:
         """Flatten the tree-like structure into a canonical form.
@@ -101,7 +101,7 @@ class Dimensionless(Expr):
         return self
 
     @property
-    def kind(self) -> _ExpressionKind:
+    def kind(self) -> ExpressionKind:
         return "dimensionless"
 
     def simplify(self) -> Expr:
@@ -121,7 +121,7 @@ class BaseDimension(Expr):
         return self
 
     @property
-    def kind(self) -> _ExpressionKind:
+    def kind(self) -> ExpressionKind:
         return "dimension"
 
     def simplify(self) -> Expr:
@@ -143,7 +143,7 @@ class BaseUnit(Expr):
         return self._dimension
 
     @property
-    def kind(self) -> _ExpressionKind:
+    def kind(self) -> ExpressionKind:
         return "unit"
 
     def simplify(self) -> Expr:
@@ -176,7 +176,7 @@ class Exp(Expr):
             raise ValueError("exponent must not be zero, use `Dimensionless`")
 
     @property
-    def kind(self) -> _ExpressionKind:
+    def kind(self) -> ExpressionKind:
         return self.base.kind
 
     @property
@@ -222,7 +222,7 @@ class Mul(Expr):
         )
 
     @property
-    def kind(self) -> _ExpressionKind:
+    def kind(self) -> ExpressionKind:
         # all terms have a consistent underlying kind (unit/dimension)
         for term in self.terms:
             term_kind = term.base.kind
@@ -250,7 +250,7 @@ class Mul(Expr):
 class Scaled(Expr):
     reference: Expr
     """The unit or dimension that this unit or dimension is based on."""
-    factor: _Factor | LazyFactor
+    factor: Factor | LazyFactor
     """Multiplying this factor converts this value into the reference.
     For example, `1 ft = 0.3048 m`, so the factor is 0.3048.
     """
@@ -267,7 +267,7 @@ class Scaled(Expr):
         return float(_fraction_to_decimal(_factor_to_fraction(factor)))
 
     @property
-    def kind(self) -> _ExpressionKind:
+    def kind(self) -> ExpressionKind:
         return self.reference.kind
 
     @property
@@ -275,7 +275,7 @@ class Scaled(Expr):
         return self.reference.dimension
 
     def simplify(self) -> Scaled:
-        products: list[tuple[_Factor, Exponent] | _Factor] = []
+        products: list[tuple[Factor, Exponent] | Factor] = []
         expr: Expr = self
         while True:
             if not isinstance(expr, Scaled):
@@ -403,7 +403,7 @@ class Converter:
                 f"expected origin and target to have the same dimension, "
                 f"but {dim_origin_simpl} != {dim_target_simpl}"
             )
-        products: list[tuple[_Factor, Exponent] | _Factor] = []
+        products: list[tuple[Factor, Exponent] | Factor] = []
         if isinstance(origin_factor, LazyFactor):
             products.extend(origin_factor.products)
         else:
@@ -430,7 +430,7 @@ class Converter:
         )
 
 
-def _get_factor(expr_simpl: Expr) -> tuple[Expr, _Factor | LazyFactor]:
+def _get_factor(expr_simpl: Expr) -> tuple[Expr, Factor | LazyFactor]:
     """Get the inner expression and the factor of a simplified expression."""
 
     if isinstance(expr_simpl, (BaseUnit, BaseDimension, Dimensionless)):
@@ -451,7 +451,7 @@ def _get_factor(expr_simpl: Expr) -> tuple[Expr, _Factor | LazyFactor]:
         raise ValueError(f"unknown expression {expr_simpl}")
 
 
-def _factor_to_fraction(factor: _Factor) -> Fraction:
+def _factor_to_fraction(factor: Factor) -> Fraction:
     if isinstance(factor, (Decimal, float, int)):
         factor = Fraction(factor)
     elif not isinstance(factor, Fraction):
@@ -465,14 +465,14 @@ def _fraction_to_decimal(fraction: Fraction) -> Decimal:
 
 @dataclass(frozen=True)
 class LazyFactor:
-    products: tuple[tuple[_Factor, Exponent] | _Factor, ...]
+    products: tuple[tuple[Factor, Exponent] | Factor, ...]
 
     @classmethod
     def from_derived_conversions(
         cls,
         derived_conversions: Sequence[tuple[Scaled, Exponent]],
     ) -> LazyFactor:
-        products: list[tuple[_Factor, Exponent] | _Factor] = []
+        products: list[tuple[Factor, Exponent] | Factor] = []
         for scaled, exponent in derived_conversions:
             if isinstance(scaled.factor, LazyFactor):  # by previous simplify()
                 for inner_item in scaled.factor.products:
@@ -588,101 +588,6 @@ class LazyFactor:
         return self.approx
 
 
-#
-# base units [1, page 130, section 2.3.3] [2, page 20, table 4]
-#
-
-DIM_TIME = BaseDimension("T")
-S = BaseUnit(DIM_TIME, "second")
-"""Time (seconds)"""
-DIM_LENGTH = BaseDimension("L")
-M = BaseUnit(DIM_LENGTH, "meter")
-"""Length (meters)"""
-DIM_MASS = BaseDimension("M")
-KG = BaseUnit(DIM_MASS, "kilogram")
-"""Mass (kilograms)"""
-DIM_CURRENT = BaseDimension("I")
-A = BaseUnit(DIM_CURRENT, "ampere")
-"""Electric Current (amperes)"""
-DIM_TEMPERATURE = BaseDimension("Θ")
-K = BaseUnit(DIM_TEMPERATURE, "kelvin")
-"""Thermodynamic Temperature (kelvins)"""
-DIM_AMOUNT = BaseDimension("N")
-MOLE = BaseUnit(DIM_AMOUNT, "mole")
-"""Amount of Substance (moles)"""
-DIM_LUMINOUS_INTENSITY = BaseDimension("J")
-CD = BaseUnit(DIM_LUMINOUS_INTENSITY, "candela")
-"""Luminous Intensity (candelas)"""
-
-#
-# derived Units [1, page 137, section 2.3.4] [2, page 22, table 5]
-# important and widely used, but which do not properly fall within the SI.
-#
-
-RAD = Dimensionless("radian")
-"""Plane angle (radians). Not to be confused with m m⁻¹."""
-SR = Dimensionless("steradian")
-"""Solid angle (steradians). Not to be confused with m² m⁻²."""
-HZ = Mul((Exp(S, -1),), "hertz")
-"""Frequency (hertz). Shall only be used for periodic phenomena."""
-N = Mul((Exp(KG, 1), Exp(M, 1), Exp(S, -2)), "newton")
-"""Force (newtons)"""
-PA = Mul((Exp(N, 1), Exp(M, -2)), "pascal")
-"""Pressure, stress (pascals)"""
-J = Mul((Exp(N, 1), Exp(M, 1)), "joule")
-"""Energy, work, amount of heat (joules)"""
-W = Mul((Exp(J, 1), Exp(S, -1)), "watt")
-"""Power, radiant flux (watts)"""
-C = Mul((Exp(A, 1), Exp(S, 1)), "coulomb")
-"""Electric charge (coulombs)"""
-V = Mul((Exp(W, 1), Exp(A, -1)), "volt")
-"""Electric potential difference, voltage (volts).
-Also named "electric tension" or "tension"."""
-F = Mul((Exp(C, 1), Exp(V, -1)), "farad")
-"""Capacitance (farads)"""
-OHM = Mul((Exp(V, 1), Exp(A, -1)), "ohm")
-"""Electric resistance (ohms)"""
-SIEMENS = Mul((Exp(A, 1), Exp(V, -1)), "siemens")
-"""Electric conductance (siemens)"""
-WB = Mul((Exp(V, 1), Exp(S, 1)), "weber")
-"""Magnetic flux (webers)"""
-T = Mul((Exp(WB, 1), Exp(M, -2)), "tesla")
-"""Magnetic flux density (teslas)"""
-H = Mul((Exp(WB, 1), Exp(A, -1)), "henry")
-"""Inductance (henries)"""
-# NOTE: degree celsius is a special case: ℃² does not equal K² so we don't
-# define it as a scaled unit of kelvin.
-DEGC = BaseUnit(DIM_TEMPERATURE, "degree_celsius")
-"""Celsius temperature (degrees Celsius).
-The numerical value of a temperature difference is the same when expressed
-in either degrees Celsius or in Kelvins."""
-# NOTE: The symbol `sr` for must be included to distinguish luminous flux (lumen)
-# from luminous intensity (candela)
-LM = Mul((Exp(CD, 1), Exp(SR, 1)), "lumen")
-"""Luminous flux (lumens)"""
-LX = Mul((Exp(LM, 1), Exp(M, -2)), "lux")
-"""Illuminance (lux)"""
-BQ = Mul((Exp(S, -1),), "becquerel")
-"""Activity referred to a radionuclide (becquerels). Shall only be used for
-stochastic processes in activity referred to a radionuclide.
-Not to be confused with "radioactivity"."""
-GY = Mul((Exp(J, 1), Exp(KG, -1)), "gray")
-"""Absorbed dose, kerma (grays)"""
-SV = Mul((Exp(J, 1), Exp(KG, -1)), "sievert")
-"""Dose equivalent (sieverts)"""
-KAT = Mul((Exp(MOLE, 1), Exp(S, -1)), "katal")
-"""Catalytic activity (katal)"""
-
-MIN = Scaled(S, 60, "minute")
-HOUR = Scaled(MIN, 60, "hour")
-DAY = Scaled(HOUR, 24, "day")
-YEAR = Scaled(DAY, Decimal("365.25"), "year")  # on average
-DECADE = Scaled(YEAR, 10, "decade")
-CENTURY = Scaled(DECADE, 10, "century")
-
-FT = Scaled(M, Decimal("0.3048"), "feet")
-
-
 @dataclass(frozen=True)
 class Disambiguation:
     dimension: Expr  # e.g. meter
@@ -690,6 +595,3 @@ class Disambiguation:
     def __call__(self, unit: Expr) -> Expr:
         # TODO: check dimension compatibility
         raise NotImplementedError
-
-
-GEOPOTENTIAL_ALTITUDE = Disambiguation(DIM_LENGTH)

@@ -11,8 +11,8 @@ from fractions import Fraction
 import pytest
 
 from isq import (
+    Factor,
     LazyFactor,
-    _Factor,
 )
 
 LP = 8
@@ -22,7 +22,7 @@ HP = 50
 
 @dataclass
 class LFCase:
-    products_input: tuple[tuple[_Factor, Fraction | int] | _Factor, ...]
+    products_input: tuple[tuple[Factor, Fraction | int] | Factor, ...]
     expected_value: Fraction | str | None
     precision: int | None
     expected_exception: type[Exception] | None
