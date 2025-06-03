@@ -74,8 +74,8 @@ class Expr(Protocol):
         - `Mul((Exp(HOUR, 1), Exp(DAY, -1)))` →
           `Scaled(Dimensionless, 1 / 24)`
         """
-        # TODO: add new parameter `keep_scaled: bool = False`
-        # if `keep_scaled`, ft² will not be simplified to 0.09290304 m²
+        # TODO: add new parameter `keep_named: bool = False`
+        # if `keep_named`, ft² will not be simplified to 0.09290304 m²
         ...  # pragma: no cover
 
     def to(self, target: Expr) -> Converter:
