@@ -10,6 +10,7 @@ from isq import (
     RAD,
     BaseUnit,
     Dimensionless,
+    Disambiguated,
     Exp,
     LazyFactor,
     M,
@@ -17,6 +18,7 @@ from isq import (
     S,
     Scaled,
 )
+from isq.aerospace import M_ALT_GEOM, M_ALT_GEOP
 
 #
 # Exp
@@ -155,6 +157,50 @@ def test_scaled_simplify_dimensionless() -> None:
     assert expr5s.factor.to_exact() == Fraction(1, 24)  # day per hour
 
 
+def test_scaled_simplify_with_lazy_factor() -> None:
+    from isq import IN  # -> ft -> m
+
+    result = Exp(IN.simplify(), 2).simplify()
+
+    assert isinstance(result, Scaled)
+    assert result.reference == Exp(M, 2)
+    assert isinstance(result.factor, LazyFactor)
+
+    assert result.factor.to_approx() == pytest.approx((0.3048 / 12) ** 2)
+
+
+def test_scaled_simplify_with_lazy_factor_multiple_terms() -> None:
+    from isq import PSI  # defined by lbf -> lbm -> kg and in -> ft -> m
+
+    psi_simplified = PSI.simplify()  # Scaled(PA.simplify(), LazyFactor(...))
+    assert isinstance(psi_simplified, Scaled)
+    assert isinstance(psi_simplified.factor, LazyFactor)
+    assert isinstance(psi_simplified.reference, Mul)
+    from isq import PA
+
+    pa_simplified = PA.simplify()
+    assert isinstance(pa_simplified, Mul)
+    assert set(psi_simplified.reference.terms) == set(pa_simplified.terms)
+    PSI_TO_PA_FACTOR = (0.45359237 * 9.80665) / ((0.3048 / 12) ** 2)
+    assert psi_simplified.factor.to_approx() == pytest.approx(PSI_TO_PA_FACTOR)
+
+    result = Exp(psi_simplified, 2).simplify()
+    assert isinstance(result, Scaled)
+    assert isinstance(result.factor, LazyFactor)
+
+    from isq import KG, M, S
+
+    result_ref_simplified = result.reference.simplify()
+    assert isinstance(result_ref_simplified, Mul)
+    # P**2 = (F/A)**2
+    #      = ((M*L*T**-2) / L**2)**2
+    #      = (M * L**-1 * T**-2)**2
+    assert set(result_ref_simplified.terms) == set(
+        (Exp(KG, 2), Exp(M, -2), Exp(S, -4))
+    )
+    assert result.factor.to_approx() == pytest.approx(PSI_TO_PA_FACTOR**2)
+
+
 def test_scaled_simplify_complex() -> None:
     # https://what-if.xkcd.com/11/
     from decimal import Decimal
@@ -204,6 +250,50 @@ def test_scaled_simplify_complex() -> None:
         )
     )
     assert period_s / (365 * 24 * 3600) == pytest.approx(195, abs=0.5)
+
+
+#
+# disambiguated
+#
+
+
+def test_disambiguated_invalid_construction() -> None:
+    with pytest.raises(ValueError, match="nesting"):
+        _ = Disambiguated(M_ALT_GEOP, "another_context")
+
+
+def test_disambiguated_simplify_cancellation() -> None:
+    expr_same_ctx = Mul((Exp(M_ALT_GEOP, 1), Exp(M_ALT_GEOP, -1)))
+    simplified_same = expr_same_ctx.simplify()
+    assert isinstance(simplified_same, Dimensionless)
+
+    expr_diff_ctx = Mul((Exp(M_ALT_GEOP, 1), Exp(M_ALT_GEOM, -1)))
+    simplified_diff = expr_diff_ctx.simplify()
+    assert isinstance(simplified_diff, Mul)  # shouldn't cancel
+    assert set(simplified_diff.terms) == set(expr_diff_ctx.terms)
+
+
+FT_ALT_GEOP = Disambiguated(FT, ("altitude", "geopotential"))
+
+
+def test_disambiguated_simplify_propagates_to_reference() -> None:
+    simplified = FT_ALT_GEOP.simplify()  # Scaled(Disambiguated(M, ...), ...)
+    assert isinstance(simplified, Disambiguated)
+    assert simplified.context == M_ALT_GEOP.context
+    assert isinstance(simplified.reference, Scaled)
+    assert simplified.reference.reference == M
+
+
+def test_disambiguated_conversion() -> None:
+    converter_ok = M_ALT_GEOP.to(FT_ALT_GEOP)
+    assert converter_ok(1) == pytest.approx(1 / 0.3048)
+
+    with pytest.raises(ValueError):
+        _ = M_ALT_GEOP.to(M_ALT_GEOM)
+    with pytest.raises(ValueError):
+        _ = M_ALT_GEOP.to(M)
+    with pytest.raises(ValueError):
+        _ = M.to(M_ALT_GEOP)
 
 
 #

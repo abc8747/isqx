@@ -6,6 +6,13 @@ Units defined by the International Civil Aviation Organization (ICAO)
 """
 
 from .core import Disambiguated
-from .si import DIM_LENGTH
+from .si import M_PERS, M
 
-GEOPOTENTIAL_ALTITUDE = Disambiguated(DIM_LENGTH)
+M_ALT_GEOP = Disambiguated(M, ("altitude", "geopotential"))
+M_ALT_GEOM = Disambiguated(M, ("altitude", "geometric"))
+
+M_PERS_TAS = Disambiguated(M_PERS, ("airspeed", "true"))
+M_PERS_CAS = Disambiguated(M_PERS, ("airspeed", "calibrated"))
+M_PERS_EAS = Disambiguated(M_PERS, ("airspeed", "equivalent"))
+M_PERS_GS = Disambiguated(M_PERS, ("airspeed", "ground"))
+M_PERS_WIND = Disambiguated(M_PERS, ("wind"))

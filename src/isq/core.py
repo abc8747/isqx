@@ -7,6 +7,7 @@ from fractions import Fraction
 from functools import lru_cache
 from typing import (
     Any,
+    Hashable,
     Literal,
     Mapping,
     MutableMapping,
@@ -37,6 +38,7 @@ class Expr(Protocol):
     | [expression raised to a power][isq.Exp]   | `Exp(METER, 2)`           |
     | [product of expressions][isq.Mul]         | `Mul(NEWTON, METER)`      |
     | [scaled expression][isq.Scaled]           | [feet][isq.FT] = 0.3048 m |
+    | [disambiguated][isq.Disambiguated]        | true vs ground speed      |
     """
 
     @property
@@ -296,6 +298,43 @@ class Scaled(Expr):
         return Converter.new(origin=self, target=target)
 
 
+@dataclass(frozen=True)
+class Disambiguated(Expr):
+    """An expression decorated with a semantic context tag.
+
+    This is used to disambiguate between quantities that share the same
+    physical dimension but have different meanings, e.g.,
+    geopotential altitude vs. geometric altitude.
+    """
+
+    reference: Expr
+    """The expression that this disambiguation wraps, e.g. `METER`"""
+    context: Hashable
+    """A hashable identifier, e.g. `geopotential`, a tuple of contexts"""
+
+    def __post_init__(self) -> None:
+        if isinstance(self.reference, Disambiguated):
+            raise ValueError(
+                "nesting disambiguated expressions is not allowed,"
+                "consider using a tuple to store multiple contexts instead"
+            )
+
+    @property
+    def kind(self) -> ExpressionKind:
+        return self.reference.kind
+
+    @property
+    def dimension(self) -> Expr:
+        return Disambiguated(self.reference.dimension, self.context)
+
+    def simplify(self) -> Expr:
+        simplified_ref = self.reference.simplify()
+        return Disambiguated(simplified_ref, self.context)
+
+    def to(self, target: Expr) -> Converter:
+        return Converter.new(origin=self, target=target)
+
+
 #
 # simplification
 #
@@ -313,7 +352,11 @@ def _decompose_expr(
     :param scaled_conversions_mut: A list of scaling factors encountered along
         the way, e.g. `[(Scaled(M, 0.3048, "FT"), 2)]`
     """
-    if isinstance(exp.base, (Dimensionless, BaseDimension, BaseUnit)):
+    if isinstance(
+        exp.base, (Dimensionless, BaseDimension, BaseUnit, Disambiguated)
+    ):
+        # NOTE: disambiguated objects are treated as unique bases:
+        # prevents mixing up geopotential altitude with geometric altitude
         base_exponent_pairs_mut.setdefault(exp.base, 0)
         base_exponent_pairs_mut[exp.base] += exp.exponent
     elif isinstance(exp.base, Exp):
@@ -362,8 +405,8 @@ def _build_canonical_expr(
     # remove zero exponents and ensure canonical order by names
     base_exponent_pairs_sorted = sorted(
         filter(lambda item: item[1] != 0, base_exponent_pairs.items()),
-        key=lambda item: item[0].name,  # type: ignore
-    )  # NOTE: `.name` is not required by `Expr` protocol!
+        key=lambda item: str(item[0]),
+    )
     if not base_exponent_pairs_sorted:
         simplified_expr = Dimensionless(
             name=f"dimensionless_form_of_{name_hint}"
@@ -426,6 +469,8 @@ class Converter:
             target_dim.terms if isinstance(target_dim, Mul) else (target_dim,)
         )
         if origin_dim_terms != target_dim_terms:
+            # NOTE: we can probably have a better error message here
+            # show the diff between two trees
             raise ValueError(
                 f"expected origin and target to have the same dimension, "
                 f"but {origin_dim_terms} != {target_dim_terms}"
@@ -450,10 +495,16 @@ class Converter:
             lazy_product=LazyFactor(tuple(products)),
         )
 
-    def __call__(self, value: Any, *, exact: bool = False) -> Any:
+    def __call__(
+        self,
+        value: Any,
+        *,
+        exact: bool = False,
+        ctx: decimal.Context | None = None,
+    ) -> Any:
         """Convert a value in the origin unit to the target unit."""
         return value * (
-            self.lazy_product.to_exact()
+            self.lazy_product.to_exact(ctx=ctx)
             if exact
             else self.lazy_product.to_approx()
         )
@@ -483,6 +534,9 @@ def _separate_factor(expr_simpl: Expr) -> tuple[Expr, Factor | LazyFactor]:
         # furthermore, since nested `Scaled(Scaled(x, c), d)` would simplify to
         # `Scaled(x, c * d)`, we don't need to recursively get the factor.
         return expr_simpl.reference, expr_simpl.factor
+    elif isinstance(expr_simpl, Disambiguated):
+        inner_ref, factor = _separate_factor(expr_simpl.reference)
+        return Disambiguated(inner_ref, expr_simpl.context), factor
     else:  # pragma: no cover
         raise ValueError(f"unknown expression {expr_simpl}")
 
@@ -557,7 +611,8 @@ class LazyFactor:
     def __float__(self) -> float:
         return self.to_approx()
 
-    # NOTE: not using lru_cache because decimal.Context is not hashable.
+    # NOTE: not using lru_cache because decimal.Context is not hashable
+    # it is the caller's responsibility to cache it
     def to_exact(
         self, *, ctx: decimal.Context | None = None
     ) -> Fraction | Decimal:
@@ -644,20 +699,3 @@ class LazyFactor:
 # - this guarantees completeness with zero boilerplate
 # - BUT... importing a module containing units would have side effects. explicit registration is prob a better idea
 # - we need to be careful of circular imports (avoid importing ft before m)
-
-
-@dataclass(frozen=True)
-class Disambiguated:
-    """A wrapper used to disambiguate between quantities with the same
-    dimension.
-
-    For example, true airspeed (TAS, speed relative to air mass) and ground
-    speed (GS, speed relative to ground) both are measured in meters per second
-    but have different semantic meaning.
-    """
-
-    dimension: Expr
-
-    def __call__(self, unit: Expr) -> Expr:
-        # TODO: check dimension compatibility
-        raise NotImplementedError

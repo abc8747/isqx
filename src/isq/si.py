@@ -58,7 +58,9 @@ SR = Dimensionless("steradian")
 """Solid angle (steradians). Not to be confused with m² m⁻²."""
 HZ = Mul((Exp(S, -1),), "hertz")
 """Frequency (hertz). Shall only be used for periodic phenomena."""
-N = Mul((Exp(KG, 1), Exp(M, 1), Exp(S, -2)), "newton")
+M_PERS = Mul((Exp(M, 1), Exp(S, -1)))
+M_PERS2 = Mul((Exp(M, 1), Exp(S, -2)))
+N = Mul((Exp(KG, 1), Exp(M_PERS2, 1)), "newton")  # F = ma
 """Force (newtons)"""
 PA = Mul((Exp(N, 1), Exp(M, -2)), "pascal")
 """Pressure, stress (pascals)"""
@@ -112,3 +114,5 @@ DAY = Scaled(HOUR, 24, "day")
 YEAR = Scaled(DAY, Decimal("365.25"), "year")  # on average
 DECADE = Scaled(YEAR, 10, "decade")
 CENTURY = Scaled(DECADE, 10, "century")
+
+G0 = Scaled(M_PERS2, Decimal("9.80665"), "standard_gravity")  # page 159

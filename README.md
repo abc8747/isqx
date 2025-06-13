@@ -79,12 +79,29 @@ At the current state, it merely serves to enable writing machine-readable, struc
     HKD_PER_YEAR = Mul((Exp(HKD, 1), Exp(WEEK, -1)))
     print(USD_PER_HR.to(HKD_PER_WEEK)(13))  # 888872.4
     ```
+- **Disambiguation**: Quantities often share the same physical dimension but are semantically distinct. Examples:
+    - geopotential altitude vs geometric altitude (meters)
+    - true airspeed vs ground speed (knots)
+    - inertial vs body vs wind reference frame
+    - $\Delta U = Q - W$, kinetic vs potential vs enthalpy vs gibbs free (joules)
+    - revenue vs cost, nominal vs real, capex vs opex (money)
+    - force_x vs force_y (newtons)
+
+    The `Disambiguated` class allows tagging a unit with any context:
+    ```py
+    from isq import Disambiguated, MOL
+
+    MOL_O2 = Disambiguated(MOL, "o2")
+    MOL_LOX = Disambiguated(MOL, ("o2", "liquid"))
+    ```
+    
+    - Simplification: `MOL_O2 * MOL_LOX**-1` will not simplify to `Dimensionless`.
+    - Conversion: `MOL_O2.to(MOL_LOX)` will fail because of contextual mismatch.
 
 ## TODOs
 
 - enable intuitive construction like `M * S**-1` directly producing new `Expr` objects (impl `__mul__`, `__truediv__`, `__pow__` for `Expr`)
 - allow `simplify(keep_named=True)` to preserve user-defined `Scaled` units (e.g. keep `psi` rather than always reducing down to `lbf in**-2` or even further)
-- "geopotential altitude" and "geometric altitude" both have the same dimension but have different semantic meaning. develop the `Disambiguation` class.
 - support for prefixes (e.g. `KILO`)
 - support for tricky affine units (e.g., farenheit, celsius)
 - convert `Expr` objects to various string representations (`siunitx`, LaTeX, ASCII, etc).
