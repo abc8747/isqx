@@ -2,11 +2,11 @@
 
 A tiny dependency-free Python library to define, manipulate, and convert physical units/dimensions.
 
-At the current state, it merely serves to enable writing machine-readable, structured documentation.
+At the current state, it merely serves to enable writing machine-readable, structured documentation. It does *not* perform runtime unit checking.
 
 ## Key principles
 
-- **No runtime value-wrapping**. Existing, mature unit-checking libraries like [`astropy.units`](https://docs.astropy.org/en/stable/units/index.html) uses operator overloading to encapsulate your data types in a new object (e.g. `(10 * u.newton) / (1 * u.kg)` returns a `Quantity` object). It checks units eagerly at runtime. This introduces performance overhead and friction with existing libraries that expect raw numerical inputs. Most simply resort to writing units in docstrings:
+- **No runtime value-wrapping**: Existing, mature unit-checking libraries like [`astropy.units`](https://docs.astropy.org/en/stable/units/index.html) use operator overloading to encapsulate your data types in a new object (a `numpy.ndarray` becomes a `Quantity` object). It checks units eagerly at runtime. This introduces performance overhead and friction with existing libraries that expect raw numerical inputs. Most simply resort to writing units in docstrings:
     ```py
     def acceleration(force, mass):
         """Return the acceleration (meters per second squared).
@@ -30,10 +30,12 @@ At the current state, it merely serves to enable writing machine-readable, struc
     This provides several benefits:
     - at runtime, the type is kept intact as `T`
     - enables powerful runtime introspection of `x` with `typing.get_type_hints()`.
-    - delegates the type checking to an [future separate tool](#type-checking)
+    - delegates the type checking to an [separate tool](#type-checking)
     - centralised source of truth
     - supports for documentation generators like `mkdocs` and intersphinx
-- **Composability**: Units and dimensions are represented as immutable tree of nodes, much like SymPy.
+    - incremental, optional adoption
+    - use in `dataclass`, `TypedDict`, `NamedTuple`...
+- **Composability**: Units and dimensions are represented as immutable tree, much like SymPy.
     ```py
     from isq import N, KG
 
@@ -65,7 +67,7 @@ At the current state, it merely serves to enable writing machine-readable, struc
     print(fpm2mps(100.0))  # 0.508
     ```
     The function accepts any type that implements `__mul__`, making it compatible with many libraries, including numpy and `jax.jit`. `exact=True` is useful for money conversions.
-- **Plug-and-play extensibility**: Create your own units without DSL, just Python classes.
+- **Plug-and-play extensibility**: Create your own units without DSL, just plain Python objects.
     ```py
     from isq import BaseDimension, BaseUnit, Scaled, Mul, Exp, HOUR, WEEK
     from decimal import Decimal
@@ -77,7 +79,6 @@ At the current state, it merely serves to enable writing machine-readable, struc
     HKD_PER_YEAR = Mul((Exp(HKD, 1), Exp(WEEK, -1)))
     print(USD_PER_HR.to(HKD_PER_WEEK)(13))  # 888872.4
     ```
-- First class support for non-SI units.
 
 ## TODOs
 

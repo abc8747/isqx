@@ -5,7 +5,7 @@ Units defined by the International Civil Aviation Organization (ICAO)
     ICAO. [Online]. Available: https://store.icao.int/en/annex-5-units-of-measurement-to-be-used-in-the-air-and-ground-services
 """
 
-from .core import Disambiguation
+from .core import Disambiguated
 from .si import DIM_LENGTH
 
-GEOPOTENTIAL_ALTITUDE = Disambiguation(DIM_LENGTH)
+GEOPOTENTIAL_ALTITUDE = Disambiguated(DIM_LENGTH)

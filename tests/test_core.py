@@ -128,7 +128,7 @@ def test_scaled_simplify_nested() -> None:
     assert isinstance(expr3s, Scaled)
     assert expr3s.reference == S
     assert isinstance(expr3s.factor, LazyFactor)
-    assert expr3s.factor.exact == 86400 * 365.25 * 100
+    assert expr3s.factor.to_exact() == 86400 * 365.25 * 100
 
 
 def test_scaled_simplify_mixed() -> None:
@@ -138,13 +138,13 @@ def test_scaled_simplify_mixed() -> None:
     assert isinstance(expr4s, Scaled)
     assert expr4s.reference == Mul((Exp(M, 3), Exp(S, 2)))
     assert isinstance(expr4s.factor, LazyFactor)
-    assert expr4s.factor.exact == 2**3 * 3**2
+    assert expr4s.factor.to_exact() == 2**3 * 3**2
 
     expr4s = FT_PERMIN.simplify()
     assert isinstance(expr4s, Scaled)
     assert expr4s.reference == M_PERS
     assert isinstance(expr4s.factor, LazyFactor)
-    assert expr4s.factor.exact == Fraction(3048, 10000) / 60
+    assert expr4s.factor.to_exact() == Fraction(3048, 10000) / 60
 
 
 def test_scaled_simplify_dimensionless() -> None:
@@ -152,7 +152,7 @@ def test_scaled_simplify_dimensionless() -> None:
     assert isinstance(expr5s, Scaled)
     assert isinstance(expr5s.reference, Dimensionless)
     assert isinstance(expr5s.factor, LazyFactor)
-    assert expr5s.factor.exact == Fraction(1, 24)  # day per hour
+    assert expr5s.factor.to_exact() == Fraction(1, 24)  # day per hour
 
 
 def test_scaled_simplify_complex() -> None:
@@ -188,7 +188,7 @@ def test_scaled_simplify_complex() -> None:
     ).simplify()  # = (km^2 * day) / cm^2
     assert isinstance(PERIOD, Scaled)
     assert isinstance(PERIOD.factor, LazyFactor)
-    assert PERIOD.factor.exact == 100_000**2 * 86400
+    assert PERIOD.factor.to_exact() == 100_000**2 * 86400
     assert PERIOD.reference == S
 
     num_birds = 300e9

@@ -7,7 +7,7 @@ name = "isq"
 version = "0.1.0"
 description = "A system for representing physical units"
 readme = "README.md"
-authors = [{ name = "cathaypacific8747", email = "abraham@ylcheung.com" }]
+authors = [{ name = "Abraham Cheung", email = "abraham@ylcheung.com" }]
 requires-python = ">=3.9"
 dependencies = []
 
@@ -43,3 +43,9 @@ warn_return_any = true
 warn_redundant_casts = true
 warn_unused_configs = true
 warn_unused_ignores = true
+
+[tool.coverage.report]
+exclude_also = [
+    # ellipsis in protocol
+    "\\.\\.\\.",
+]

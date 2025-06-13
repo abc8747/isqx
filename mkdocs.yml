@@ -48,9 +48,10 @@ plugins:
             show_symbol_type_toc: true
             show_root_heading: true
             show_root_full_path: false
-            show_source: false
-            summary: true
-            show_submodules: true
+            show_submodules: false
+            show_source: true
+            docstring_style: sphinx
+            show_if_no_docstring: true
       enable_inventory: true
 markdown_extensions:
   - abbr

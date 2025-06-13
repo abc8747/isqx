@@ -1,25 +1,3 @@
-"""
-A system for representing physical units, contains a selection of commonly
-used SI and US Customary Units.
-
-Unlike libraries like `pint` which use runtime unit-aware number types,
-we do not seek to "wrap" numerical values with their units.
-It is common for different rows in a matrix to represent different quantities,
-making it very difficult to annotate properly. Instead, this library treats
-units as metadata for use in static analysis tools and documentation.
-
-[1] The International System of Units (SI): Text in English (updated in 2024),
-    9th edition 2019, V3.01 August 2024. Sèvres Cedex BIPM 2024, 2024.
-    Available: https://www.bipm.org/documents/20126/41483022/SI-Brochure-9-EN.pdf
-
-[2] C. C2, "C2: Commission on Symbols, Units, Nomenclature, Atomic Masses and
-    Fundamental Constants - IUPAP: The International Union of Pure and Applied
-    Physics," Mar. 04, 2021. Available: https://archive2.iupap.org/wp-content/uploads/2014/05/A4.pdf
-
-[3] "NIST Handbook 44 - 2024 - Appendix C. General Tables of Units of
-    Measurement," NIST, Available: https://www.nist.gov/document/nist-handbook-44-2024-appendix-c-pdf
-"""
-
 from __future__ import annotations
 
 import decimal
@@ -45,22 +23,43 @@ ExpressionKind: TypeAlias = Literal["dimensionless", "unit", "dimension"]
 Factor: TypeAlias = Union[Decimal, Fraction, float, int]
 
 
-def _is_factor(value: Any) -> bool:
-    return isinstance(value, (Decimal, Fraction, float, int))
-
-
 @runtime_checkable
 class Expr(Protocol):
-    """Trait representing a tree-like unit or dimension expression."""
+    """A protocol that a "unit-like" expression must implement.
+
+    It may be of the following forms:
+
+    | Type                                      | Example                   |
+    | ----------------------------------------- | ------------------------- |
+    | [dimensionless number][isq.Dimensionless] | `Reynolds`, `Prandtl`     |
+    | [base dimension][isq.BaseDimension]       | [length][isq.DIM_LENGTH]  |
+    | [base unit][isq.BaseUnit]                 | [meter][isq.M]            |
+    | [expression raised to a power][isq.Exp]   | `Exp(METER, 2)`           |
+    | [product of expressions][isq.Mul]         | `Mul(NEWTON, METER)`      |
+    | [scaled expression][isq.Scaled]           | [feet][isq.FT] = 0.3048 m |
+    """
 
     @property
-    def dimension(self) -> Expr: ...
+    def dimension(self) -> Expr:
+        r"""Return the dimension of this "unit-like" expression.
+        Note that it does not perform simplification.
+
+        Examples:
+
+        - `Exp(M, 2)` -> `Exp(DIM_LENGTH, 2)`
+        - `Mul(M, Exp(S, -1))` -> `Mul(DIM_LENGTH, Exp(DIM_TIME, -1))`
+        """
+        ...
 
     @property
-    def kind(self) -> ExpressionKind: ...
+    def kind(self) -> ExpressionKind:
+        r"""Whether this expression is a unit, dimension, or dimensionless."""
+        ...
 
     def simplify(self) -> Expr:
-        """Flatten the tree-like structure into a canonical form.
+        """Flatten a complex tree-like structure into a simple canonical form,
+        including: distributing exponents, combining like terms and merging
+        nested scaling factors.
 
         Examples:
 
@@ -68,15 +67,15 @@ class Expr(Protocol):
         - `Mul((Exp(M, 2), Exp(M, -2)))` → `Dimensionless`
         - `Exp(Mul((Exp(M, 1), Exp(S, -1))), 2)` →
           `Mul((Exp(M, 2), Exp(S, -2)))`
-        - `Scaled(Scaled(M, 2), 3)` → `Scaled(M, 6)`
+        - `Scaled(Scaled(M, 2), 3)` → `Scaled(M, LazyFactor((3, 2)))`
         - `Scaled(Mul((Exp(Scaled(M, 2), 3), Exp(Scaled(S, 3), 2))), 6)` →
-          `Scaled(Mul((Exp(M, 3), Exp(S, 2)), 72))`
+          `Scaled(Mul((Exp(M, 3), Exp(S, 2)), 432))`
         - `Mul((Exp(HOUR, 1), Exp(DAY, -1)))` →
           `Scaled(Dimensionless, 1 / 24)`
         """
         # TODO: add new parameter `keep_named: bool = False`
-        # if `keep_named`, ft² will not be simplified to 0.09290304 m²
-        ...  # pragma: no cover
+        # why: we sometimes dont want ft² to be simplified to 0.09290304 m²
+        ...
 
     def to(self, target: Expr) -> Converter:
         """Return a converter object, that when called with a value, converts it
@@ -85,16 +84,15 @@ class Expr(Protocol):
         :param target: The target unit or dimension to convert to. Must have
             compatible dimensions with the origin.
         """
-        # NOTE: not using mixins because we want to track coverage
         # TODO: add new parameter `exact: bool = False` for money conversions
         # or should we just use the `.to(*, exact: bool = False)`?
-        ...  # pragma: no cover
+        ...
 
 
 @dataclass(frozen=True)
 class Dimensionless(Expr):
     name: str
-    """Name for the dimensionless number, e.g. `reynolds`, `stanton`"""
+    """Name for the dimensionless number, e.g. `reynolds`, `prandtl`"""
 
     @property
     def dimension(self) -> Dimensionless:
@@ -184,10 +182,15 @@ class Exp(Expr):
         return Exp(self.base.dimension, self.exponent)
 
     def simplify(self) -> Expr:
+        """Flattens the expression by distributing exponents inward.
+
+        This is the first step of simplification, ensuring expressions like
+        (m/s)² correctly become m² / s² before terms are combined.
+        """
         base_exponent_pairs: dict[Expr, Exponent] = {}
         derived_conversions: list[tuple[Scaled, Exponent]] = []
-        _insert_root_expr(self, base_exponent_pairs, derived_conversions)
-        return _get_simplified_expression(
+        _decompose_expr(self, base_exponent_pairs, derived_conversions)
+        return _build_canonical_expr(
             base_exponent_pairs,
             derived_conversions,
             name_hint=f"expr_{hash(self)}",
@@ -202,7 +205,7 @@ class Mul(Expr):
     """Products of powers of an expression."""
 
     terms: tuple[Exp, ...]
-    """A tuple of expressions raised to an exponent."""
+    """A tuple of expressions raised to an exponent, preserving the order."""
     name: str | None = None
     """Name for this expression, e.g. `newton`, `joule`"""
 
@@ -232,11 +235,15 @@ class Mul(Expr):
         return "dimensionless"
 
     def simplify(self) -> Expr:
+        """Reduces the expression to its canonical product-of-powers form.
+
+        This combines all like terms, so N * kg⁻¹ simplifies into m * s⁻².
+        """
         base_exponent_pairs: dict[Expr, Exponent] = {}
         derived_conversions: list[tuple[Scaled, Exponent]] = []
         for term in self.terms:
-            _insert_root_expr(term, base_exponent_pairs, derived_conversions)
-        return _get_simplified_expression(
+            _decompose_expr(term, base_exponent_pairs, derived_conversions)
+        return _build_canonical_expr(
             base_exponent_pairs,
             derived_conversions,
             name_hint=self.name or f"expr_{hash(self)}",
@@ -251,20 +258,11 @@ class Scaled(Expr):
     reference: Expr
     """The unit or dimension that this unit or dimension is based on."""
     factor: Factor | LazyFactor
-    """Multiplying this factor converts this value into the reference.
+    """The exact factor to convert this unit or dimension to the reference.
     For example, `1 ft = 0.3048 m`, so the factor is 0.3048.
     """
     name: str
-    """Name of this unit or dimension."""
-
-    @property
-    def factor_approx(self) -> float | int:
-        """Approximate factor to convert this unit or dimension to the
-        reference unit or dimension."""
-        factor = self.factor
-        if isinstance(factor, LazyFactor):
-            return factor.approx
-        return float(_fraction_to_decimal(_factor_to_fraction(factor)))
+    """Name of this unit or dimension, e.g. `feet`."""
 
     @property
     def kind(self) -> ExpressionKind:
@@ -275,6 +273,12 @@ class Scaled(Expr):
         return self.reference.dimension
 
     def simplify(self) -> Scaled:
+        """Merges nested scaling factors into a single [`LazyFactor`][isq.LazyFactor].
+
+        For example, `Scaled(Scaled(M, 2), Fraction(1, 3))` will be simplified
+        to `Scaled(M, LazyFactor((Fraction(1, 3), 2))))`. Note that we do not
+        eagerly evaluate the multiplication.
+        """
         products: list[tuple[Factor, Exponent] | Factor] = []
         expr: Expr = self
         while True:
@@ -295,24 +299,33 @@ class Scaled(Expr):
 #
 # simplification
 #
-def _insert_root_expr(
+def _decompose_expr(
     exp: Exp,
     base_exponent_pairs_mut: MutableMapping[Expr, Exponent],
     scaled_conversions_mut: MutableSequence[tuple[Scaled, Exponent]],
 ) -> None:
+    """Recursively traverse an expression tree to flatten it.
+
+    Example: for `Exp(Mul(Exp(FT, 1), Exp(S, -1)), 2)`, we want to populate:
+
+    :param base_exponent_pairs_mut: A flat map of base units/dimensions to their
+        exponents, e.g. `{M: 2, S: -2}`
+    :param scaled_conversions_mut: A list of scaling factors encountered along
+        the way, e.g. `[(Scaled(M, 0.3048, "FT"), 2)]`
+    """
     if isinstance(exp.base, (Dimensionless, BaseDimension, BaseUnit)):
         base_exponent_pairs_mut.setdefault(exp.base, 0)
         base_exponent_pairs_mut[exp.base] += exp.exponent
     elif isinstance(exp.base, Exp):
         exp_inner = exp.base
-        _insert_root_expr(
+        _decompose_expr(
             Exp(exp_inner.base, exp_inner.exponent * exp.exponent),
             base_exponent_pairs_mut,
             scaled_conversions_mut,
         )
     elif isinstance(exp.base, Mul):
         for exp_inner in exp.base.terms:
-            _insert_root_expr(
+            _decompose_expr(
                 Exp(exp_inner.base, exp_inner.exponent * exp.exponent),
                 base_exponent_pairs_mut,
                 scaled_conversions_mut,
@@ -320,7 +333,7 @@ def _insert_root_expr(
     elif isinstance(exp.base, Scaled):
         expr_derived = exp.base
         scaled_conversions_mut.append((expr_derived, exp.exponent))
-        _insert_root_expr(
+        _decompose_expr(
             Exp(expr_derived.reference, exp.exponent),
             base_exponent_pairs_mut,
             scaled_conversions_mut,
@@ -329,12 +342,21 @@ def _insert_root_expr(
         raise ValueError(f"unknown expression {exp}")
 
 
-def _get_simplified_expression(
+def _build_canonical_expr(
     base_exponent_pairs: Mapping[Expr, Exponent],
     scaled_conversions: list[tuple[Scaled, Exponent]],
     *,
     name_hint: str,
 ) -> Expr:
+    r"""Construct a canonical expression from flattened parts.
+
+    This is second step of the simpification. Examples:
+
+    - `base_exponent_pairs = {M: 1, S: -2}` and an empty `scaled_conversions`,
+        this returns `Mul(Exp(M, 1), Exp(S, -2))`
+    - if `scaled_conversions` was `[(Scaled(M, 0.3048, "FT"), 2)]`, the result
+        would be wrapped: `Scaled(reference=Mul(..., factor=LazyFactor(...)`
+    """
     no_conversions_involved = not scaled_conversions
     simplified_expr: Expr
     # remove zero exponents and ensure canonical order by names
@@ -380,7 +402,11 @@ class Converter:
 
     @classmethod
     def new(cls, origin: Expr, target: Expr) -> Converter:
-        """Create a new unit converter from one unit to another."""
+        """Create a new unit converter from one unit to another.
+
+        Checks that the underlying dimension are compatible
+        (e.g. `USD/year` and `HKD/hour`) and computes the total scaling factor.
+        """
         origin_simpl = origin.simplify()
         target_simpl = target.simplify()
         if origin_simpl.kind != target_simpl.kind:
@@ -389,19 +415,20 @@ class Converter:
                 f"but {origin_simpl.kind} != {target_simpl.kind}"
             )
 
-        origin_inner_simpl, origin_factor = _get_factor(origin_simpl)
-        target_inner_simpl, target_factor = _get_factor(target_simpl)
-        dim_origin_simpl: Any = origin_inner_simpl.dimension
-        dim_target_simpl: Any = target_inner_simpl.dimension
-        # ensure `Mul` equality checks for terms, not including the name attr
-        if isinstance(dim_origin_simpl, Mul):
-            dim_origin_simpl = dim_origin_simpl.terms
-        if isinstance(dim_target_simpl, Mul):
-            dim_target_simpl = dim_target_simpl.terms
-        if dim_origin_simpl != dim_target_simpl:
+        origin_inner_simpl, origin_factor = _separate_factor(origin_simpl)
+        target_inner_simpl, target_factor = _separate_factor(target_simpl)
+        origin_dim = origin_inner_simpl.dimension
+        target_dim = target_inner_simpl.dimension
+        origin_dim_terms = (
+            origin_dim.terms if isinstance(origin_dim, Mul) else (origin_dim,)
+        )
+        target_dim_terms = (
+            target_dim.terms if isinstance(target_dim, Mul) else (target_dim,)
+        )
+        if origin_dim_terms != target_dim_terms:
             raise ValueError(
                 f"expected origin and target to have the same dimension, "
-                f"but {dim_origin_simpl} != {dim_target_simpl}"
+                f"but {origin_dim_terms} != {target_dim_terms}"
             )
         products: list[tuple[Factor, Exponent] | Factor] = []
         if isinstance(origin_factor, LazyFactor):
@@ -426,12 +453,21 @@ class Converter:
     def __call__(self, value: Any, *, exact: bool = False) -> Any:
         """Convert a value in the origin unit to the target unit."""
         return value * (
-            self.lazy_product.exact if exact else self.lazy_product.approx
+            self.lazy_product.to_exact()
+            if exact
+            else self.lazy_product.to_approx()
         )
 
 
-def _get_factor(expr_simpl: Expr) -> tuple[Expr, Factor | LazyFactor]:
-    """Get the inner expression and the factor of a simplified expression."""
+def _separate_factor(expr_simpl: Expr) -> tuple[Expr, Factor | LazyFactor]:
+    """Unpack a simplified expression into its unit and scaling factor.
+
+    This is used in [Converter.new][] to isolate the core unit from its
+    numerical scale. Examples:
+
+    - `Scaled(M, 0.3048)` → `(M, 0.3048)`
+    - `M` → `(M, 1.0)`
+    """
 
     if isinstance(expr_simpl, (BaseUnit, BaseDimension, Dimensionless)):
         return expr_simpl, 1.0
@@ -465,6 +501,13 @@ def _fraction_to_decimal(fraction: Fraction) -> Decimal:
 
 @dataclass(frozen=True)
 class LazyFactor:
+    r"""Represents a scaling factor as a sequence of products.
+
+    Lazy evaluation allows the choice between evaluating it to an exact value
+    (taking longer to compute, useful for financial calculations) or an
+    approximate float.
+    """
+
     products: tuple[tuple[Factor, Exponent] | Factor, ...]
 
     @classmethod
@@ -485,12 +528,45 @@ class LazyFactor:
                 products.append((scaled.factor, exponent))
         return cls(tuple(products))
 
-    @property
     @lru_cache(maxsize=None)
-    def exact(self) -> Fraction | Decimal:
-        """Evaluate the lazy factor to an exact fraction or decimal.
+    def to_approx(self) -> float:
+        """Reduce it to an approximate float value. Good enough for most
+        applications."""
+        product = 1.0
+        for item in self.products:
+            if isinstance(item, tuple):
+                base, exponent = item
+                exp_value = float(exponent)
+                if base == 0:
+                    if exp_value > 0:
+                        return 0.0
+                    if exp_value == 0:
+                        continue  # 0 ** 0 = 1
+                if base == 1:
+                    continue
+                product *= float(base) ** float(exponent)
+            else:
+                if item == 0:
+                    return 0.0
+                if item == 1:
+                    continue
+                product *= float(item)
+        return product
 
-        The return type depends on the products:
+    # NOTE: not defining `__mul__` to avoid confusion.
+    def __float__(self) -> float:
+        return self.to_approx()
+
+    # NOTE: not using lru_cache because decimal.Context is not hashable.
+    def to_exact(
+        self, *, ctx: decimal.Context | None = None
+    ) -> Fraction | Decimal:
+        """Reduce it to an *exact* fraction or decimal.
+
+        :param ctx: The decimal context (precision, rounding, etc.) to use.
+            If none, the global `decimal.getcontext()` is used.
+
+        The return type depends on the items of each product:
 
         ```
                          +--------+-------+----------------+
@@ -508,6 +584,7 @@ class LazyFactor:
 
         . Yes
         * Only if q > 0 and a^p and b^q are the perfect q-th power of an integer
+          e.g. (8/27) ** (1/3) = 2/3
         ^ Sometimes, e.g. 4 ** (1/2)
         x No, decimal only
         ```
@@ -515,9 +592,7 @@ class LazyFactor:
         For simplicity, only cases that can definitively be represented as a
         `Fraction` are returned as such. A `Decimal` is returned otherwise.
         """
-        # NOTE: lru_cache doesn't invalidate with changes in Decimal context
-        # TODO: figure out how to handle that
-        ctx = decimal.getcontext()
+        ctx = ctx or decimal.getcontext()
         # accumulate products in two streams: if the "tripwire" for decimal
         # is hit, we must return Decimal.
         product_fraction = Fraction(1)
@@ -528,9 +603,11 @@ class LazyFactor:
                 continue
             base, exponent = item
             if base == 0:
-                if exponent == 0:
-                    continue
-                return Fraction(0)
+                if exponent > 0:
+                    return Fraction(0)
+                if exponent < 0:
+                    raise ZeroDivisionError
+                continue  # 0 ** 0 = 1
             if base == 1:
                 continue
             if isinstance(exponent, int):
@@ -561,36 +638,25 @@ class LazyFactor:
             return product_fraction
         return _fraction_to_decimal(product_fraction) * product_decimal
 
-    @property
-    @lru_cache(maxsize=None)
-    def approx(self) -> float:
-        product = 1.0
-        for item in self.products:
-            if isinstance(item, tuple):
-                base, exponent = item
-                if base == 0:
-                    if exponent == 0:
-                        continue
-                    return 0.0
-                if base == 1:
-                    continue
-                product *= float(base) ** float(exponent)
-            else:
-                if item == 0:
-                    return 0.0
-                if item == 1:
-                    continue
-                product *= float(item)
-        return product
 
-    # NOTE: not defining `__mul__` to avoid confusion.
-    def __float__(self) -> float:
-        return self.approx
+# NOTE: for a registry, one option is to adopt https://peps.python.org/pep-0487/#subclass-registration:
+# - have a `Registrable` mixin with `__init_subclass__` so the act of defining a class `S` automatically adds it to a global dict
+# - this guarantees completeness with zero boilerplate
+# - BUT... importing a module containing units would have side effects. explicit registration is prob a better idea
+# - we need to be careful of circular imports (avoid importing ft before m)
 
 
 @dataclass(frozen=True)
-class Disambiguation:
-    dimension: Expr  # e.g. meter
+class Disambiguated:
+    """A wrapper used to disambiguate between quantities with the same
+    dimension.
+
+    For example, true airspeed (TAS, speed relative to air mass) and ground
+    speed (GS, speed relative to ground) both are measured in meters per second
+    but have different semantic meaning.
+    """
+
+    dimension: Expr
 
     def __call__(self, unit: Expr) -> Expr:
         # TODO: check dimension compatibility

@@ -98,8 +98,8 @@ LF_CASES = [
     LFCase(((0, 0),), Fraction(1), DP, None),
     LFCase(((0, Fraction(1, 2)),), Fraction(0), DP, None),
     LFCase(((0, Fraction(0, 1)),), Fraction(1), DP, None),
-    LFCase(((0, -2),), Fraction(0), DP, None),
-    LFCase(((0, Fraction(-1, 2)),), Fraction(0), DP, None),
+    LFCase(((0, -2),), None, DP, ZeroDivisionError),
+    LFCase(((0, Fraction(-1, 2)),), None, DP, ZeroDivisionError),
     # 1
     LFCase(((1, 10),), Fraction(1), DP, None),
     LFCase(((1, Fraction(2, 3)),), Fraction(1), DP, None),
@@ -150,13 +150,10 @@ def test_lazy_product(
             ctx.prec = tc.precision
         if tc.expected_exception:
             with pytest.raises(tc.expected_exception):
-                lpwe.exact
+                lpwe.to_exact()
         else:
-            # clear cache so we can test different precisions
-            # TODO: figure out a way to invalidate on precision change (?)
-            LazyFactor.exact.fget.cache_clear()  # type: ignore
-            result_exact = lpwe.exact
-            result_approx = lpwe.approx
+            result_exact = lpwe.to_exact(ctx=ctx)
+            result_approx = lpwe.to_approx()
             if isinstance(tc.expected_value, Fraction):
                 assert isinstance(result_exact, Fraction)
                 assert result_exact == tc.expected_value
