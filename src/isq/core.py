@@ -67,12 +67,11 @@ class Expr(Protocol):
 
         - `Exp(Exp(M, 2), 3)` → `Exp(M, 6)`
         - `Mul((Exp(M, 2), Exp(M, -2)))` → `Dimensionless`
-        - `Exp(Mul((Exp(M, 1), Exp(S, -1))), 2)` →
-          `Mul((Exp(M, 2), Exp(S, -2)))`
+        - `Exp(Mul((M, Exp(S, -1))), 2)` → `Mul((Exp(M, 2), Exp(S, -2)))`
         - `Scaled(Scaled(M, 2), 3)` → `Scaled(M, LazyFactor((3, 2)))`
         - `Scaled(Mul((Exp(Scaled(M, 2), 3), Exp(Scaled(S, 3), 2))), 6)` →
           `Scaled(Mul((Exp(M, 3), Exp(S, 2)), 432))`
-        - `Mul((Exp(HOUR, 1), Exp(DAY, -1)))` →
+        - `Mul((HOUR, Exp(DAY, -1)))` →
           `Scaled(Dimensionless, 1 / 24)`
         """
         # TODO: add new parameter `keep_named: bool = False`
@@ -191,7 +190,9 @@ class Exp(Expr):
         """
         base_exponent_pairs: dict[Expr, Exponent] = {}
         derived_conversions: list[tuple[Scaled, Exponent]] = []
-        _decompose_expr(self, base_exponent_pairs, derived_conversions)
+        _decompose_expr(
+            self.base, self.exponent, base_exponent_pairs, derived_conversions
+        )
         return _build_canonical_expr(
             base_exponent_pairs,
             derived_conversions,
@@ -206,8 +207,8 @@ class Exp(Expr):
 class Mul(Expr):
     """Products of powers of an expression."""
 
-    terms: tuple[Exp, ...]
-    """A tuple of expressions raised to an exponent, preserving the order."""
+    terms: tuple[Expr, ...]
+    """A tuple of expressions to be multiplied, preserving the order."""
     name: str | None = None
     """Name for this expression, e.g. `newton`, `joule`"""
 
@@ -215,7 +216,7 @@ class Mul(Expr):
         n_terms = len(self.terms)
         if n_terms == 0:
             raise ValueError("terms must not be empty, use `Dimensionless`")
-        unique_kinds = set(t.base.kind for t in self.terms) - {"dimensionless"}
+        unique_kinds = set(t.kind for t in self.terms) - {"dimensionless"}
         if len(unique_kinds) != 1:
             raise ValueError("terms must all be either `unit` or `dimension`")
 
@@ -230,7 +231,7 @@ class Mul(Expr):
     def kind(self) -> ExpressionKind:
         # all terms have a consistent underlying kind (unit/dimension)
         for term in self.terms:
-            term_kind = term.base.kind
+            term_kind = term.kind
             if term_kind != "dimensionless":
                 return term_kind
         # everything left are dimensionless to the power of something
@@ -243,8 +244,7 @@ class Mul(Expr):
         """
         base_exponent_pairs: dict[Expr, Exponent] = {}
         derived_conversions: list[tuple[Scaled, Exponent]] = []
-        for term in self.terms:
-            _decompose_expr(term, base_exponent_pairs, derived_conversions)
+        _decompose_expr(self, 1, base_exponent_pairs, derived_conversions)
         return _build_canonical_expr(
             base_exponent_pairs,
             derived_conversions,
@@ -339,50 +339,62 @@ class Disambiguated(Expr):
 # simplification
 #
 def _decompose_expr(
-    exp: Exp,
+    expr: Expr,  # ‾
+    exponent: Exponent,  # *
     base_exponent_pairs_mut: MutableMapping[Expr, Exponent],
-    scaled_conversions_mut: MutableSequence[tuple[Scaled, Exponent]],
+    scaled_conversions_mut: MutableSequence[tuple[Scaled, Exponent]],  # ^
 ) -> None:
     """Recursively traverse an expression tree to flatten it.
 
-    Example: for `Exp(Mul(Exp(FT, 1), Exp(S, -1)), 2)`, we want to populate:
+    This is the first step of the simplification, example:
 
-    :param base_exponent_pairs_mut: A flat map of base units/dimensions to their
-        exponents, e.g. `{M: 2, S: -2}`
-    :param scaled_conversions_mut: A list of scaling factors encountered along
-        the way, e.g. `[(Scaled(M, 0.3048, "FT"), 2)]`
+    - expr=Mul(Scaled(M, 0.3048, "FT"), Exp(S, -1)), exponent=2
+        - expr=Scaled(M, 0.3048, "FT"), exponent=2
+            - scaled_conversions_mut += [(Scaled(M, 0.3048, "FT"), 2)]
+            - expr=M, exponent=2
+                - base_exponent_pairs_mut[M] += 2
+        - expr=Exp(S, -1), exponent=2
+            - expr=Expr(S, -2), exponent=1
+                - base_exponent_pairs_mut[S] += -2
     """
     if isinstance(
-        exp.base, (Dimensionless, BaseDimension, BaseUnit, Disambiguated)
+        expr, (Dimensionless, BaseDimension, BaseUnit, Disambiguated)
     ):
-        # NOTE: disambiguated objects are treated as unique bases:
-        # prevents mixing up geopotential altitude with geometric altitude
-        base_exponent_pairs_mut.setdefault(exp.base, 0)
-        base_exponent_pairs_mut[exp.base] += exp.exponent
-    elif isinstance(exp.base, Exp):
-        exp_inner = exp.base
+        # we hit a fundamental-like unit (we treat disambiguated obj as unique
+        # bases). add its accumulated exponent
+        base_exponent_pairs_mut.setdefault(expr, 0)
+        base_exponent_pairs_mut[expr] += exponent
+    elif isinstance(expr, Exp):
+        # (xᵃ)ᵇ -> xᵃᵇ
+        # ‾‾‾‾*    ‾**
         _decompose_expr(
-            Exp(exp_inner.base, exp_inner.exponent * exp.exponent),
+            expr.base,
+            expr.exponent * exponent,
             base_exponent_pairs_mut,
             scaled_conversions_mut,
         )
-    elif isinstance(exp.base, Mul):
-        for exp_inner in exp.base.terms:
+    elif isinstance(expr, Mul):
+        # (xyᵃ)ᵇ -> xᵇyᵃᵇ
+        # ‾‾‾‾‾*    ‾*‾**
+        for term in expr.terms:
             _decompose_expr(
-                Exp(exp_inner.base, exp_inner.exponent * exp.exponent),
+                term,
+                exponent,
                 base_exponent_pairs_mut,
                 scaled_conversions_mut,
             )
-    elif isinstance(exp.base, Scaled):
-        expr_derived = exp.base
-        scaled_conversions_mut.append((expr_derived, exp.exponent))
+    elif isinstance(expr, Scaled):
+        # (kx)ᵇ -> kᵇxᵇ
+        # ‾‾‾‾*    ^^‾*
+        scaled_conversions_mut.append((expr, exponent))
         _decompose_expr(
-            Exp(expr_derived.reference, exp.exponent),
+            expr.reference,
+            exponent,
             base_exponent_pairs_mut,
             scaled_conversions_mut,
         )
     else:  # pragma: no cover
-        raise ValueError(f"unknown expression {exp}")
+        raise ValueError(f"unknown {type(expr)=}")
 
 
 def _build_canonical_expr(
@@ -395,10 +407,12 @@ def _build_canonical_expr(
 
     This is second step of the simpification. Examples:
 
-    - `base_exponent_pairs = {M: 1, S: -2}` and an empty `scaled_conversions`,
-        this returns `Mul(Exp(M, 1), Exp(S, -2))`
-    - if `scaled_conversions` was `[(Scaled(M, 0.3048, "FT"), 2)]`, the result
-        would be wrapped: `Scaled(reference=Mul(..., factor=LazyFactor(...)`
+    - `{}` and `[]` -> dimensionless
+    - `{M: 1}` and `[]` -> `M`
+    - `{M: 2}` and `[]` -> `Exp(M, 2)`
+    - `{M: 1, S: -2}` and `[]` -> `Mul(M, Exp(S, -2))`
+    - `{...}` and `[(Scaled(M, 0.3048, "FT"), 2)]` -> result will be wrapped:
+      `Scaled(reference=Mul(..., factor=LazyFactor(...)`
     """
     no_conversions_involved = not scaled_conversions
     simplified_expr: Expr
@@ -417,7 +431,7 @@ def _build_canonical_expr(
     else:
         simplified_expr = Mul(
             tuple(
-                Exp(base, exponent)
+                base if exponent == 1 else Exp(base, exponent)
                 for base, exponent in base_exponent_pairs_sorted
             ),
             name=name_hint if no_conversions_involved else None,

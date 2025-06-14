@@ -15,10 +15,10 @@ FT = Scaled(M, Decimal("0.3048"), "ft")
 IN = Scaled(FT, Fraction(1, 12), "in")
 
 LB = Scaled(KG, Decimal("0.45359237"), "lb")
-LBF = Mul((Exp(LB, 1), Exp(G0, 1)), "lbf")
+LBF = Mul((LB, G0), "lbf")
 
-PSI = Mul((Exp(LBF, 1), Exp(IN, -2)), "psi")
+PSI = Mul((LBF, Exp(IN, -2)), "psi")
 
-FT_PERS2 = Mul((Exp(FT, 1), Exp(S, -2)))
-SLUG = Mul((Exp(LBF, 1), Exp(FT_PERS2, -1)), "slug")
+FT_PERS2 = Mul((FT, Exp(S, -2)))
+SLUG = Mul((LBF, Exp(FT_PERS2, -1)), "slug")
 """Mass that is accelerated by 1 [ft s⁻²][isq.FT_PERS2] under 1 [lbf][isq.LBF] of force."""

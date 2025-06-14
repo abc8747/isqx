@@ -58,32 +58,32 @@ SR = Dimensionless("steradian")
 """Solid angle (steradians). Not to be confused with m² m⁻²."""
 HZ = Mul((Exp(S, -1),), "hertz")
 """Frequency (hertz). Shall only be used for periodic phenomena."""
-M_PERS = Mul((Exp(M, 1), Exp(S, -1)))
-M_PERS2 = Mul((Exp(M, 1), Exp(S, -2)))
-N = Mul((Exp(KG, 1), Exp(M_PERS2, 1)), "newton")  # F = ma
+M_PERS = Mul((M, Exp(S, -1)))
+M_PERS2 = Mul((M, Exp(S, -2)))
+N = Mul((KG, M_PERS2), "newton")  # F = ma
 """Force (newtons)"""
-PA = Mul((Exp(N, 1), Exp(M, -2)), "pascal")
+PA = Mul((N, Exp(M, -2)), "pascal")
 """Pressure, stress (pascals)"""
-J = Mul((Exp(N, 1), Exp(M, 1)), "joule")
+J = Mul((N, M), "joule")
 """Energy, work, amount of heat (joules)"""
-W = Mul((Exp(J, 1), Exp(S, -1)), "watt")
+W = Mul((J, Exp(S, -1)), "watt")
 """Power, radiant flux (watts)"""
-C = Mul((Exp(A, 1), Exp(S, 1)), "coulomb")
+C = Mul((A, S), "coulomb")
 """Electric charge (coulombs)"""
-V = Mul((Exp(W, 1), Exp(A, -1)), "volt")
+V = Mul((W, Exp(A, -1)), "volt")
 """Electric potential difference, voltage (volts).
 Also named "electric tension" or "tension"."""
-F = Mul((Exp(C, 1), Exp(V, -1)), "farad")
+F = Mul((C, Exp(V, -1)), "farad")
 """Capacitance (farads)"""
-OHM = Mul((Exp(V, 1), Exp(A, -1)), "ohm")
+OHM = Mul((V, Exp(A, -1)), "ohm")
 """Electric resistance (ohms)"""
-SIEMENS = Mul((Exp(A, 1), Exp(V, -1)), "siemens")
+SIEMENS = Mul((A, Exp(V, -1)), "siemens")
 """Electric conductance (siemens)"""
-WB = Mul((Exp(V, 1), Exp(S, 1)), "weber")
+WB = Mul((V, S), "weber")
 """Magnetic flux (webers)"""
-T = Mul((Exp(WB, 1), Exp(M, -2)), "tesla")
+T = Mul((WB, Exp(M, -2)), "tesla")
 """Magnetic flux density (teslas)"""
-H = Mul((Exp(WB, 1), Exp(A, -1)), "henry")
+H = Mul((WB, Exp(A, -1)), "henry")
 """Inductance (henries)"""
 # NOTE: degree celsius is a special case: ℃² does not equal K² so we don't
 # define it as a scaled unit of kelvin.
@@ -93,19 +93,19 @@ The numerical value of a temperature difference is the same when expressed
 in either degrees Celsius or in Kelvins."""
 # NOTE: The symbol `sr` for must be included to distinguish luminous flux (lumen)
 # from luminous intensity (candela)
-LM = Mul((Exp(CD, 1), Exp(SR, 1)), "lumen")
+LM = Mul((CD, SR), "lumen")
 """Luminous flux (lumens)"""
-LX = Mul((Exp(LM, 1), Exp(M, -2)), "lux")
+LX = Mul((LM, Exp(M, -2)), "lux")
 """Illuminance (lux)"""
 BQ = Mul((Exp(S, -1),), "becquerel")
 """Activity referred to a radionuclide (becquerels). Shall only be used for
 stochastic processes in activity referred to a radionuclide.
 Not to be confused with "radioactivity"."""
-GY = Mul((Exp(J, 1), Exp(KG, -1)), "gray")
+GY = Mul((J, Exp(KG, -1)), "gray")
 """Absorbed dose, kerma (grays)"""
-SV = Mul((Exp(J, 1), Exp(KG, -1)), "sievert")
+SV = Mul((J, Exp(KG, -1)), "sievert")
 """Dose equivalent (sieverts)"""
-KAT = Mul((Exp(MOLE, 1), Exp(S, -1)), "katal")
+KAT = Mul((MOLE, Exp(S, -1)), "katal")
 """Catalytic activity (katal)"""
 
 MIN = Scaled(S, 60, "minute")

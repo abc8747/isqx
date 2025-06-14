@@ -39,19 +39,19 @@ At the current state, it merely serves to enable writing machine-readable, struc
     ```py
     from isq import N, KG
 
-    # N = Mul((Exp(KG, 1), Exp(M, 1), Exp(S, -2)), name='newton')
-    ACCELERATION = Mul((Exp(N, 1), Exp(KG, -1)))
+    # N = Mul((KG, M, Exp(S, -2)), name='newton')
+    ACCELERATION = Mul((N, Exp(KG, -1)))
     print(ACCELERATION)
-    # Mul((Exp(N, 1), Exp(KG, -1)))
+    # Mul((N, Exp(KG, -1)))
     ```
     Sometimes, we just want a semantically meaningful unit. Units are not aggressively simplified by default.
 - **Simplification**: The `simplify()` method reduces complex nested expressions into a canonical form (product of base units raised to powers, potentially scaled).
     ```py
     from isq import N, KG, Exp, Mul
 
-    ACCELERATION = Mul((Exp(N, 1), Exp(KG, -1)))
+    ACCELERATION = Mul((N, Exp(KG, -1)))
     print(ACCELERATION.simplify())
-    # Mul((Exp(M, 1), Exp(S, -2)))
+    # Mul((M, Exp(S, -2)))
     ```
     This forms the basis for checking dimensional homogeneity.
 - **Unit Conversion**: The `to()` method returns a function that allow you to convert between compatible units.
@@ -60,8 +60,8 @@ At the current state, it merely serves to enable writing machine-readable, struc
 
     # FT = Scaled(M, factor=Decimal('0.3048'))
     # MIN = Scaled(S, factor=60)
-    FT_PER_MIN = Mul((Exp(FT, 1), Exp(MIN, -1)))
-    M_PER_S = Mul((Exp(M, 1), Exp(S, -1)))
+    FT_PER_MIN = Mul((FT, Exp(MIN, -1)))
+    M_PER_S = Mul((M, Exp(S, -1)))
     fpm2mps = FT_PER_MIN.to(M_PER_S)
     print(fpm2mps(1000, exact=True))  # Fraction(127, 25)
     print(fpm2mps(100.0))  # 0.508
@@ -75,8 +75,8 @@ At the current state, it merely serves to enable writing machine-readable, struc
     DIM_MONEY = BaseDimension("MONEY")
     USD = BaseUnit(DIM_MONEY, name="USD")
     HKD = Scaled(USD, factor=1 / Decimal("7.8"), name="HKD")
-    USD_PER_HR = Mul((Exp(USD, 1), Exp(HOUR, -1)))
-    HKD_PER_YEAR = Mul((Exp(HKD, 1), Exp(WEEK, -1)))
+    USD_PER_HR = Mul((USD, Exp(HOUR, -1)))
+    HKD_PER_YEAR = Mul((HKD, Exp(WEEK, -1)))
     print(USD_PER_HR.to(HKD_PER_WEEK)(13))  # 888872.4
     ```
 - **Disambiguation**: Quantities often share the same physical dimension but are semantically distinct. Examples:

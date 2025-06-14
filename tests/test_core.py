@@ -60,20 +60,20 @@ def test_mul_invalid() -> None:
     with pytest.raises(ValueError):
         _u0 = Mul(tuple())
     with pytest.raises(ValueError):
-        _u1 = Mul((Exp(M, 1), Exp(M.dimension, 1)))
+        _u1 = Mul((M, M.dimension))
 
 
-M_PERS = Mul((Exp(M, 1), Exp(S, -1)))
-FT_PERMIN = Mul((Exp(FT, 1), Exp(MIN, -1)))
+M_PERS = Mul((M, Exp(S, -1)))
+FT_PERMIN = Mul((FT, Exp(MIN, -1)))
 
 
 def test_mul_dimension() -> None:
-    assert M_PERS.dimension == Mul((Exp(M.dimension, 1), Exp(S.dimension, -1)))
+    assert M_PERS.dimension == Mul((M.dimension, Exp(S.dimension, -1)))
 
 
 def test_mul_simplify_basic() -> None:
     # cancel terms
-    expr1s = Mul((Exp(M, 1), Exp(M, -1))).simplify()
+    expr1s = Mul((M, Exp(M, -1))).simplify()
     assert isinstance(expr1s, Dimensionless)
 
     # distribute inner
@@ -82,7 +82,7 @@ def test_mul_simplify_basic() -> None:
     assert expr2s.terms == Mul((Exp(M, 2), Exp(S, -2))).terms
 
     # combine terms with same base
-    expr_s = Mul((Exp(M, 1), Exp(S, -1), Exp(M, 2), Exp(S, -2))).simplify()
+    expr_s = Mul((M, Exp(S, -1), Exp(M, 2), Exp(S, -2))).simplify()
     assert isinstance(expr_s, Mul)
     assert expr_s.terms == Mul((Exp(M, 3), Exp(S, -3))).terms
 
@@ -91,23 +91,13 @@ def test_mul_simplify_basic() -> None:
     assert isinstance(expr_s, BaseUnit)
     assert expr_s == M
 
-    # NOTE: right now, `Mul` terms must be `Exp(base, exponent)` objects
-    # which means that the following with not simplify to `M * S`
-    # but in the future, we may want to change this
-    expr_ = Mul((Exp(M, 1), Exp(S, 1)))
-    expr_s = expr_.simplify()
-    assert isinstance(expr_s, Mul)
-    assert expr_s.terms == expr_.terms
-
 
 def test_mul_simplify_nested() -> None:
-    assert isinstance(
-        Mul((Exp(M_PERS, 1), Exp(M_PERS, -1))).simplify(), Dimensionless
-    )
+    assert isinstance(Mul((M_PERS, Exp(M_PERS, -1))).simplify(), Dimensionless)
 
 
 def test_mul_simplify_ordering() -> None:
-    PERSM = Mul((Exp(S, -1), Exp(M, 1))).simplify()
+    PERSM = Mul((Exp(S, -1), M)).simplify()
     assert isinstance(PERSM, Mul)
     assert PERSM.terms == M_PERS.terms
 
@@ -150,7 +140,7 @@ def test_scaled_simplify_mixed() -> None:
 
 
 def test_scaled_simplify_dimensionless() -> None:
-    expr5s = Mul((Exp(HOUR, 1), Exp(DAY, -1))).simplify()
+    expr5s = Mul((HOUR, Exp(DAY, -1))).simplify()
     assert isinstance(expr5s, Scaled)
     assert isinstance(expr5s.reference, Dimensionless)
     assert isinstance(expr5s.factor, LazyFactor)
@@ -214,20 +204,20 @@ def test_scaled_simplify_complex() -> None:
     CM = Scaled(M, Decimal("0.01"), "centimeter")
     KM = Scaled(M, Decimal("1000"), "kilometer")
 
-    BIRD_PERKM2 = Mul((Exp(BIRD, 1), Exp(KM, -2)))
-    POOP_PERBIRD_PERHOUR = Mul((Exp(POOP, 1), Exp(BIRD, -1), Exp(HOUR, -1)))
-    HOURS_PERDAY = Mul((Exp(HOUR, 1), Exp(DAY, -1)))
-    MOUTHS_PERPOOP = Mul((Exp(MOUTH, 1), Exp(POOP, -1)))
+    BIRD_PERKM2 = Mul((BIRD, Exp(KM, -2)))
+    POOP_PERBIRD_PERHOUR = Mul((POOP, Exp(BIRD, -1), Exp(HOUR, -1)))
+    HOURS_PERDAY = Mul((HOUR, Exp(DAY, -1)))
+    MOUTHS_PERPOOP = Mul((MOUTH, Exp(POOP, -1)))
     CM2_PERMOUTH = Mul((Exp(CM, 2), Exp(MOUTH, -1)))
 
     PERIOD = Exp(
         Mul(
             (
-                Exp(BIRD_PERKM2, 1),
-                Exp(POOP_PERBIRD_PERHOUR, 1),
-                Exp(HOURS_PERDAY, 1),
-                Exp(MOUTHS_PERPOOP, 1),
-                Exp(CM2_PERMOUTH, 1),
+                BIRD_PERKM2,
+                POOP_PERBIRD_PERHOUR,
+                HOURS_PERDAY,
+                MOUTHS_PERPOOP,
+                CM2_PERMOUTH,
             ),
         ),
         -1,
@@ -263,11 +253,11 @@ def test_disambiguated_invalid_construction() -> None:
 
 
 def test_disambiguated_simplify_cancellation() -> None:
-    expr_same_ctx = Mul((Exp(M_ALT_GEOP, 1), Exp(M_ALT_GEOP, -1)))
+    expr_same_ctx = Mul((M_ALT_GEOP, Exp(M_ALT_GEOP, -1)))
     simplified_same = expr_same_ctx.simplify()
     assert isinstance(simplified_same, Dimensionless)
 
-    expr_diff_ctx = Mul((Exp(M_ALT_GEOP, 1), Exp(M_ALT_GEOM, -1)))
+    expr_diff_ctx = Mul((M_ALT_GEOP, Exp(M_ALT_GEOM, -1)))
     simplified_diff = expr_diff_ctx.simplify()
     assert isinstance(simplified_diff, Mul)  # shouldn't cancel
     assert set(simplified_diff.terms) == set(expr_diff_ctx.terms)
@@ -320,10 +310,9 @@ def test_convert_base_dimension() -> None:
     assert DIM_TIME.to(DIM_TIME)(1) == 1  # -> BaseDimension
     with pytest.raises(ValueError):
         _fn = Scaled(DIM_TIME, 1, "s").to(S)  # -> BaseUnit
-    DIM_TIME1 = Exp(DIM_TIME, 1)
-    assert DIM_TIME.to(DIM_TIME1)(1) == 1  # -> Exp
-    assert DIM_TIME.to(Mul((DIM_TIME1,), "dim_time1"))(1) == 1  # -> Mul
-    assert DIM_TIME.to(Scaled(DIM_TIME1, 2, "dim_time1"))(1) == 0.5  # -> Scaled
+    assert DIM_TIME.to(Exp(DIM_TIME, 1))(1) == 1  # -> Exp
+    assert DIM_TIME.to(Mul((DIM_TIME,), "dim_time1"))(1) == 1  # -> Mul
+    assert DIM_TIME.to(Scaled(DIM_TIME, 2, "dim_time1"))(1) == 0.5  # -> Scaled
 
 
 def test_convert_base_unit() -> None:
@@ -334,10 +323,9 @@ def test_convert_base_unit() -> None:
     assert S.to(S)(1) == 1  # -> BaseUnit
     with pytest.raises(ValueError):
         _fn = S.to(S.dimension)  # -> BaseDimension
-    S1 = Exp(S, 1)
-    assert S.to(S1)(1) == 1  # -> Exp
-    assert S.to(Mul((S1,), "s1"))(1) == 1  # -> Mul
-    assert S.to(Scaled(S1, 2, "2s1"))(1) == 0.5  # -> Scaled
+    assert S.to(Exp(S, 1))(1) == 1  # -> Exp
+    assert S.to(Mul((S,), "s1"))(1) == 1  # -> Mul
+    assert S.to(Scaled(S, 2, "2s1"))(1) == 0.5  # -> Scaled
 
 
 def test_convert_exp() -> None:
@@ -377,8 +365,7 @@ def test_convert_scaled() -> None:
     assert DAY.to(S)(1) == 86400  # -> BaseUnit
     with pytest.raises(ValueError):
         _value = HOUR.to(S.dimension)  # -> BaseDimension
-    S1 = Exp(S, 1)
-    assert DAY.to(S1)(1) == 86400  # -> Exp
-    assert DAY.to(Mul((S1,), "s1"))(1) == 86400  # -> Mul
+    assert DAY.to(Exp(S, 1))(1) == 86400  # -> Exp
+    assert DAY.to(Mul((S,), "s1"))(1) == 86400  # -> Mul
     assert MIN.to(HOUR)(60) == 1  # -> Scaled
     assert DAY.to(DAY)(1) == 1
