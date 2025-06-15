@@ -100,10 +100,8 @@ At the current state, it merely serves to enable writing machine-readable, struc
 
 ## TODOs
 
+- support for tricky units (`Translated`: farenheit and celsius, `Logarithmic`: pH and dB).
 - enable intuitive construction like `M * S**-1` directly producing new `Expr` objects (impl `__mul__`, `__truediv__`, `__pow__` for `Expr`)
-- allow `simplify(keep_named=True)` to preserve user-defined `Scaled` units (e.g. keep `psi` rather than always reducing down to `lbf in**-2` or even further)
-- support for prefixes (e.g. `KILO`)
-- support for tricky affine units (e.g., farenheit, celsius)
 - convert `Expr` objects to various string representations (`siunitx`, LaTeX, ASCII, etc).
 - potentially, create a `mkdocs` plugin that serialises them
 

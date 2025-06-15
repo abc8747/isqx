@@ -11,6 +11,7 @@ Units as defined by the International System of Units (SI)
 """
 
 from decimal import Decimal
+from fractions import Fraction
 
 from .core import (
     BaseDimension,
@@ -18,6 +19,7 @@ from .core import (
     Dimensionless,
     Exp,
     Mul,
+    Prefix,
     Scaled,
 )
 
@@ -34,6 +36,8 @@ M = BaseUnit(DIM_LENGTH, "meter")
 DIM_MASS = BaseDimension("M")
 KG = BaseUnit(DIM_MASS, "kilogram")
 """Mass (kilograms)"""
+GRAM = Scaled(KG, Fraction(1, 1000), "gram", allow_prefix=True)
+"""Mass (grams)"""
 DIM_CURRENT = BaseDimension("I")
 A = BaseUnit(DIM_CURRENT, "ampere")
 """Electric Current (amperes)"""
@@ -48,7 +52,7 @@ CD = BaseUnit(DIM_LUMINOUS_INTENSITY, "candela")
 """Luminous Intensity (candelas)"""
 
 #
-# derived Units [1, page 137, section 2.3.4] [2, page 22, table 5]
+# derived units [1, page 137, section 2.3.4] [2, page 22, table 5]
 # important and widely used, but which do not properly fall within the SI.
 #
 
@@ -108,11 +112,53 @@ SV = Mul((J, Exp(KG, -1)), "sievert")
 KAT = Mul((MOLE, Exp(S, -1)), "katal")
 """Catalytic activity (katal)"""
 
+#
+# si prefixes [1, page 143] [2, page 4, table 1]
+#
+
+YOTTA = Prefix(10**24, "yotta")
+ZETTA = Prefix(10**21, "zetta")
+EXA = Prefix(10**18, "exa")
+PETA = Prefix(10**15, "peta")
+TERA = Prefix(10**12, "tera")
+GIGA = Prefix(10**9, "giga")
+MEGA = Prefix(10**6, "mega")
+KILO = Prefix(10**3, "kilo")
+HECTO = Prefix(10**2, "hecto")
+DECA = Prefix(10**1, "deca")
+DECI = Prefix(Fraction(1, 10**1), "deci")
+CENTI = Prefix(Fraction(1, 10**2), "centi")
+MILLI = Prefix(Fraction(1, 10**3), "milli")
+MICRO = Prefix(Fraction(1, 10**6), "micro")
+NANO = Prefix(Fraction(1, 10**9), "nano")
+PICO = Prefix(Fraction(1, 10**12), "pico")
+FEMTO = Prefix(Fraction(1, 10**15), "femto")
+ATTO = Prefix(Fraction(1, 10**18), "atto")
+ZEPTO = Prefix(Fraction(1, 10**21), "zepto")
+YOCTO = Prefix(Fraction(1, 10**24), "yocto")
+
+KIBI = Prefix(1024**1, "kibi")
+MEBI = Prefix(1024**2, "mebi")
+GIBI = Prefix(1024**3, "gibi")
+TEBI = Prefix(1024**4, "tebi")
+PEBI = Prefix(1024**5, "pebi")
+EXBI = Prefix(1024**6, "exbi")
+ZEBI = Prefix(1024**7, "zebi")
+YOBI = Prefix(1024**8, "yobi")
+
+
+#
+# non-si units accepted for use in the si [1: page 145]
+#
+
 MIN = Scaled(S, 60, "minute")
 HOUR = Scaled(MIN, 60, "hour")
 DAY = Scaled(HOUR, 24, "day")
 YEAR = Scaled(DAY, Decimal("365.25"), "year")  # on average
 DECADE = Scaled(YEAR, 10, "decade")
 CENTURY = Scaled(DECADE, 10, "century")
+
+L = Scaled(Exp(M, 3), Fraction(1, 10**3), "liter", allow_prefix=True)
+TONNE = Scaled(KG, 1000, "tonne", allow_prefix=True)
 
 G0 = Scaled(M_PERS2, Decimal("9.80665"), "standard_gravity")  # page 159

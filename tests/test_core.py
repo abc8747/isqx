@@ -243,6 +243,30 @@ def test_scaled_simplify_complex() -> None:
 
 
 #
+# prefix
+#
+
+
+def test_prefix_invalid() -> None:
+    from isq import GRAM, KG, KILO, W
+
+    KW = KILO * W
+    assert KW.name == KILO.name + W.name  # type: ignore
+    with pytest.raises(TypeError):
+        _ = KILO * KG.dimension  # type: ignore
+    with pytest.raises(TypeError):
+        _ = KILO * KG
+    with pytest.raises(TypeError):
+        _ = KILO * Mul((KG, Exp(S, -1)))
+    with pytest.raises(TypeError):
+        _ = KILO * KW
+    with pytest.raises(TypeError):
+        _ = KILO * GRAM
+    with pytest.raises(TypeError):
+        _ = KILO * Exp(M, 3)  # type: ignore
+
+
+#
 # disambiguated
 #
 

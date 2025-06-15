@@ -74,9 +74,12 @@ class Expr(Protocol):
         - `Mul((HOUR, Exp(DAY, -1)))` →
           `Scaled(Dimensionless, 1 / 24)`
         """
-        # TODO: add new parameter `keep_named: bool = False`
-        # why: we sometimes dont want ft² to be simplified to 0.09290304 m²
         ...
+
+    # TODO: in the future, we want a as_basis() function that accepts set[Expr]
+    # why: we sometimes want to re-express some unit not in MKS, but CGS
+    # that will require linear algebra to solve the dimensional exponents but
+    # we're leaving that as optional and far in the future.
 
     def to(self, target: Expr) -> Converter:
         """Return a converter object, that when called with a value, converts it
@@ -265,6 +268,9 @@ class Scaled(Expr):
     """
     name: str
     """Name of this unit or dimension, e.g. `feet`."""
+    allow_prefix: bool = False
+    """Whether to allow prefixes to be attached. This should only be true for
+    some units like `liter`, `tonne`, `electronvolt`"""
 
     @property
     def kind(self) -> ExpressionKind:
@@ -296,6 +302,58 @@ class Scaled(Expr):
 
     def to(self, target: Expr) -> Converter:
         return Converter.new(origin=self, target=target)
+
+
+@dataclass(frozen=True)
+class Prefix:
+    """A factory, which when multiplied by a [base unit][isq.BaseUnit] or
+    [**named** derived unit][isq.Mul], returs a [scaled unit][isq.Scaled].
+
+    Note that this is not an [isq.Expr][], but a *constructor helper*.
+    """
+
+    factor: Factor
+    name: str
+    """Name of this prefix, e.g. `milli`, `kibi`"""
+
+    def __mul__(self, rhs: BaseUnit | Mul | Scaled) -> Scaled:
+        if rhs.kind != "unit":
+            raise TypeError(
+                f"cannot apply prefix `{self.name}` to {rhs=}"
+                f"\nhelp: expected rhs to be a unit, but rhs is `{rhs.kind}`"
+            )
+        if isinstance(rhs, BaseUnit) and rhs.name == "kilogram":
+            raise TypeError(
+                f"cannot apply prefix `{self.name}` to `KG`."
+                "\nhelp: apply it to `GRAM` instead."
+            )  # kilo(kilogram)
+        if isinstance(rhs, Mul) and rhs.name is None:
+            raise TypeError(
+                f"cannot apply prefix `{self.name}` to unnamed derived unit"
+                f" {rhs}\nhelp: must be a named derived unit like Newtons."
+            )  # kilo(m s⁻¹)
+        if isinstance(rhs, Scaled):
+            if not rhs.allow_prefix:
+                raise TypeError(
+                    f"cannot apply another prefix `{self.name}` to a unit that"
+                    "does not allow further prefixes"
+                )  # kilo(kilowatt)
+            if self.name == "kilo" and rhs.name == "gram":
+                raise TypeError(
+                    "cannot apply prefix KILO to GRAM"
+                    "\nhelp: use isq.KG directly instead"
+                )
+        if not isinstance(rhs, (BaseUnit, Mul, Scaled)):
+            raise TypeError(
+                f"cannot apply prefix `{self.name}` to {rhs=} ({type(rhs)=})"
+                f"\nhelp: rhs must be `GRAM`, or a `BaseUnit` (e.g. meters, "
+                "except kg) or a named derived unit (e.g. newtons)."
+            )  # kilo(m³), kilo(Re)
+
+        new_name = f"{self.name}{rhs.name}"
+        return Scaled(rhs, self.factor, name=new_name, allow_prefix=False)
+
+    # NOTE: not defining __rmul__ to avoid confusion
 
 
 @dataclass(frozen=True)
