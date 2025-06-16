@@ -17,7 +17,9 @@ from .core import (
     BaseDimension,
     BaseUnit,
     Dimensionless,
+    E,
     Exp,
+    Logarithmic,
     Mul,
     Prefix,
     Scaled,
@@ -159,3 +161,20 @@ L = Scaled(Exp(M, 3), Fraction(1, 10**3), "liter", allow_prefix=True)
 TONNE = Scaled(KG, 1000, "tonne", allow_prefix=True)
 
 G0 = Scaled(M_PERS2, Decimal("9.80665"), "standard_gravity")  # page 159
+
+#
+# logarithmic quantities [1, page 145] [ISO 80000-3:2006]
+#
+# NOTE: not defining the abstract neper or bel.
+
+DBV = Logarithmic(V, quantity_type="field", log_base=10, name="dBV")
+DBUV = Logarithmic(MICRO * V, quantity_type="field", log_base=10, name="dBμV")
+NPV = Logarithmic(
+    V, quantity_type="field", log_base=E(), name="NpV", allow_prefix=True
+)
+
+DBM = Logarithmic(MILLI * W, quantity_type="power", log_base=10, name="dBm")
+DBW = Logarithmic(W, quantity_type="power", log_base=10, name="dBW")
+NPW = Logarithmic(
+    W, quantity_type="power", log_base=E(), name="NpW", allow_prefix=True
+)

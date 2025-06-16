@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import decimal
+import math
 from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
@@ -40,8 +41,9 @@ class Expr(Protocol):
     | [scaled expression][isq.Scaled]           | [feet][isq.FT] = 0.3048 m |
     | [disambiguated][isq.Disambiguated]        | true vs ground speed      |
     | [translated expression][isq.Translated]^  | [celsius][isq.CELSIUS]    |
+    | [logarithmic quantity][isq.Logarithmic]^  | [decibel-volts][isq.DBV]  |
 
-    ^ translated units are *terminal*, meaning it cannot be further
+    ^ these expressions are *terminal*, meaning it cannot be further
       [exponentiated][isq.Exp], [multiplied][isq.Mul], [scaled][isq.Scaled] or
       [translated][isq.Translated] to form a more complex expression. However,
       it can be further [disambiguated][isq.Disambiguated] (e.g. surface
@@ -50,7 +52,7 @@ class Expr(Protocol):
 
     @property
     def dimension(self) -> Expr:
-        r"""Return the dimension of this "unit-like" expression.
+        """Return the dimension of this "unit-like" expression.
         Note that it does not perform simplification.
 
         Examples:
@@ -62,7 +64,7 @@ class Expr(Protocol):
 
     @property
     def kind(self) -> ExpressionKind:
-        r"""Whether this expression is a unit, dimension, or dimensionless."""
+        """Whether this expression is a unit, dimension, or dimensionless."""
         ...
 
     def simplify(self) -> Expr:
@@ -103,6 +105,7 @@ class ConvertMixin:
         :param target: The target unit or dimension to convert to. Must have
             compatible dimensions with the origin.
         """
+        ctx = ctx or decimal.getcontext()
         return Converter.new(origin=self, target=target, exact=exact, ctx=ctx)
 
 
@@ -119,7 +122,7 @@ class Dimensionless(ConvertMixin, Expr):
     def kind(self) -> ExpressionKind:
         return "dimensionless"
 
-    def simplify(self) -> Expr:
+    def simplify(self) -> Dimensionless:
         return self
 
 
@@ -136,7 +139,7 @@ class BaseDimension(ConvertMixin, Expr):
     def kind(self) -> ExpressionKind:
         return "dimension"
 
-    def simplify(self) -> Expr:
+    def simplify(self) -> BaseDimension:
         return self
 
 
@@ -155,7 +158,7 @@ class BaseUnit(ConvertMixin, Expr):
     def kind(self) -> ExpressionKind:
         return "unit"
 
-    def simplify(self) -> Expr:
+    def simplify(self) -> BaseUnit:
         return self
 
 
@@ -180,12 +183,18 @@ class Exp(ConvertMixin, Expr):
     def __post_init__(self) -> None:
         if self.exponent == 0:
             raise ValueError("exponent must not be zero, use `Dimensionless`")
-        if isinstance(ref := _unwrap_disambiguated(self.base), Translated):
+        ref = _unwrap_disambiguated(self.base)
+        if isinstance(ref, Translated):
             raise ValueError(
                 f"translated expression `{ref.name}` is terminal: it cannot be"
                 f"futher raised to the power of {self.exponent}"
                 f"\nhelp: did you mean to exponentiate {ref.reference}?"
             )  # prevent ℃². J ℃⁻¹ should be written as J K⁻¹
+        if isinstance(ref, Logarithmic):
+            raise ValueError(
+                f"logarithmic expression `{ref.name}` is terminal: it cannot be"
+                f"further raised to the power of {self.exponent}"
+            )
 
     @property
     def kind(self) -> ExpressionKind:
@@ -228,13 +237,19 @@ class Mul(ConvertMixin, Expr):
             raise ValueError("terms must not be empty, use `Dimensionless`")
         kinds = []
         for term in self.terms:
-            if isinstance(ref := _unwrap_disambiguated(term), Translated):
+            ref = _unwrap_disambiguated(term)
+            if isinstance(ref, Translated):
                 raise ValueError(
-                    f"translated expression `{ref}` is terminal:"
+                    f"translated expression `{ref.name}` is terminal:"
                     "it cannot be multiplied with other expressions"
                     "\nhelp: use its absolute reference instead"
                     f": `{ref.reference}`"
                 )  # prevent ℃ * ℃
+            if isinstance(ref, Logarithmic):
+                raise ValueError(
+                    f"logarithmic expression `{ref.name}` is terminal: "
+                    "it cannot be multiplied with other expressions"
+                )
             kinds.append(term.kind)
         unique_kinds = set(kinds) - {"dimensionless"}
         if len(unique_kinds) != 1:
@@ -287,11 +302,14 @@ class Scaled(ConvertMixin, Expr):
     some units like `liter`, `tonne`, `electronvolt`"""
 
     def __post_init__(self) -> None:
-        if isinstance(ref := _unwrap_disambiguated(self.reference), Translated):
+        ref = _unwrap_disambiguated(self.reference)
+        if isinstance(ref, Translated) or (
+            isinstance(ref, Logarithmic) and not ref.allow_prefix
+        ):
             raise ValueError(
-                f"translated expression `{ref.name}` is terminal:"
-                f"it cannot be further scaled"
-            )  # prevent 13 * ℃
+                f"expression `{ref.name}` is terminal:"
+                " it cannot be further scaled"
+            )  # prevent 13 * ℃, milli(decibel)
 
     @property
     def kind(self) -> ExpressionKind:
@@ -334,8 +352,8 @@ class Prefix:
     name: str
     """Name of this prefix, e.g. `milli`, `kibi`"""
 
-    def __mul__(self, rhs: BaseUnit | Mul | Scaled) -> Scaled:
-        if rhs.kind != "unit":
+    def __mul__(self, rhs: BaseUnit | Mul | Scaled | Logarithmic) -> Scaled:
+        if not isinstance(rhs, Logarithmic) and rhs.kind != "unit":
             raise TypeError(
                 f"cannot apply prefix `{self.name}` to {rhs=}"
                 f"\nhelp: expected rhs to be a unit, but rhs is `{rhs.kind}`"
@@ -361,11 +379,17 @@ class Prefix:
                     "cannot apply prefix KILO to GRAM"
                     "\nhelp: use isq.KG directly instead"
                 )
-        if isinstance(_unwrap_disambiguated(rhs), Translated):
+        ref = _unwrap_disambiguated(rhs)
+        if isinstance(ref, Translated):
             raise TypeError(
                 f"cannot apply prefix `{self.name}` to translated unit {rhs=}"
             )  # kilo(℃)
-        if not isinstance(rhs, (BaseUnit, Mul, Scaled)):
+        if isinstance(ref, Logarithmic) and not ref.allow_prefix:
+            raise TypeError(
+                f"cannot apply prefix `{self.name}` to logarithmic unit {rhs=} "
+                "because it does not allow prefixes"
+            )  # kilo(dB)
+        if not isinstance(rhs, (BaseUnit, Mul, Scaled, Logarithmic)):
             raise TypeError(
                 f"cannot apply prefix `{self.name}` to {rhs=} ({type(rhs)=})"
                 f"\nhelp: rhs must be `GRAM`, or a `BaseUnit` (e.g. meters, "
@@ -424,11 +448,12 @@ class Translated(ConvertMixin, Expr):
     name: str
 
     def __post_init__(self) -> None:
-        if isinstance(self.reference, Translated):
-            raise TypeError("nesting translated units is not allowed")
-        if not isinstance(
-            ref := _unwrap_disambiguated(self.reference), (BaseUnit, Scaled)
-        ):
+        ref = _unwrap_disambiguated(self.reference)
+        if isinstance(ref, Translated):
+            raise TypeError(
+                "nesting translated units in `Translated` is not allowed"
+            )
+        if not isinstance(ref, (BaseUnit, Scaled)):
             raise TypeError(
                 f"reference of translated unit `{self.name}` must be a"
                 f"BaseUnit or Scaled, not `{type(ref).__name__}`"
@@ -446,7 +471,79 @@ class Translated(ConvertMixin, Expr):
         return Translated(self.reference.simplify(), self.offset, self.name)
 
 
+@dataclass
+class Logarithmic(ConvertMixin, Expr):
+    r"""A logarithmic unit, representing a level of a quantity.
+
+    A level $L$ is defined as the ratio between a quantity to its reference:
+    $$
+    L = k \cdot \log_{b}\left(\frac{Q}{Q_\text{ref}}\right)
+    $$
+    The parameters $k$ and $b$ are determined by the specific unit:
+
+    - Neper (Np): The coherent SI unit for level.
+        - $b = e$
+        - $k=1$ for field quantities (e.g., [V][isq.V], [A][isq.A], [Pa][isq.PA]).
+        - $k=1/2$ for power quantities (e.g., [W][isq.W], W/m²).
+    - Bel (B) and Decibel (dB):
+        - $b = 10$
+        - $k=20$ for field quantities.
+        - $k=10$ for power quantities.
+    """
+
+    reference: BaseUnit | Exp | Mul | Scaled
+    """The linear unit being measured (e.g., V for dBV, W for dBm)"""
+    quantity_type: Literal["power", "field"]
+    """Whether the reference is a power or a field quantity."""
+    log_base: Factor | E
+    """The base of the logarithm (e.g., 10, 2, [isq.E][])"""
+    name: str
+    allow_prefix: bool = False
+    """Whether prefixes can be applied to the logarithmic unit (e.g., mNp)."""
+
+    def __post_init__(self) -> None:
+        ref = _unwrap_disambiguated(self.reference)
+        if isinstance(ref, (Logarithmic, Translated)):
+            raise TypeError(
+                f"reference of logarithmic unit `{self.name}` must be not be"
+                f"a Logarithmic or Translated unit, got {type(ref).__name__}"
+            )
+        if isinstance(ref.dimension, Dimensionless):
+            raise TypeError(
+                f"reference of logarithmic unit `{self.name}` must have a"
+                "physical dimension, not Dimensionless."
+            )
+
+    @property
+    def level_factor(self) -> Factor:
+        """Determines the multiplicative factor (e.g., 10 or 20 for dB)."""
+        if self.log_base == 10:  # decibels
+            return 10 if self.quantity_type == "power" else 20
+        elif isinstance(self.log_base, E):  # nepers
+            return 1 if self.quantity_type == "field" else Fraction(1, 2)
+        else:  # bits (log_base=2)
+            return 1
+
+    @property
+    def dimension(self) -> Dimensionless:
+        return Dimensionless(f"log_level_{self.name}")
+
+    @property
+    def kind(self) -> Literal["dimensionless"]:
+        return "dimensionless"
+
+    def simplify(self) -> Logarithmic:
+        return Logarithmic(
+            self.reference.simplify(),  # type: ignore
+            self.quantity_type,
+            self.log_base,
+            self.name,
+            self.allow_prefix,
+        )
+
+
 def _unwrap_disambiguated(expr: Expr) -> Expr:
+    # `Translated` and `Logarithmic` are terminal, this plugs a loophole
     if isinstance(expr, Disambiguated):
         return expr.reference
     return expr
@@ -520,7 +617,7 @@ def _build_canonical_expr(
     *,
     name_hint: str,
 ) -> Expr:
-    r"""Construct a canonical expression from flattened parts.
+    """Construct a canonical expression from flattened parts.
 
     This is second step of the simpification. Examples:
 
@@ -572,8 +669,6 @@ def _build_canonical_expr(
 class Converter:
     scale: Factor
     offset: Factor
-    origin_simpl: Expr  # for dbg
-    target_simpl: Expr
 
     @classmethod
     def new(
@@ -582,7 +677,7 @@ class Converter:
         target: Expr,
         *,
         exact: bool,
-        ctx: decimal.Context | None = None,
+        ctx: decimal.Context,
     ) -> Converter:
         """Create a new unit converter from one unit to another.
 
@@ -591,6 +686,49 @@ class Converter:
         """
         origin_simpl = origin.simplify()
         target_simpl = target.simplify()
+
+        # special case: between logarithmic units
+        origin_log, origin_prefix_factor = _unwrap_log_and_factor(origin_simpl)
+        target_log, target_prefix_factor = _unwrap_log_and_factor(target_simpl)
+        if origin_log and target_log:
+            base_converter = Converter.new_logarithmic(
+                origin_log,
+                target_log,
+                exact=exact,
+                ctx=ctx,
+            )
+            f_origin_prefix = _factor_to_fraction(origin_prefix_factor, ctx=ctx)
+            f_target_prefix = _factor_to_fraction(target_prefix_factor, ctx=ctx)
+            if exact:
+                return cls(
+                    scale=(
+                        _factor_to_fraction(base_converter.scale, ctx=ctx)
+                        * f_origin_prefix
+                        / f_target_prefix
+                    ),
+                    offset=(
+                        _factor_to_fraction(base_converter.offset, ctx=ctx)
+                        / f_target_prefix
+                    ),
+                )
+            else:
+                return cls(
+                    scale=(
+                        float(base_converter.scale)
+                        * float(f_origin_prefix)
+                        / float(f_target_prefix)
+                    ),
+                    offset=float(base_converter.offset)
+                    / float(f_target_prefix),
+                )
+        elif origin_log or target_log:
+            raise TypeError(
+                "conversion between a logarithmic unit and a linear unit is "
+                "non-linear and requires a reference value (e.g., 1V for dBV). "
+                "this library performs value-agnostic conversions only. "
+                "perform the calculation manually."
+            )  # e.g. V = V_ref * b**(L_dBV / k), L_dbV = k * log_b(V / V_ref)
+
         if origin_simpl.kind != target_simpl.kind:
             raise ValueError(
                 "expected self and target to have the same kind, "
@@ -645,9 +783,71 @@ class Converter:
         return cls(
             scale=scale.to_exact(ctx=ctx) if exact else scale.to_approx(),
             offset=offset.to_exact(ctx=ctx) if exact else offset.to_approx(),
-            origin_simpl=origin_simpl,
-            target_simpl=target_simpl,
         )
+
+    @classmethod
+    def new_logarithmic(
+        cls,
+        origin_simpl: Logarithmic,
+        target_simpl: Logarithmic,
+        *,
+        exact: bool,
+        ctx: decimal.Context,
+    ) -> Converter:
+        r"""
+        With $L_1 = k_1 \log_{b_1}\left(\frac{Q}{Q_{\text{ref}_1}}\right)$,
+        $L_2 = k_2 \log_{b_2}\left(\frac{Q}{Q_{\text{ref}_2}}\right)
+        = \underbrace{\left(\frac{k_2\ln b_1}{k_1\ln b_2}\right)}_\text{scale}
+        L_1 + \underbrace{k_2 \log_{b_2}\left(\frac{Q_{\text{ref}_1}}
+        {Q_{\text{ref}_2}}\right)}_\text{offset}$
+        """
+        origin_ref_dim = origin_simpl.reference.simplify().dimension
+        target_ref_dim = target_simpl.reference.simplify().dimension
+        if origin_ref_dim != target_ref_dim:  # e.g. dBV -> dBm
+            raise ValueError(
+                f"cannot convert `{origin_simpl.name}` to `{target_simpl.name}`"
+                f" because their reference units `{origin_simpl.reference}`"
+                f" and `{target_simpl.reference}` have incompatible dimensions:"
+                f" {origin_ref_dim} vs {target_ref_dim}."
+            )
+
+        ref_converter = Converter.new(
+            origin=origin_simpl.reference,
+            target=target_simpl.reference,
+            exact=exact,
+            ctx=ctx,
+        )  # needed for e.g. dBm <-> dBW, dBV <-> dBμV
+        ref_ratio = ref_converter.scale  # Q_ref1 / Q_ref2, e.g. W -> mW: 1000
+
+        b1 = origin_simpl.log_base
+        b2 = target_simpl.log_base
+        k1 = _factor_to_fraction(origin_simpl.level_factor, ctx=ctx)
+        k2 = _factor_to_fraction(target_simpl.level_factor, ctx=ctx)
+        k_ratio = k2 / k1
+        if exact:
+            ln_b1_d = (
+                E.to_decimal(ctx)
+                if isinstance(b1, E)
+                else _fraction_to_decimal(_factor_to_fraction(b1, ctx=ctx))
+            ).ln(ctx)
+            ln_b2_d = (
+                E.to_decimal(ctx)
+                if isinstance(b2, E)
+                else _fraction_to_decimal(_factor_to_fraction(b2, ctx=ctx))
+            ).ln(ctx)
+            ref_ratio_d = _fraction_to_decimal(
+                _factor_to_fraction(ref_ratio, ctx=ctx)
+            )
+            return cls(
+                scale=k_ratio * Fraction(ln_b1_d) / Fraction(ln_b2_d),
+                offset=k2 * Fraction(ref_ratio_d.ln(ctx) / ln_b2_d),
+            )
+        else:
+            ln_b2_f = math.log(float(b2))
+            return cls(
+                scale=float(k_ratio) * math.log(float(b1)) / ln_b2_f,
+                offset=float(k2) * (math.log(float(ref_ratio)) / ln_b2_f),
+            )
 
     def __call__(self, value: Any) -> Any:
         """Convert a value in the origin unit to the target unit.
@@ -659,6 +859,29 @@ class Converter:
             [fractions.Fraction][].
         """
         return value * self.scale + self.offset
+
+
+def _unwrap_log_and_factor(
+    expr: Expr,
+) -> tuple[Logarithmic | None, Factor | LazyFactor]:
+    expr = _unwrap_disambiguated(expr)
+    if isinstance(expr, Logarithmic):
+        return expr, 1
+    if isinstance(expr, Scaled) and isinstance(expr.reference, Logarithmic):
+        assert expr.reference.allow_prefix
+        return expr.reference, expr.factor
+    return None, 1
+
+
+class E:
+    __slots__ = ()
+
+    @classmethod
+    def to_decimal(cls, ctx: decimal.Context) -> Decimal:
+        return ctx.exp(Decimal(1))
+
+    def __float__(self) -> float:
+        return math.e
 
 
 class ConversionInfo(NamedTuple):
@@ -716,7 +939,7 @@ def _flatten(
 
 
 def _factor_to_fraction(
-    factor: Factor | LazyFactor, *, ctx: decimal.Context | None = None
+    factor: Factor | LazyFactor, *, ctx: decimal.Context
 ) -> Fraction:
     if isinstance(factor, LazyFactor):
         return Fraction(factor.to_exact(ctx=ctx))
@@ -733,7 +956,7 @@ def _fraction_to_decimal(fraction: Fraction) -> Decimal:
 
 @dataclass(frozen=True)
 class LazyFactor:
-    r"""Represents a scaling factor as a sequence of products.
+    """Represents a scaling factor as a sequence of products.
 
     Lazy evaluation allows the choice between evaluating it to an exact value
     (taking longer to compute, useful for financial calculations) or an
@@ -829,7 +1052,7 @@ class LazyFactor:
         product_decimal = Decimal(1)
         for item in self.products:
             if not isinstance(item, tuple):  # no exponent
-                product_fraction *= _factor_to_fraction(item)
+                product_fraction *= _factor_to_fraction(item, ctx=ctx)
                 continue
             base, exponent = item
             if base == 0:
@@ -846,7 +1069,7 @@ class LazyFactor:
                     base_decimal = ctx.create_decimal_from_float(base)
                     product_decimal *= base_decimal**exponent
                 else:
-                    base_fraction = _factor_to_fraction(base)
+                    base_fraction = _factor_to_fraction(base, ctx=ctx)
                     product_fraction *= base_fraction**exponent
             elif isinstance(exponent, Fraction):
                 # but raising to a Fraction exponent requires decimal

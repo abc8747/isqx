@@ -1,3 +1,4 @@
+import math
 from fractions import Fraction
 
 import pytest
@@ -420,19 +421,13 @@ def test_convert_translated() -> None:
     assert K.to(CELSIUS)(1.1) == -272.04999999999995  # inexact
     assert K.to(CELSIUS, exact=True)(Fraction(11, 10)) == Fraction(-27205, 100)
 
-    c_to_f_approx = CELSIUS.to(FARENHEIT)
-    assert c_to_f_approx.scale == 1.7999999999999998
-    assert c_to_f_approx.offset == 32
-    assert c_to_f_approx(100) == 211.99999999999997
-
-    c_to_f_exact = CELSIUS.to(FARENHEIT, exact=True)
-    assert isinstance(
-        c_to_f_exact.scale, Fraction
-    ) and c_to_f_exact.scale == Fraction(9, 5)
-    assert isinstance(
-        c_to_f_exact.offset, Fraction
-    ) and c_to_f_exact.offset == Fraction(32, 1)
-    assert c_to_f_exact(100) == 212
+    c_to_f = CELSIUS.to(FARENHEIT, exact=True)
+    assert isinstance(c_to_f.scale, Fraction) and c_to_f.scale == Fraction(9, 5)
+    assert isinstance(c_to_f.offset, Fraction) and c_to_f.offset == Fraction(
+        32, 1
+    )
+    assert c_to_f(100) == 212
+    assert CELSIUS.to(FARENHEIT).scale == 1.7999999999999998  # inexact
 
     f_to_c = FARENHEIT.to(CELSIUS, exact=True)
     assert f_to_c(32) == 0
@@ -456,3 +451,78 @@ def test_convert_disambiguated_translated() -> None:
         SURFACE_TEMP_C.to(K)
     with pytest.raises(ValueError):
         K.to(SURFACE_TEMP_C)
+
+
+def test_logarithmic_is_terminal() -> None:
+    from isq import DBV, KILO, M
+    from isq.core import Exp, Logarithmic, Mul, Scaled
+
+    with pytest.raises(ValueError):
+        Exp(DBV, 2)
+    with pytest.raises(ValueError):
+        Mul((DBV, M))
+    with pytest.raises(ValueError):
+        Scaled(DBV, 2, "scaled_db")
+    with pytest.raises(TypeError):
+        _ = KILO * DBV
+    with pytest.raises(TypeError):
+        Logarithmic(DBV, "power", log_base=10, name="fail")  # type: ignore
+    with pytest.raises(TypeError):
+        Logarithmic(
+            Dimensionless("reynolds"),  # type: ignore
+            "power",
+            log_base=10,
+            name="fail",
+        )
+
+
+def test_convert_logarithmic() -> None:
+    from isq import DBM, DBUV, DBV, DBW, NPV, NPW
+
+    assert isinstance(DBM.dimension, Dimensionless)
+
+    dbw_to_dbm = DBW.to(DBM, exact=True)
+    assert dbw_to_dbm.scale == 1
+    assert dbw_to_dbm.offset == Fraction(30, 1)
+    assert dbw_to_dbm(10) == 40
+    npw_to_dbw = NPW.to(DBW)
+    assert npw_to_dbw.scale == pytest.approx(20 / math.log(10))
+    assert npw_to_dbw.offset == 0
+    assert npw_to_dbw(1) == pytest.approx(8.6858896)
+
+    dbv_to_dbuv = DBV.to(DBUV, exact=True)
+    assert dbv_to_dbuv.scale == 1
+    assert dbv_to_dbuv.offset == Fraction(120, 1)
+    assert dbv_to_dbuv(1) == 121
+    assert DBV.to(DBUV).offset == 119.99999999999999  # inexact
+    dbv_to_npv = DBV.to(NPV)
+    assert dbv_to_npv.offset == 0
+    assert dbv_to_npv.scale == pytest.approx(math.log(10) / 20)
+    assert dbv_to_npv(20) == pytest.approx(2.302585)
+    npv_to_dbv = NPV.to(DBV)
+    assert npv_to_dbv.offset == 0
+    assert npv_to_dbv.scale == pytest.approx(20 / math.log(10))
+
+
+def test_convert_logarithmic_with_prefix() -> None:
+    from isq import DBV, DECI, MILLI, NPV
+
+    npv_to_decinpv = NPV.to(DECI * NPV, exact=True)
+    assert npv_to_decinpv.offset == 0
+    assert npv_to_decinpv.scale == 10
+    millinpv_to_decinpv = (MILLI * NPV).to(DECI * NPV, exact=True)
+    assert millinpv_to_decinpv.scale == Fraction(1, 100)
+    decinpv_to_npv = (DECI * NPV).to(DBV)
+    assert decinpv_to_npv.offset == 0
+    assert decinpv_to_npv.scale == pytest.approx(20e-1 / math.log(10))
+
+
+def test_convert_logarithmic_fail() -> None:
+    from isq import DBM, DBV, V
+
+    with pytest.raises(TypeError):
+        V.to(DBV)
+    with pytest.raises(TypeError):
+        DBV.to(V)
+    with pytest.raises(ValueError):
+        DBV.to(DBM)
