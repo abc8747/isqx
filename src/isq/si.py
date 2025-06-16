@@ -21,6 +21,7 @@ from .core import (
     Mul,
     Prefix,
     Scaled,
+    Translated,
 )
 
 #
@@ -89,12 +90,8 @@ T = Mul((WB, Exp(M, -2)), "tesla")
 """Magnetic flux density (teslas)"""
 H = Mul((WB, Exp(A, -1)), "henry")
 """Inductance (henries)"""
-# NOTE: degree celsius is a special case: ℃² does not equal K² so we don't
-# define it as a scaled unit of kelvin.
-DEGC = BaseUnit(DIM_TEMPERATURE, "degree_celsius")
-"""Celsius temperature (degrees Celsius).
-The numerical value of a temperature difference is the same when expressed
-in either degrees Celsius or in Kelvins."""
+CELSIUS = Translated(K, Decimal("-273.15"), "celsius")
+"""Thermodynamic temperature (Celsius). Absolute, translated scale."""
 # NOTE: The symbol `sr` for must be included to distinguish luminous flux (lumen)
 # from luminous intensity (candela)
 LM = Mul((CD, SR), "lumen")

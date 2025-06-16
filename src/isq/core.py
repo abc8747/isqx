@@ -4,7 +4,6 @@ import decimal
 from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
-from functools import lru_cache
 from typing import (
     Any,
     Hashable,
@@ -12,6 +11,7 @@ from typing import (
     Mapping,
     MutableMapping,
     MutableSequence,
+    NamedTuple,
     Protocol,
     Sequence,
     Union,
@@ -39,6 +39,13 @@ class Expr(Protocol):
     | [product of expressions][isq.Mul]         | `Mul(NEWTON, METER)`      |
     | [scaled expression][isq.Scaled]           | [feet][isq.FT] = 0.3048 m |
     | [disambiguated][isq.Disambiguated]        | true vs ground speed      |
+    | [translated expression][isq.Translated]^  | [celsius][isq.CELSIUS]    |
+
+    ^ translated units are *terminal*, meaning it cannot be further
+      [exponentiated][isq.Exp], [multiplied][isq.Mul], [scaled][isq.Scaled] or
+      [translated][isq.Translated] to form a more complex expression. However,
+      it can be further [disambiguated][isq.Disambiguated] (e.g. surface
+      temperature vs ISA temperature).
     """
 
     @property
@@ -81,20 +88,26 @@ class Expr(Protocol):
     # that will require linear algebra to solve the dimensional exponents but
     # we're leaving that as optional and far in the future.
 
-    def to(self, target: Expr) -> Converter:
+
+class ConvertMixin:
+    def to(
+        self: Expr,
+        target: Expr,
+        *,
+        exact: bool = False,
+        ctx: decimal.Context | None = None,
+    ) -> Converter:
         """Return a converter object, that when called with a value, converts it
         to the target unit or dimension.
 
         :param target: The target unit or dimension to convert to. Must have
             compatible dimensions with the origin.
         """
-        # TODO: add new parameter `exact: bool = False` for money conversions
-        # or should we just use the `.to(*, exact: bool = False)`?
-        ...
+        return Converter.new(origin=self, target=target, exact=exact, ctx=ctx)
 
 
 @dataclass(frozen=True)
-class Dimensionless(Expr):
+class Dimensionless(ConvertMixin, Expr):
     name: str
     """Name for the dimensionless number, e.g. `reynolds`, `prandtl`"""
 
@@ -109,12 +122,9 @@ class Dimensionless(Expr):
     def simplify(self) -> Expr:
         return self
 
-    def to(self, target: Expr) -> Converter:
-        return Converter.new(origin=self, target=target)
-
 
 @dataclass(frozen=True)
-class BaseDimension(Expr):
+class BaseDimension(ConvertMixin, Expr):
     name: str
     """Name for the base dimension, e.g. `L`, `M`, `T`"""
 
@@ -129,12 +139,9 @@ class BaseDimension(Expr):
     def simplify(self) -> Expr:
         return self
 
-    def to(self, target: Expr) -> Converter:
-        return Converter.new(origin=self, target=target)
-
 
 @dataclass(frozen=True)
-class BaseUnit(Expr):
+class BaseUnit(ConvertMixin, Expr):
     _dimension: BaseDimension
     """Reference to the base dimension"""
     name: str
@@ -151,9 +158,6 @@ class BaseUnit(Expr):
     def simplify(self) -> Expr:
         return self
 
-    def to(self, target: Expr) -> Converter:
-        return Converter.new(origin=self, target=target)
-
 
 Exponent: TypeAlias = Union[int, Fraction]
 """An exponent, generally small integers, which can be positive, negative,
@@ -161,7 +165,7 @@ or a fraction, but not zero"""
 
 
 @dataclass(frozen=True)
-class Exp(Expr):
+class Exp(ConvertMixin, Expr):
     """An expression raised to an exponent.
     For example, `BaseUnit("meter", Dimension("L")), 2)` is m².
     Can be recursively nested, e.g. `Exp(Exp(METER, 2), Fraction(1, 2))`
@@ -176,6 +180,12 @@ class Exp(Expr):
     def __post_init__(self) -> None:
         if self.exponent == 0:
             raise ValueError("exponent must not be zero, use `Dimensionless`")
+        if isinstance(ref := _unwrap_disambiguated(self.base), Translated):
+            raise ValueError(
+                f"translated expression `{ref.name}` is terminal: it cannot be"
+                f"futher raised to the power of {self.exponent}"
+                f"\nhelp: did you mean to exponentiate {ref.reference}?"
+            )  # prevent ℃². J ℃⁻¹ should be written as J K⁻¹
 
     @property
     def kind(self) -> ExpressionKind:
@@ -202,12 +212,9 @@ class Exp(Expr):
             name_hint=f"expr_{hash(self)}",
         )
 
-    def to(self, target: Expr) -> Converter:
-        return Converter.new(origin=self, target=target)
-
 
 @dataclass(frozen=True)
-class Mul(Expr):
+class Mul(ConvertMixin, Expr):
     """Products of powers of an expression."""
 
     terms: tuple[Expr, ...]
@@ -219,7 +226,17 @@ class Mul(Expr):
         n_terms = len(self.terms)
         if n_terms == 0:
             raise ValueError("terms must not be empty, use `Dimensionless`")
-        unique_kinds = set(t.kind for t in self.terms) - {"dimensionless"}
+        kinds = []
+        for term in self.terms:
+            if isinstance(ref := _unwrap_disambiguated(term), Translated):
+                raise ValueError(
+                    f"translated expression `{ref}` is terminal:"
+                    "it cannot be multiplied with other expressions"
+                    "\nhelp: use its absolute reference instead"
+                    f": `{ref.reference}`"
+                )  # prevent ℃ * ℃
+            kinds.append(term.kind)
+        unique_kinds = set(kinds) - {"dimensionless"}
         if len(unique_kinds) != 1:
             raise ValueError("terms must all be either `unit` or `dimension`")
 
@@ -254,16 +271,13 @@ class Mul(Expr):
             name_hint=self.name or f"expr_{hash(self)}",
         )
 
-    def to(self, target: Expr) -> Converter:
-        return Converter.new(origin=self, target=target)
-
 
 @dataclass(frozen=True)
-class Scaled(Expr):
+class Scaled(ConvertMixin, Expr):
     reference: Expr
     """The unit or dimension that this unit or dimension is based on."""
     factor: Factor | LazyFactor
-    """The exact factor to convert this unit or dimension to the reference.
+    """The exact factor to multiply to this unit to convert it to the reference.
     For example, `1 ft = 0.3048 m`, so the factor is 0.3048.
     """
     name: str
@@ -271,6 +285,13 @@ class Scaled(Expr):
     allow_prefix: bool = False
     """Whether to allow prefixes to be attached. This should only be true for
     some units like `liter`, `tonne`, `electronvolt`"""
+
+    def __post_init__(self) -> None:
+        if isinstance(ref := _unwrap_disambiguated(self.reference), Translated):
+            raise ValueError(
+                f"translated expression `{ref.name}` is terminal:"
+                f"it cannot be further scaled"
+            )  # prevent 13 * ℃
 
     @property
     def kind(self) -> ExpressionKind:
@@ -299,9 +320,6 @@ class Scaled(Expr):
                 products.append(expr.factor)
             expr = expr.reference
         return Scaled(expr, LazyFactor(tuple(products)), self.name)
-
-    def to(self, target: Expr) -> Converter:
-        return Converter.new(origin=self, target=target)
 
 
 @dataclass(frozen=True)
@@ -343,6 +361,10 @@ class Prefix:
                     "cannot apply prefix KILO to GRAM"
                     "\nhelp: use isq.KG directly instead"
                 )
+        if isinstance(_unwrap_disambiguated(rhs), Translated):
+            raise TypeError(
+                f"cannot apply prefix `{self.name}` to translated unit {rhs=}"
+            )  # kilo(℃)
         if not isinstance(rhs, (BaseUnit, Mul, Scaled)):
             raise TypeError(
                 f"cannot apply prefix `{self.name}` to {rhs=} ({type(rhs)=})"
@@ -357,7 +379,7 @@ class Prefix:
 
 
 @dataclass(frozen=True)
-class Disambiguated(Expr):
+class Disambiguated(ConvertMixin, Expr):
     """An expression decorated with a semantic context tag.
 
     This is used to disambiguate between quantities that share the same
@@ -382,15 +404,52 @@ class Disambiguated(Expr):
         return self.reference.kind
 
     @property
-    def dimension(self) -> Expr:
+    def dimension(self) -> Disambiguated:
         return Disambiguated(self.reference.dimension, self.context)
 
-    def simplify(self) -> Expr:
+    def simplify(self) -> Disambiguated:
         simplified_ref = self.reference.simplify()
         return Disambiguated(simplified_ref, self.context)
 
-    def to(self, target: Expr) -> Converter:
-        return Converter.new(origin=self, target=target)
+
+@dataclass(frozen=True)
+class Translated(ConvertMixin, Expr):
+    """An expression offsetted from some reference unit."""
+
+    reference: Expr
+    """The expression that this expression is based on (e.g., `K` for `DEGC`)"""
+    offset: Factor
+    """The exact offset to add to the reference to get this unit.
+    For example, `℃ = K - 273.15`, so the offset is -273.15."""
+    name: str
+
+    def __post_init__(self) -> None:
+        if isinstance(self.reference, Translated):
+            raise TypeError("nesting translated units is not allowed")
+        if not isinstance(
+            ref := _unwrap_disambiguated(self.reference), (BaseUnit, Scaled)
+        ):
+            raise TypeError(
+                f"reference of translated unit `{self.name}` must be a"
+                f"BaseUnit or Scaled, not `{type(ref).__name__}`"
+            )
+
+    @property
+    def kind(self) -> ExpressionKind:
+        return self.reference.kind
+
+    @property
+    def dimension(self) -> Expr:
+        return self.reference.dimension
+
+    def simplify(self) -> Translated:
+        return Translated(self.reference.simplify(), self.offset, self.name)
+
+
+def _unwrap_disambiguated(expr: Expr) -> Expr:
+    if isinstance(expr, Disambiguated):
+        return expr.reference
+    return expr
 
 
 #
@@ -511,12 +570,20 @@ def _build_canonical_expr(
 
 @dataclass(frozen=True)
 class Converter:
-    origin_simpl: Expr
+    scale: Factor
+    offset: Factor
+    origin_simpl: Expr  # for dbg
     target_simpl: Expr
-    lazy_product: LazyFactor
 
     @classmethod
-    def new(cls, origin: Expr, target: Expr) -> Converter:
+    def new(
+        cls,
+        origin: Expr,
+        target: Expr,
+        *,
+        exact: bool,
+        ctx: decimal.Context | None = None,
+    ) -> Converter:
         """Create a new unit converter from one unit to another.
 
         Checks that the underlying dimension are compatible
@@ -530,10 +597,10 @@ class Converter:
                 f"but {origin_simpl.kind} != {target_simpl.kind}"
             )
 
-        origin_inner_simpl, origin_factor = _separate_factor(origin_simpl)
-        target_inner_simpl, target_factor = _separate_factor(target_simpl)
-        origin_dim = origin_inner_simpl.dimension
-        target_dim = target_inner_simpl.dimension
+        info_origin = _flatten(origin_simpl)
+        info_target = _flatten(target_simpl)
+        origin_dim = info_origin.expr.dimension
+        target_dim = info_target.expr.dimension
         origin_dim_terms = (
             origin_dim.terms if isinstance(origin_dim, Mul) else (origin_dim,)
         )
@@ -547,75 +614,114 @@ class Converter:
                 f"expected origin and target to have the same dimension, "
                 f"but {origin_dim_terms} != {target_dim_terms}"
             )
-        products: list[tuple[Factor, Exponent] | Factor] = []
-        if isinstance(origin_factor, LazyFactor):
-            products.extend(origin_factor.products)
+        # we have:
+        #   v_abs = scale_origin * v_origin + offset_origin
+        #   v_abs = scale_target * v_target + offset_target
+        # then:
+        #   v_target = (scale_origin / scale_target) * v_origin +
+        #              (offset_origin - offset_target) / scale_target
+        scale_origin: list[tuple[Factor, Exponent] | Factor] = []
+        if isinstance(info_origin.factor, LazyFactor):
+            scale_origin.extend(info_origin.factor.products)
         else:
-            products.append(origin_factor)
-        if isinstance(target_factor, LazyFactor):
-            for item in target_factor.products:
+            scale_origin.append(info_origin.factor)
+        inv_scale_target: list[tuple[Factor, Exponent] | Factor] = []
+        if isinstance(info_target.factor, LazyFactor):
+            for item in info_target.factor.products:
                 if isinstance(item, tuple):
                     base, exponent = item
-                    products.append((base, -exponent))
+                    inv_scale_target.append((base, -exponent))
                 else:
-                    products.append((item, -1))
+                    inv_scale_target.append((item, -1))
         else:
-            products.append((target_factor, -1))
+            inv_scale_target.append((info_target.factor, -1))
+        scale = LazyFactor(tuple([*scale_origin, *inv_scale_target]))
+
+        offset_numerator = _factor_to_fraction(
+            info_origin.offset, ctx=ctx
+        ) - _factor_to_fraction(info_target.offset, ctx=ctx)
+        offset = LazyFactor(tuple([offset_numerator, *inv_scale_target]))
+
         return cls(
+            scale=scale.to_exact(ctx=ctx) if exact else scale.to_approx(),
+            offset=offset.to_exact(ctx=ctx) if exact else offset.to_approx(),
             origin_simpl=origin_simpl,
             target_simpl=target_simpl,
-            lazy_product=LazyFactor(tuple(products)),
         )
 
-    def __call__(
-        self,
-        value: Any,
-        *,
-        exact: bool = False,
-        ctx: decimal.Context | None = None,
-    ) -> Any:
-        """Convert a value in the origin unit to the target unit."""
-        return value * (
-            self.lazy_product.to_exact(ctx=ctx)
-            if exact
-            else self.lazy_product.to_approx()
-        )
+    def __call__(self, value: Any) -> Any:
+        """Convert a value in the origin unit to the target unit.
+
+        :param value: An integer, float or [fractions.Fraction][].
+            If the converter was created with exact=False, it can also take an
+            array-like object.
+            If exact=True, [decimal.Decimal][] inputs should be converted into a
+            [fractions.Fraction][].
+        """
+        return value * self.scale + self.offset
 
 
-def _separate_factor(expr_simpl: Expr) -> tuple[Expr, Factor | LazyFactor]:
-    """Unpack a simplified expression into its unit and scaling factor.
+class ConversionInfo(NamedTuple):
+    expr: Expr
+    """Absolute (non-translated, non-scaled) reference"""
+    factor: Factor | LazyFactor
+    """Total scaling factor to convert from this unit to the absolute reference"""
+    offset: Factor | LazyFactor
+    """Total offset to convert from this unit to the absolute reference"""
 
-    This is used in [Converter.new][] to isolate the core unit from its
-    numerical scale. Examples:
 
-    - `Scaled(M, 0.3048)` → `(M, 0.3048)`
-    - `M` → `(M, 1.0)`
-    """
-
+def _flatten(
+    expr_simpl: Expr,
+) -> ConversionInfo:
+    """Recursively flattens an expression into its absolute base unit."""
+    # NOTE: by design Exp, Mul and Scaled cannot contain Translated so offset=0
     if isinstance(expr_simpl, (BaseUnit, BaseDimension, Dimensionless)):
-        return expr_simpl, 1.0
+        return ConversionInfo(expr_simpl, 1, 0)
     elif isinstance(expr_simpl, Exp):
         # if expr is `Exp(Scaled(x, a), b)`, simplifying will result in
         # `Scaled(Exp(x, b), a * b)` so it'll be handled by the `Scaled` case
-        return expr_simpl, 1.0
+        return ConversionInfo(expr_simpl, 1, 0)
     elif isinstance(expr_simpl, Mul):
         # similarly, `Mul((Scaled(...),))` → `Scaled(Mul((...),),)`
-        return expr_simpl, 1.0
+        return ConversionInfo(expr_simpl, 1, 0)
     elif isinstance(expr_simpl, Scaled):
         # so `Scaled` should always be pushed to outmost level.
         # furthermore, since nested `Scaled(Scaled(x, c), d)` would simplify to
         # `Scaled(x, c * d)`, we don't need to recursively get the factor.
-        return expr_simpl.reference, expr_simpl.factor
+        return ConversionInfo(expr_simpl.reference, expr_simpl.factor, 0)
     elif isinstance(expr_simpl, Disambiguated):
-        inner_ref, factor = _separate_factor(expr_simpl.reference)
-        return Disambiguated(inner_ref, expr_simpl.context), factor
+        info_ref = _flatten(expr_simpl.reference)
+        return ConversionInfo(
+            Disambiguated(info_ref.expr, expr_simpl.context),
+            info_ref.factor,
+            info_ref.offset,
+        )
+    elif isinstance(expr_simpl, Translated):
+        info_ref = _flatten(expr_simpl.reference)
+        assert info_ref.offset == 0, (
+            f"inner reference of {expr_simpl=} should not have any offset"
+        )
+        factor_ref = (
+            info_ref.factor.products
+            if isinstance(info_ref.factor, LazyFactor)
+            else (info_ref.factor,)
+        )
+        # v_local = v_ref + offset_local
+        #   v_abs = v_ref * factor_ref =
+        #         = v_local * factor_ref - offset_local * factor_ref
+        new_offset = LazyFactor((-1, expr_simpl.offset, *factor_ref))
+        return ConversionInfo(info_ref.expr, info_ref.factor, new_offset)
     else:  # pragma: no cover
         raise ValueError(f"unknown expression {expr_simpl}")
 
 
-def _factor_to_fraction(factor: Factor) -> Fraction:
-    if isinstance(factor, (Decimal, float, int)):
-        factor = Fraction(factor)
+def _factor_to_fraction(
+    factor: Factor | LazyFactor, *, ctx: decimal.Context | None = None
+) -> Fraction:
+    if isinstance(factor, LazyFactor):
+        return Fraction(factor.to_exact(ctx=ctx))
+    elif isinstance(factor, (Decimal, float, int)):
+        return Fraction(factor)
     elif not isinstance(factor, Fraction):
         raise ValueError(f"unknown {type(factor)=}")  # pragma: no cover
     return factor
@@ -654,7 +760,6 @@ class LazyFactor:
                 products.append((scaled.factor, exponent))
         return cls(tuple(products))
 
-    @lru_cache(maxsize=None)
     def to_approx(self) -> float:
         """Reduce it to an approximate float value. Good enough for most
         applications."""
@@ -683,8 +788,6 @@ class LazyFactor:
     def __float__(self) -> float:
         return self.to_approx()
 
-    # NOTE: not using lru_cache because decimal.Context is not hashable
-    # it is the caller's responsibility to cache it
     def to_exact(
         self, *, ctx: decimal.Context | None = None
     ) -> Fraction | Decimal:

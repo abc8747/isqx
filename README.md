@@ -100,7 +100,7 @@ At the current state, it merely serves to enable writing machine-readable, struc
 
 ## TODOs
 
-- support for tricky units (`Translated`: farenheit and celsius, `Logarithmic`: pH and dB).
+- support for tricky units (`Logarithmic`: pH and dB).
 - enable intuitive construction like `M * S**-1` directly producing new `Expr` objects (impl `__mul__`, `__truediv__`, `__pow__` for `Expr`)
 - convert `Expr` objects to various string representations (`siunitx`, LaTeX, ASCII, etc).
 - potentially, create a `mkdocs` plugin that serialises them

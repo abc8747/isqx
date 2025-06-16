@@ -14,7 +14,7 @@ Default re-exports:
 
 Additional useful modules not re-exported for brevity:
 
-- [isq.aerospace][]: Definitions in aerospace (TAS, CAS, geopotential alt etc.)
+- [`isq.aerospace`][]: Definitions in aerospace (TAS, CAS, geopotential alt etc.)
 
 ::: isq.core
 

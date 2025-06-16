@@ -393,3 +393,66 @@ def test_convert_scaled() -> None:
     assert DAY.to(Mul((S,), "s1"))(1) == 86400  # -> Mul
     assert MIN.to(HOUR)(60) == 1  # -> Scaled
     assert DAY.to(DAY)(1) == 1
+
+
+def test_translated_is_terminal() -> None:
+    from isq import CELSIUS, KILO, Translated
+
+    with pytest.raises(ValueError):
+        Exp(CELSIUS, 2)
+    with pytest.raises(ValueError):
+        Mul((CELSIUS, M))
+    with pytest.raises(ValueError):
+        Scaled(CELSIUS, 2, "scaled_celsius")
+    with pytest.raises(TypeError):
+        KILO * CELSIUS  # type: ignore
+    with pytest.raises(TypeError):
+        Translated(CELSIUS, 1, "celsius + 1")
+    with pytest.raises(TypeError):
+        Translated(M_PERS, 1, "m/s + 1")
+
+
+def test_convert_translated() -> None:
+    from isq import CELSIUS, DIM_TEMPERATURE, FARENHEIT, K, R
+
+    assert CELSIUS.dimension == DIM_TEMPERATURE
+
+    assert K.to(CELSIUS)(1.1) == -272.04999999999995  # inexact
+    assert K.to(CELSIUS, exact=True)(Fraction(11, 10)) == Fraction(-27205, 100)
+
+    c_to_f_approx = CELSIUS.to(FARENHEIT)
+    assert c_to_f_approx.scale == 1.7999999999999998
+    assert c_to_f_approx.offset == 32
+    assert c_to_f_approx(100) == 211.99999999999997
+
+    c_to_f_exact = CELSIUS.to(FARENHEIT, exact=True)
+    assert isinstance(
+        c_to_f_exact.scale, Fraction
+    ) and c_to_f_exact.scale == Fraction(9, 5)
+    assert isinstance(
+        c_to_f_exact.offset, Fraction
+    ) and c_to_f_exact.offset == Fraction(32, 1)
+    assert c_to_f_exact(100) == 212
+
+    f_to_c = FARENHEIT.to(CELSIUS, exact=True)
+    assert f_to_c(32) == 0
+    assert f_to_c(212) == 100
+    c_to_r = CELSIUS.to(R, exact=True)
+    assert c_to_r(0) == Fraction("273.15") * Fraction(9, 5)
+
+
+def test_convert_disambiguated_translated() -> None:
+    from isq import CELSIUS, K
+
+    SURFACE_TEMP_C = Disambiguated(CELSIUS, "surface")
+    SURFACE_TEMP_K = Disambiguated(K, "surface")
+
+    c_to_k_exact = SURFACE_TEMP_C.to(SURFACE_TEMP_K, exact=True)
+    assert c_to_k_exact(10) == Fraction(28315, 100)
+    k_to_c_exact = SURFACE_TEMP_K.to(SURFACE_TEMP_C, exact=True)
+    assert k_to_c_exact(c_to_k_exact(10)) == 10
+
+    with pytest.raises(ValueError):
+        SURFACE_TEMP_C.to(K)
+    with pytest.raises(ValueError):
+        K.to(SURFACE_TEMP_C)
