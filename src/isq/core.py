@@ -7,6 +7,7 @@ from decimal import Decimal
 from fractions import Fraction
 from typing import (
     Any,
+    Generator,
     Hashable,
     Literal,
     Mapping,
@@ -435,6 +436,20 @@ class Disambiguated(ConvertMixin, Expr):
         simplified_ref = self.reference.simplify()
         return Disambiguated(simplified_ref, self.context)
 
+    def with_units(self, new_reference: Expr) -> Disambiguated:
+        """Creates a new `Disambiguated` expression with the same context, but a
+        different reference unit. Useful for switching between metric and
+        imperial units."""
+        original_dim = self.reference.dimension.simplify()
+        new_dim = new_reference.dimension.simplify()
+        if original_dim != new_dim:
+            raise ValueError(
+                f"cannot replace unit for `{self.context}` with a unit of "
+                f"incompatible dimensions."
+                f"\nhelp: original dimension: {original_dim}, new: {new_dim}"
+            )
+        return Disambiguated(new_reference, self.context)
+
 
 @dataclass(frozen=True)
 class Translated(ConvertMixin, Expr):
@@ -508,10 +523,10 @@ class Logarithmic(ConvertMixin, Expr):
                 f"reference of logarithmic unit `{self.name}` must be not be"
                 f"a Logarithmic or Translated unit, got {type(ref).__name__}"
             )
-        if isinstance(ref.dimension, Dimensionless):
+        if ref.kind != "unit":
             raise TypeError(
-                f"reference of logarithmic unit `{self.name}` must have a"
-                "physical dimension, not Dimensionless."
+                f"reference of logarithmic unit `{self.name}` must be a "
+                f"unit, not a `{ref.kind}`."
             )
 
     @property
@@ -687,41 +702,35 @@ class Converter:
         origin_simpl = origin.simplify()
         target_simpl = target.simplify()
 
-        # special case: between logarithmic units
-        origin_log, origin_prefix_factor = _unwrap_log_and_factor(origin_simpl)
-        target_log, target_prefix_factor = _unwrap_log_and_factor(target_simpl)
-        if origin_log and target_log:
+        info_origin = _flatten(origin_simpl)
+        info_target = _flatten(target_simpl)
+        origin_core_expr = info_origin.expr
+        target_core_expr = info_target.expr
+        is_origin_log = isinstance(origin_core_expr, Logarithmic)
+        is_target_log = isinstance(target_core_expr, Logarithmic)
+        if is_origin_log and is_target_log:
             base_converter = Converter.new_logarithmic(
-                origin_log,
-                target_log,
+                origin_core_expr,  # type: ignore
+                target_core_expr,  # type: ignore
                 exact=exact,
                 ctx=ctx,
             )
-            f_origin_prefix = _factor_to_fraction(origin_prefix_factor, ctx=ctx)
-            f_target_prefix = _factor_to_fraction(target_prefix_factor, ctx=ctx)
-            if exact:
-                return cls(
-                    scale=(
-                        _factor_to_fraction(base_converter.scale, ctx=ctx)
-                        * f_origin_prefix
-                        / f_target_prefix
-                    ),
-                    offset=(
-                        _factor_to_fraction(base_converter.offset, ctx=ctx)
-                        / f_target_prefix
-                    ),
-                )
-            else:
-                return cls(
-                    scale=(
-                        float(base_converter.scale)
-                        * float(f_origin_prefix)
-                        / float(f_target_prefix)
-                    ),
-                    offset=float(base_converter.offset)
-                    / float(f_target_prefix),
-                )
-        elif origin_log or target_log:
+            # prefixed log units:
+            # v_target_prefixed = (scale_base * v_origin_prefixed) + offset_base
+            # v_target = (scale_base * factor_origin / factor_target) * v_origin
+            #            + (offset_base / factor_target)
+            origin_prefix_f = _factor_to_fraction(info_origin.factor, ctx=ctx)
+            target_prefix_f = _factor_to_fraction(info_target.factor, ctx=ctx)
+            base_scale_f = _factor_to_fraction(base_converter.scale, ctx=ctx)
+            base_offset_f = _factor_to_fraction(base_converter.offset, ctx=ctx)
+
+            final_scale = base_scale_f * origin_prefix_f / target_prefix_f
+            final_offset = base_offset_f / target_prefix_f
+            return cls(
+                scale=final_scale if exact else float(final_scale),
+                offset=final_offset if exact else float(final_offset),
+            )
+        elif is_origin_log or is_target_log:
             raise TypeError(
                 "conversion between a logarithmic unit and a linear unit is "
                 "non-linear and requires a reference value (e.g., 1V for dBV). "
@@ -735,8 +744,6 @@ class Converter:
                 f"but {origin_simpl.kind} != {target_simpl.kind}"
             )
 
-        info_origin = _flatten(origin_simpl)
-        info_target = _flatten(target_simpl)
         origin_dim = info_origin.expr.dimension
         target_dim = info_target.expr.dimension
         origin_dim_terms = (
@@ -746,8 +753,6 @@ class Converter:
             target_dim.terms if isinstance(target_dim, Mul) else (target_dim,)
         )
         if origin_dim_terms != target_dim_terms:
-            # NOTE: we can probably have a better error message here
-            # show the diff between two trees
             raise ValueError(
                 f"expected origin and target to have the same dimension, "
                 f"but {origin_dim_terms} != {target_dim_terms}"
@@ -758,21 +763,15 @@ class Converter:
         # then:
         #   v_target = (scale_origin / scale_target) * v_origin +
         #              (offset_origin - offset_target) / scale_target
-        scale_origin: list[tuple[Factor, Exponent] | Factor] = []
-        if isinstance(info_origin.factor, LazyFactor):
-            scale_origin.extend(info_origin.factor.products)
-        else:
-            scale_origin.append(info_origin.factor)
+        scale_origin = list(_products(info_origin.factor))
+
         inv_scale_target: list[tuple[Factor, Exponent] | Factor] = []
-        if isinstance(info_target.factor, LazyFactor):
-            for item in info_target.factor.products:
-                if isinstance(item, tuple):
-                    base, exponent = item
-                    inv_scale_target.append((base, -exponent))
-                else:
-                    inv_scale_target.append((item, -1))
-        else:
-            inv_scale_target.append((info_target.factor, -1))
+        for item in _products(info_target.factor):
+            if isinstance(item, tuple):
+                base, exponent = item
+                inv_scale_target.append((base, -exponent))
+            else:
+                inv_scale_target.append((item, -1))
         scale = LazyFactor(tuple([*scale_origin, *inv_scale_target]))
 
         offset_numerator = _factor_to_fraction(
@@ -824,7 +823,7 @@ class Converter:
         k1 = _factor_to_fraction(origin_simpl.level_factor, ctx=ctx)
         k2 = _factor_to_fraction(target_simpl.level_factor, ctx=ctx)
         k_ratio = k2 / k1
-        if exact:
+        if exact:  # ln is transcendental, tiny precision loss expected
             ln_b1_d = (
                 E.to_decimal(ctx)
                 if isinstance(b1, E)
@@ -861,18 +860,6 @@ class Converter:
         return value * self.scale + self.offset
 
 
-def _unwrap_log_and_factor(
-    expr: Expr,
-) -> tuple[Logarithmic | None, Factor | LazyFactor]:
-    expr = _unwrap_disambiguated(expr)
-    if isinstance(expr, Logarithmic):
-        return expr, 1
-    if isinstance(expr, Scaled) and isinstance(expr.reference, Logarithmic):
-        assert expr.reference.allow_prefix
-        return expr.reference, expr.factor
-    return None, 1
-
-
 class E:
     __slots__ = ()
 
@@ -897,15 +884,12 @@ def _flatten(
     expr_simpl: Expr,
 ) -> ConversionInfo:
     """Recursively flattens an expression into its absolute base unit."""
-    # NOTE: by design Exp, Mul and Scaled cannot contain Translated so offset=0
-    if isinstance(expr_simpl, (BaseUnit, BaseDimension, Dimensionless)):
-        return ConversionInfo(expr_simpl, 1, 0)
-    elif isinstance(expr_simpl, Exp):
-        # if expr is `Exp(Scaled(x, a), b)`, simplifying will result in
-        # `Scaled(Exp(x, b), a * b)` so it'll be handled by the `Scaled` case
-        return ConversionInfo(expr_simpl, 1, 0)
-    elif isinstance(expr_simpl, Mul):
-        # similarly, `Mul((Scaled(...),))` → `Scaled(Mul((...),),)`
+    # since `Exp(Scaled(x, a), b)` → `Scaled(Exp(x, b), a * b)`
+    # similarly, `Mul((Scaled(...),))` → `Scaled(Mul((...),),)`
+    if isinstance(
+        expr_simpl,
+        (BaseUnit, BaseDimension, Dimensionless, Logarithmic, Exp, Mul),
+    ):
         return ConversionInfo(expr_simpl, 1, 0)
     elif isinstance(expr_simpl, Scaled):
         # so `Scaled` should always be pushed to outmost level.
@@ -924,18 +908,25 @@ def _flatten(
         assert info_ref.offset == 0, (
             f"inner reference of {expr_simpl=} should not have any offset"
         )
-        factor_ref = (
-            info_ref.factor.products
-            if isinstance(info_ref.factor, LazyFactor)
-            else (info_ref.factor,)
-        )
         # v_local = v_ref + offset_local
-        #   v_abs = v_ref * factor_ref =
+        #   v_abs = v_ref * factor_ref
         #         = v_local * factor_ref - offset_local * factor_ref
-        new_offset = LazyFactor((-1, expr_simpl.offset, *factor_ref))
+        new_offset = LazyFactor(
+            (-1, expr_simpl.offset, *_products(info_ref.factor))
+        )
         return ConversionInfo(info_ref.expr, info_ref.factor, new_offset)
     else:  # pragma: no cover
         raise ValueError(f"unknown expression {expr_simpl}")
+
+
+def _products(
+    factor: Factor | LazyFactor,
+) -> Generator[tuple[Factor, Exponent] | Factor]:
+    if isinstance(factor, LazyFactor):
+        for product in factor.products:
+            yield product
+    else:
+        yield factor
 
 
 def _factor_to_fraction(
@@ -972,15 +963,12 @@ class LazyFactor:
     ) -> LazyFactor:
         products: list[tuple[Factor, Exponent] | Factor] = []
         for scaled, exponent in derived_conversions:
-            if isinstance(scaled.factor, LazyFactor):  # by previous simplify()
-                for inner_item in scaled.factor.products:
-                    if isinstance(inner_item, tuple):
-                        base, inner_exp = inner_item
-                        products.append((base, inner_exp * exponent))
-                    else:
-                        products.append((inner_item, exponent))
-            else:
-                products.append((scaled.factor, exponent))
+            for inner_item in _products(scaled.factor):
+                if isinstance(inner_item, tuple):
+                    base, inner_exp = inner_item
+                    products.append((base, inner_exp * exponent))
+                else:
+                    products.append((inner_item, exponent))
         return cls(tuple(products))
 
     def to_approx(self) -> float:
@@ -988,23 +976,15 @@ class LazyFactor:
         applications."""
         product = 1.0
         for item in self.products:
-            if isinstance(item, tuple):
-                base, exponent = item
-                exp_value = float(exponent)
-                if base == 0:
-                    if exp_value > 0:
-                        return 0.0
-                    if exp_value == 0:
-                        continue  # 0 ** 0 = 1
-                if base == 1:
-                    continue
-                product *= float(base) ** float(exponent)
-            else:
-                if item == 0:
+            base, exponent = item if isinstance(item, tuple) else (item, 1)
+            if base == 0:
+                if exponent > 0:
                     return 0.0
-                if item == 1:
-                    continue
-                product *= float(item)
+                if exponent == 0:
+                    continue  # 0 ** 0 = 1
+            if base == 1:
+                continue
+            product *= float(base) ** float(exponent)
         return product
 
     # NOTE: not defining `__mul__` to avoid confusion.

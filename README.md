@@ -89,14 +89,18 @@ At the current state, it merely serves to enable writing machine-readable, struc
 
     The `Disambiguated` class allows tagging a unit with any context:
     ```py
-    from isq import Disambiguated, MOL
+    from isq import Disambiguated, M_PERS
 
-    MOL_O2 = Disambiguated(MOL, "o2")
-    MOL_LOX = Disambiguated(MOL, ("o2", "liquid"))
+    M_PERS_GS = Disambiguated(M_PERS, context=("airspeed", "ground"))
+    M_PERS_TAS = Disambiguated(M_PERS, context=("airspeed", "true"))
+
+    from isq import KNOT
+    
+    KNOT_GS = M_PERS_GS.with_units(KNOT)  # swap to us customary, keeping context
     ```
     
-    - Simplification: `MOL_O2 * MOL_LOX**-1` will not simplify to `Dimensionless`.
-    - Conversion: `MOL_O2.to(MOL_LOX)` will fail because of contextual mismatch.
+    - Simplification: `M_PERS_GS * M_PERS_TAS**-1` will not simplify to `Dimensionless`.
+    - Conversion: `M_PERS_TAS.to(M_PERS_GS)` will fail because of contextual mismatch.
 
 ## TODOs
 

@@ -9,13 +9,19 @@ from decimal import Decimal
 from fractions import Fraction
 
 from .core import Exp, Mul, Scaled, Translated
-from .si import G0, KG, K, M, S
+from .si import G0, HOUR, KG, K, M, S
 
-FT = Scaled(M, Decimal("0.3048"), "ft")
-IN = Scaled(FT, Fraction(1, 12), "in")
+FT = Scaled(M, Decimal("0.3048"), "foot")
+NMI = Scaled(M, 1852, "nautical_mile")
+IN = Scaled(FT, Fraction(1, 12), "inch")
+YD = Scaled(FT, 3, "yard")
+MI = Scaled(FT, 5280, "mile")
 
-LB = Scaled(KG, Decimal("0.45359237"), "lb")
-LBF = Mul((LB, G0), "lbf")
+KNOT = Mul((NMI, Exp(HOUR, -1)), "knot")
+MPH = Mul((MI, Exp(HOUR, -1)), "mph")
+
+LB = Scaled(KG, Decimal("0.45359237"), "pound_mass")
+LBF = Mul((LB, G0), "pound_force")
 
 PSI = Mul((LBF, Exp(IN, -2)), "psi")
 

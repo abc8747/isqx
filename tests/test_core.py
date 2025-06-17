@@ -311,6 +311,14 @@ def test_disambiguated_conversion() -> None:
         _ = M.to(M_ALT_GEOP)
 
 
+def test_disambiguated_with_units() -> None:
+    FT_ALT_GEOP = M_ALT_GEOP.with_units(FT)
+    assert FT_ALT_GEOP.reference == FT
+
+    with pytest.raises(ValueError):
+        M_ALT_GEOP.with_units(S)
+
+
 #
 # Unit conversions
 #
