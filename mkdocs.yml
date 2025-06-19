@@ -5,7 +5,9 @@ repo_url: https://github.com/cathaypacific8747/isq
 site_url: https://cathaypacific8747.github.io/isq/
 nav:
   - "README.md"
-  - API Reference: "api.md"
+  - API Reference:
+    - Core (SI + US Customary): "api/core.md"
+    - Aerospace: "api/aerospace.md"
 
 theme:
   name: material

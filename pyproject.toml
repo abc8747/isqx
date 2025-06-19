@@ -43,6 +43,7 @@ warn_return_any = true
 warn_redundant_casts = true
 warn_unused_configs = true
 warn_unused_ignores = true
+disable_error_code = "has-type" # avoid need to spam N: Mul = Mul
 
 [tool.coverage.report]
 exclude_also = [

@@ -7,6 +7,7 @@ from decimal import Decimal
 from fractions import Fraction
 from typing import (
     Any,
+    Final,
     Generator,
     Hashable,
     Literal,
@@ -16,14 +17,22 @@ from typing import (
     NamedTuple,
     Protocol,
     Sequence,
+    SupportsFloat,
     Union,
+    final,
     runtime_checkable,
 )
 
 from typing_extensions import TypeAlias
 
+
+@runtime_checkable
+class SupportsDecimal(SupportsFloat, Protocol):
+    def to_decimal(self, ctx: decimal.Context) -> Decimal: ...
+
+
 ExpressionKind: TypeAlias = Literal["dimensionless", "unit", "dimension"]
-Factor: TypeAlias = Union[Decimal, Fraction, float, int]
+Factor: TypeAlias = Union[SupportsDecimal, Decimal, Fraction, float, int]
 
 
 @runtime_checkable
@@ -40,15 +49,15 @@ class Expr(Protocol):
     | [expression raised to a power][isq.Exp]   | `Exp(METER, 2)`           |
     | [product of expressions][isq.Mul]         | `Mul(NEWTON, METER)`      |
     | [scaled expression][isq.Scaled]           | [feet][isq.FT] = 0.3048 m |
-    | [disambiguated][isq.Disambiguated]        | true vs ground speed      |
+    | [tagged][isq.Tagged]                      | true vs ground speed      |
     | [translated expression][isq.Translated]^  | [celsius][isq.CELSIUS]    |
     | [logarithmic quantity][isq.Logarithmic]^  | [decibel-volts][isq.DBV]  |
 
     ^ these expressions are *terminal*, meaning it cannot be further
       [exponentiated][isq.Exp], [multiplied][isq.Mul], [scaled][isq.Scaled] or
       [translated][isq.Translated] to form a more complex expression. However,
-      it can be further [disambiguated][isq.Disambiguated] (e.g. surface
-      temperature vs ISA temperature).
+      it can be further [tagged][isq.Tagged] (e.g. surface temperature vs
+      ISA temperature).
     """
 
     @property
@@ -184,7 +193,7 @@ class Exp(ConvertMixin, Expr):
     def __post_init__(self) -> None:
         if self.exponent == 0:
             raise ValueError("exponent must not be zero, use `Dimensionless`")
-        ref = _unwrap_disambiguated(self.base)
+        ref = _unwrap_tagged(self.base)
         if isinstance(ref, Translated):
             raise ValueError(
                 f"translated expression `{ref.name}` is terminal: it cannot be"
@@ -238,7 +247,7 @@ class Mul(ConvertMixin, Expr):
             raise ValueError("terms must not be empty, use `Dimensionless`")
         kinds = []
         for term in self.terms:
-            ref = _unwrap_disambiguated(term)
+            ref = _unwrap_tagged(term)
             if isinstance(ref, Translated):
                 raise ValueError(
                     f"translated expression `{ref.name}` is terminal:"
@@ -303,7 +312,7 @@ class Scaled(ConvertMixin, Expr):
     some units like `liter`, `tonne`, `electronvolt`"""
 
     def __post_init__(self) -> None:
-        ref = _unwrap_disambiguated(self.reference)
+        ref = _unwrap_tagged(self.reference)
         if isinstance(ref, Translated) or (
             isinstance(ref, Logarithmic) and not ref.allow_prefix
         ):
@@ -344,7 +353,7 @@ class Scaled(ConvertMixin, Expr):
 @dataclass(frozen=True)
 class Prefix:
     """A factory, which when multiplied by a [base unit][isq.BaseUnit] or
-    [**named** derived unit][isq.Mul], returs a [scaled unit][isq.Scaled].
+    [**named** derived unit][isq.Mul], returns a [scaled unit][isq.Scaled].
 
     Note that this is not an [isq.Expr][], but a *constructor helper*.
     """
@@ -380,7 +389,7 @@ class Prefix:
                     "cannot apply prefix KILO to GRAM"
                     "\nhelp: use isq.KG directly instead"
                 )
-        ref = _unwrap_disambiguated(rhs)
+        ref = _unwrap_tagged(rhs)
         if isinstance(ref, Translated):
             raise TypeError(
                 f"cannot apply prefix `{self.name}` to translated unit {rhs=}"
@@ -404,23 +413,21 @@ class Prefix:
 
 
 @dataclass(frozen=True)
-class Disambiguated(ConvertMixin, Expr):
-    """An expression decorated with a semantic context tag.
+class Tagged(ConvertMixin, Expr):
+    """An concrete unit expression decorated with a semantic context tag.
 
     This is used to disambiguate between quantities that share the same
     physical dimension but have different meanings, e.g.,
-    geopotential altitude vs. geometric altitude.
-    """
+    geopotential altitude vs. geometric altitude."""
 
     reference: Expr
-    """The expression that this disambiguation wraps, e.g. `METER`"""
     context: Hashable
     """A hashable identifier, e.g. `geopotential`, a tuple of contexts"""
 
     def __post_init__(self) -> None:
-        if isinstance(self.reference, Disambiguated):
+        if isinstance(self.reference, Tagged):
             raise ValueError(
-                "nesting disambiguated expressions is not allowed,"
+                "nesting tagged expressions is not allowed,"
                 "consider using a tuple to store multiple contexts instead"
             )
 
@@ -429,26 +436,41 @@ class Disambiguated(ConvertMixin, Expr):
         return self.reference.kind
 
     @property
-    def dimension(self) -> Disambiguated:
-        return Disambiguated(self.reference.dimension, self.context)
+    def dimension(self) -> Tagged:
+        return Tagged(self.reference.dimension, self.context)
 
-    def simplify(self) -> Disambiguated:
+    def simplify(self) -> Tagged:
         simplified_ref = self.reference.simplify()
-        return Disambiguated(simplified_ref, self.context)
+        return Tagged(simplified_ref, self.context)
 
-    def with_units(self, new_reference: Expr) -> Disambiguated:
-        """Creates a new `Disambiguated` expression with the same context, but a
-        different reference unit. Useful for switching between metric and
-        imperial units."""
-        original_dim = self.reference.dimension.simplify()
-        new_dim = new_reference.dimension.simplify()
-        if original_dim != new_dim:
+
+@dataclass(frozen=True)
+class QtyKind:
+    """An abstract *kind of quantity* (ISO 80000-1) represents a "concept" (e.g.
+    speed) *without* a specific unit tied to it.
+
+    When indexed with a unit, it becomes a
+    [concrete unit with tagged context][isq.Tagged].
+    """
+
+    unit_si: Expr
+    """The SI unit, e.g. `M_PERS` for speed"""
+    context: Hashable
+    """A hashable identifier, e.g. `geopotential`, a tuple of contexts"""
+
+    def __getitem__(self, unit: Expr) -> Tagged:
+        """Attach a specific unit to this kind of quantity."""
+        if unit is self.unit_si:
+            return Tagged(self.unit_si, context=self.context)
+        dim_unit = unit.simplify().dimension
+        dim_unit_self = self.unit_si.simplify().dimension
+        if dim_unit != dim_unit_self:
             raise ValueError(
-                f"cannot replace unit for `{self.context}` with a unit of "
-                f"incompatible dimensions."
-                f"\nhelp: original dimension: {original_dim}, new: {new_dim}"
+                f"cannot attach a specific unit `{unit}` because "
+                f"its dimension (`{dim_unit}`) does not match the expected "
+                f"dimension of the kind `{self.unit_si}` (`{dim_unit_self}`)"
             )
-        return Disambiguated(new_reference, self.context)
+        return Tagged(unit, context=self.context)
 
 
 @dataclass(frozen=True)
@@ -463,7 +485,7 @@ class Translated(ConvertMixin, Expr):
     name: str
 
     def __post_init__(self) -> None:
-        ref = _unwrap_disambiguated(self.reference)
+        ref = _unwrap_tagged(self.reference)
         if isinstance(ref, Translated):
             raise TypeError(
                 "nesting translated units in `Translated` is not allowed"
@@ -510,14 +532,14 @@ class Logarithmic(ConvertMixin, Expr):
     """The linear unit being measured (e.g., V for dBV, W for dBm)"""
     quantity_type: Literal["power", "field"]
     """Whether the reference is a power or a field quantity."""
-    log_base: Factor | E
+    log_base: Factor
     """The base of the logarithm (e.g., 10, 2, [isq.E][])"""
     name: str
     allow_prefix: bool = False
     """Whether prefixes can be applied to the logarithmic unit (e.g., mNp)."""
 
     def __post_init__(self) -> None:
-        ref = _unwrap_disambiguated(self.reference)
+        ref = _unwrap_tagged(self.reference)
         if isinstance(ref, (Logarithmic, Translated)):
             raise TypeError(
                 f"reference of logarithmic unit `{self.name}` must be not be"
@@ -534,7 +556,7 @@ class Logarithmic(ConvertMixin, Expr):
         """Determines the multiplicative factor (e.g., 10 or 20 for dB)."""
         if self.log_base == 10:  # decibels
             return 10 if self.quantity_type == "power" else 20
-        elif isinstance(self.log_base, E):  # nepers
+        elif self.log_base is E:  # nepers
             return 1 if self.quantity_type == "field" else Fraction(1, 2)
         else:  # bits (log_base=2)
             return 1
@@ -557,9 +579,9 @@ class Logarithmic(ConvertMixin, Expr):
         )
 
 
-def _unwrap_disambiguated(expr: Expr) -> Expr:
+def _unwrap_tagged(expr: Expr) -> Expr:
     # `Translated` and `Logarithmic` are terminal, this plugs a loophole
-    if isinstance(expr, Disambiguated):
+    if isinstance(expr, Tagged):
         return expr.reference
     return expr
 
@@ -586,11 +608,9 @@ def _decompose_expr(
             - expr=Expr(S, -2), exponent=1
                 - base_exponent_pairs_mut[S] += -2
     """
-    if isinstance(
-        expr, (Dimensionless, BaseDimension, BaseUnit, Disambiguated)
-    ):
-        # we hit a fundamental-like unit (we treat disambiguated obj as unique
-        # bases). add its accumulated exponent
+    if isinstance(expr, (Dimensionless, BaseDimension, BaseUnit, Tagged)):
+        # we hit a fundamental-like unit (we treat tagged as unique bases).
+        # add its accumulated exponent
         base_exponent_pairs_mut.setdefault(expr, 0)
         base_exponent_pairs_mut[expr] += exponent
     elif isinstance(expr, Exp):
@@ -824,22 +844,16 @@ class Converter:
         k2 = _factor_to_fraction(target_simpl.level_factor, ctx=ctx)
         k_ratio = k2 / k1
         if exact:  # ln is transcendental, tiny precision loss expected
-            ln_b1_d = (
-                E.to_decimal(ctx)
-                if isinstance(b1, E)
-                else _fraction_to_decimal(_factor_to_fraction(b1, ctx=ctx))
-            ).ln(ctx)
-            ln_b2_d = (
-                E.to_decimal(ctx)
-                if isinstance(b2, E)
-                else _fraction_to_decimal(_factor_to_fraction(b2, ctx=ctx))
-            ).ln(ctx)
-            ref_ratio_d = _fraction_to_decimal(
-                _factor_to_fraction(ref_ratio, ctx=ctx)
+            b1_d = _fraction_to_decimal(_factor_to_fraction(b1, ctx=ctx))
+            ln_b2_d = _fraction_to_decimal(_factor_to_fraction(b2, ctx=ctx)).ln(
+                ctx
             )
+            ln_ref_ratio_d = _fraction_to_decimal(
+                _factor_to_fraction(ref_ratio, ctx=ctx)
+            ).ln(ctx)
             return cls(
-                scale=k_ratio * Fraction(ln_b1_d) / Fraction(ln_b2_d),
-                offset=k2 * Fraction(ref_ratio_d.ln(ctx) / ln_b2_d),
+                scale=k_ratio * Fraction(b1_d.ln(ctx)) / Fraction(ln_b2_d),
+                offset=k2 * Fraction(ln_ref_ratio_d / ln_b2_d),
             )
         else:
             ln_b2_f = math.log(float(b2))
@@ -858,17 +872,6 @@ class Converter:
             [fractions.Fraction][].
         """
         return value * self.scale + self.offset
-
-
-class E:
-    __slots__ = ()
-
-    @classmethod
-    def to_decimal(cls, ctx: decimal.Context) -> Decimal:
-        return ctx.exp(Decimal(1))
-
-    def __float__(self) -> float:
-        return math.e
 
 
 class ConversionInfo(NamedTuple):
@@ -896,10 +899,10 @@ def _flatten(
         # furthermore, since nested `Scaled(Scaled(x, c), d)` would simplify to
         # `Scaled(x, c * d)`, we don't need to recursively get the factor.
         return ConversionInfo(expr_simpl.reference, expr_simpl.factor, 0)
-    elif isinstance(expr_simpl, Disambiguated):
+    elif isinstance(expr_simpl, Tagged):
         info_ref = _flatten(expr_simpl.reference)
         return ConversionInfo(
-            Disambiguated(info_ref.expr, expr_simpl.context),
+            Tagged(info_ref.expr, expr_simpl.context),
             info_ref.factor,
             info_ref.offset,
         )
@@ -936,6 +939,8 @@ def _factor_to_fraction(
         return Fraction(factor.to_exact(ctx=ctx))
     elif isinstance(factor, (Decimal, float, int)):
         return Fraction(factor)
+    elif isinstance(factor, SupportsDecimal):
+        return Fraction(factor.to_decimal(ctx=ctx))
     elif not isinstance(factor, Fraction):
         raise ValueError(f"unknown {type(factor)=}")  # pragma: no cover
     return factor
@@ -946,7 +951,7 @@ def _fraction_to_decimal(fraction: Fraction) -> Decimal:
 
 
 @dataclass(frozen=True)
-class LazyFactor:
+class LazyFactor(SupportsFloat):
     """Represents a scaling factor as a sequence of products.
 
     Lazy evaluation allows the choice between evaluating it to an exact value
@@ -1072,6 +1077,42 @@ class LazyFactor:
         return _fraction_to_decimal(product_fraction) * product_decimal
 
 
+@final
+class _E(SupportsDecimal):
+    __slots__ = ()
+
+    def to_decimal(self, ctx: decimal.Context) -> Decimal:
+        return ctx.exp(Decimal(1))
+
+    def __float__(self) -> float:
+        return math.e
+
+
+@final
+class _PI(SupportsDecimal):
+    __slots__ = ()
+
+    def to_decimal(self, ctx: decimal.Context) -> Decimal:
+        # from: https://docs.python.org/3/library/decimal.html#recipes
+        ctx.prec += 2  # extra digits for intermediate steps
+        three = Decimal(3)
+        lasts, t, s, n, na, d, da = Decimal(0), three, Decimal(3), 1, 0, 0, 24
+        while s != lasts:
+            lasts = s
+            n, na = n + na, na + 8
+            d, da = d + da, da + 32
+            t = (t * n) / d
+            s += t
+        ctx.prec -= 2
+        pi = +s  # unary plus applies the new precision
+        return pi
+
+    def __float__(self) -> float:
+        return math.pi
+
+
+E: Final = _E()
+PI: Final = _PI()
 # NOTE: for a registry, one option is to adopt https://peps.python.org/pep-0487/#subclass-registration:
 # - have a `Registrable` mixin with `__init_subclass__` so the act of defining a class `S` automatically adds it to a global dict
 # - this guarantees completeness with zero boilerplate

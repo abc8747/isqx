@@ -2,21 +2,13 @@
 
 A tiny dependency-free Python library to define, manipulate, and convert physical units/dimensions.
 
-At the current state, it merely serves to enable writing machine-readable, structured documentation. It does *not* perform runtime unit checking.
+Unlike mature unit-checking libraries like [`astropy.units`](https://github.com/astropy/astropy) which encapsulate your data types in a new object (a `numpy.ndarray` becomes a `Quantity`), this library **does not perform runtime dimensional homogenity checks**.
+
+At the current state, it merely serves to enable writing machine-readable, structured documentation.
 
 ## Key principles
 
-- **No runtime value-wrapping**: Existing, mature unit-checking libraries like [`astropy.units`](https://docs.astropy.org/en/stable/units/index.html) use operator overloading to encapsulate your data types in a new object (a `numpy.ndarray` becomes a `Quantity` object). It checks units eagerly at runtime. This introduces performance overhead and friction with existing libraries that expect raw numerical inputs. Most simply resort to writing units in docstrings:
-    ```py
-    def acceleration(force, mass):
-        """Return the acceleration (meters per second squared).
-
-        :param force: Force, newtons.
-        :param mass: Mass, kilograms.
-        """
-        return force / mass
-    ```
-    Instead, we leverage `Annotated[T, x]` to decorate existing types with [zero-cost metadata](https://peps.python.org/pep-0593/)
+- Inspired by modern data validation libraries like [Pydantic](https://github.com/pydantic/pydantic), this library offers metadata objects that can be used in `typing.Annotated[T, x]`:
     ```py
     from typing import Any, Annotated
     from isq import N, KG, M, S
@@ -27,34 +19,25 @@ At the current state, it merely serves to enable writing machine-readable, struc
     ) -> Annotated[Any, M * S**-2]:
         ...
     ```
-    This provides several benefits:
-    - at runtime, the type is kept intact as `T`
+    Benefits:
+    - the type is kept intact as `T`, with zero runtime overhead (see [PEP 593](https://peps.python.org/pep-0593/))
     - enables powerful runtime introspection of `x` with `typing.get_type_hints()`.
     - delegates the type checking to an [separate tool](#type-checking)
     - centralised source of truth
     - supports for documentation generators like `mkdocs` and intersphinx
     - incremental, optional adoption
     - use in `dataclass`, `TypedDict`, `NamedTuple`...
-- **Composability**: Units and dimensions are represented as immutable tree, much like SymPy.
+- Units and dimensions are represented as immutable tree, much like SymPy.
     ```py
     from isq import N, KG
 
     # N = Mul((KG, M, Exp(S, -2)), name='newton')
     ACCELERATION = Mul((N, Exp(KG, -1)))
-    print(ACCELERATION)
-    # Mul((N, Exp(KG, -1)))
+    print(ACCELERATION) # Mul((N, Exp(KG, -1)))
+    print(ACCELERATION.simplify()) # Mul((M, Exp(S, -2)))
     ```
-    Sometimes, we just want a semantically meaningful unit. Units are not aggressively simplified by default.
-- **Simplification**: The `simplify()` method reduces complex nested expressions into a canonical form (product of base units raised to powers, potentially scaled).
-    ```py
-    from isq import N, KG, Exp, Mul
-
-    ACCELERATION = Mul((N, Exp(KG, -1)))
-    print(ACCELERATION.simplify())
-    # Mul((M, Exp(S, -2)))
-    ```
-    This forms the basis for checking dimensional homogeneity.
-- **Unit Conversion**: The `to()` method returns a function that allow you to convert between compatible units.
+    Ordering is preserved and units are not aggressively simplified unless the `simplify()` method is called. Simplification reduces reduces the complex nested tree into a flat canonical form (product of base units raised to powers, potentially scaled).
+- The `to()` method returns a callable that allow you to convert between compatible units.
     ```py
     from isq import FT, MIN, M, S, Exp, Mul
 
@@ -63,44 +46,37 @@ At the current state, it merely serves to enable writing machine-readable, struc
     FT_PER_MIN = Mul((FT, Exp(MIN, -1)))
     M_PER_S = Mul((M, Exp(S, -1)))
     fpm2mps = FT_PER_MIN.to(M_PER_S)
-    print(fpm2mps(1000, exact=True))  # Fraction(127, 25)
     print(fpm2mps(100.0))  # 0.508
+    print(FT_PER_MIN.to(M_PER_S, exact=True)(1000))  # Fraction(127, 25)
     ```
-    The function accepts any type that implements `__mul__`, making it compatible with many libraries, including numpy and `jax.jit`. `exact=True` is useful for money conversions.
-- **Plug-and-play extensibility**: Create your own units without DSL, just plain Python objects.
+    The callable is compatible with many libraries, including `numpy` and `jax.jit`. Exact arithmetic is supported, useful for financial applications.
+- Define your own units without DSL with plug-and-play extensibility.
     ```py
-    from isq import BaseDimension, BaseUnit, Scaled, Mul, Exp, HOUR, WEEK
-    from decimal import Decimal
+    from fractions import Fraction
+    from isq import FT, M, Scaled
 
-    DIM_MONEY = BaseDimension("MONEY")
-    USD = BaseUnit(DIM_MONEY, name="USD")
-    HKD = Scaled(USD, factor=1 / Decimal("7.8"), name="HKD")
-    USD_PER_HR = Mul((USD, Exp(HOUR, -1)))
-    HKD_PER_YEAR = Mul((HKD, Exp(WEEK, -1)))
-    print(USD_PER_HR.to(HKD_PER_WEEK)(13))  # 888872.4
+    SMOOT = Scaled(FT, factor=5 + Fraction(7, 12), name="smoot")
+    print(SMOOT.to(M, exact=True)(Fraction("364.4")))  # 7751699/12500
     ```
-- **Disambiguation**: Quantities often share the same physical dimension but are semantically distinct. Examples:
-    - geopotential altitude vs geometric altitude (meters)
-    - true airspeed vs ground speed (knots)
-    - inertial vs body vs wind reference frame
-    - $\Delta U = Q - W$, kinetic vs potential vs enthalpy vs gibbs free (joules)
-    - revenue vs cost, nominal vs real, capex vs opex (money)
-    - force_x vs force_y (newtons)
+- Different quantities often share the same physical dimension but are semantically distinct. For example:
+    - geopotential vs geometric altitude (ft)
+    - true vs ground speed (knots)
+    - inertial vs body vs wind reference frames
+    - $\Delta U = Q - W$, kinetic vs potential vs enthalpy vs Gibbs free energy (joules)
+    - nominal vs real, capex vs opex (money)
+    - force in the x, y and z directions (newtons)
 
-    The `Disambiguated` class allows tagging a unit with any context:
+    Use the `Tagged` class to add context to a unit:
     ```py
-    from isq import Disambiguated, M_PERS
+    from isq import Tagged, M_PERS
 
-    M_PERS_GS = Disambiguated(M_PERS, context=("airspeed", "ground"))
-    M_PERS_TAS = Disambiguated(M_PERS, context=("airspeed", "true"))
+    M_PERS_GS = Tagged(M_PERS, context=("airspeed", "ground"))
+    M_PERS_TAS = Tagged(M_PERS, context=("airspeed", "true"))
 
-    from isq import KNOT
-    
-    KNOT_GS = M_PERS_GS.with_units(KNOT)  # swap to us customary, keeping context
+    Mul(M_PERS_GS, Exp(M_PERS_GS, -1)).simplify() # NOT dimensionless.
+    # unit conversion will fail due to context mismatch:
+    # M_PERS_TAS.to(M_PERS_GS) 
     ```
-    
-    - Simplification: `M_PERS_GS * M_PERS_TAS**-1` will not simplify to `Dimensionless`.
-    - Conversion: `M_PERS_TAS.to(M_PERS_GS)` will fail because of contextual mismatch.
 
 ## TODOs
 
@@ -121,6 +97,8 @@ One possible path is to use tracer objects that record operations just-in-time, 
 Moving forward, the first MVP should start with simple function boundary checks, *only* at points where data crosses a declared "unit boundary" (argument passing, return statements). This alone would already cover most usecases.
 
 Intra-expression errors (e.g. `distance_m + time_s`) are significantly more difficult to deal with and come much later.
+
+Such a tool will be released as an optional feature, separate from the core library.
 
 ## Installation
 

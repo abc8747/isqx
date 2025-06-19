@@ -11,15 +11,15 @@ from isq import (
     RAD,
     BaseUnit,
     Dimensionless,
-    Disambiguated,
     Exp,
     LazyFactor,
     M,
     Mul,
     S,
     Scaled,
+    Tagged,
 )
-from isq.aerospace import M_ALT_GEOM, M_ALT_GEOP
+from isq.aerospace import ALT_GEOM, ALT_GEOP
 
 #
 # Exp
@@ -268,13 +268,16 @@ def test_prefix_invalid() -> None:
 
 
 #
-# disambiguated
+# tagged
 #
+
+M_ALT_GEOM = ALT_GEOM[M]
+M_ALT_GEOP = ALT_GEOP[M]
 
 
 def test_disambiguated_invalid_construction() -> None:
     with pytest.raises(ValueError, match="nesting"):
-        _ = Disambiguated(M_ALT_GEOP, "another_context")
+        _ = Tagged(M_ALT_GEOP, "another_context")
 
 
 def test_disambiguated_simplify_cancellation() -> None:
@@ -288,12 +291,12 @@ def test_disambiguated_simplify_cancellation() -> None:
     assert set(simplified_diff.terms) == set(expr_diff_ctx.terms)
 
 
-FT_ALT_GEOP = Disambiguated(FT, ("altitude", "geopotential"))
+FT_ALT_GEOP = Tagged(FT, ("altitude", "geopotential"))
 
 
 def test_disambiguated_simplify_propagates_to_reference() -> None:
     simplified = FT_ALT_GEOP.simplify()  # Scaled(Disambiguated(M, ...), ...)
-    assert isinstance(simplified, Disambiguated)
+    assert isinstance(simplified, Tagged)
     assert simplified.context == M_ALT_GEOP.context
     assert isinstance(simplified.reference, Scaled)
     assert simplified.reference.reference == M
@@ -311,12 +314,35 @@ def test_disambiguated_conversion() -> None:
         _ = M.to(M_ALT_GEOP)
 
 
-def test_disambiguated_with_units() -> None:
-    FT_ALT_GEOP = M_ALT_GEOP.with_units(FT)
-    assert FT_ALT_GEOP.reference == FT
+def test_qty_kind_getitem() -> None:
+    from isq import KNOT, M_PERS
+    from isq.aerospace import TAS
+
+    tas_mps = TAS[M_PERS]
+    assert isinstance(tas_mps, Tagged)
+    assert tas_mps.reference == M_PERS
+    assert tas_mps.context == ("airspeed", "true")
+
+    tas_knots = TAS[KNOT]
+    assert isinstance(tas_knots, Tagged)
+    assert tas_knots.reference == KNOT
+    assert tas_knots.context == ("airspeed", "true")
+
+    mps_to_knots = tas_mps.to(tas_knots)
+    assert mps_to_knots(1.0) == pytest.approx(1.94384449)
 
     with pytest.raises(ValueError):
-        M_ALT_GEOP.with_units(S)
+        _ = TAS[M]
+
+    with pytest.raises(ValueError):
+        _ = ALT_GEOP[M_PERS]
+
+    alt_m = ALT_GEOP[M]
+    alt_ft = ALT_GEOP[FT]
+    assert alt_m.to(alt_ft)(100) == pytest.approx(328.08399)
+
+    with pytest.raises(ValueError):
+        _ = tas_mps.to(alt_m)
 
 
 #
@@ -422,22 +448,22 @@ def test_translated_is_terminal() -> None:
 
 
 def test_convert_translated() -> None:
-    from isq import CELSIUS, DIM_TEMPERATURE, FARENHEIT, K, R
+    from isq import CELSIUS, DIM_TEMPERATURE, FAHRENHEIT, K, R
 
     assert CELSIUS.dimension == DIM_TEMPERATURE
 
     assert K.to(CELSIUS)(1.1) == -272.04999999999995  # inexact
     assert K.to(CELSIUS, exact=True)(Fraction(11, 10)) == Fraction(-27205, 100)
 
-    c_to_f = CELSIUS.to(FARENHEIT, exact=True)
+    c_to_f = CELSIUS.to(FAHRENHEIT, exact=True)
     assert isinstance(c_to_f.scale, Fraction) and c_to_f.scale == Fraction(9, 5)
     assert isinstance(c_to_f.offset, Fraction) and c_to_f.offset == Fraction(
         32, 1
     )
     assert c_to_f(100) == 212
-    assert CELSIUS.to(FARENHEIT).scale == 1.7999999999999998  # inexact
+    assert CELSIUS.to(FAHRENHEIT).scale == 1.7999999999999998  # inexact
 
-    f_to_c = FARENHEIT.to(CELSIUS, exact=True)
+    f_to_c = FAHRENHEIT.to(CELSIUS, exact=True)
     assert f_to_c(32) == 0
     assert f_to_c(212) == 100
     c_to_r = CELSIUS.to(R, exact=True)
@@ -447,8 +473,8 @@ def test_convert_translated() -> None:
 def test_convert_disambiguated_translated() -> None:
     from isq import CELSIUS, K
 
-    SURFACE_TEMP_C = Disambiguated(CELSIUS, "surface")
-    SURFACE_TEMP_K = Disambiguated(K, "surface")
+    SURFACE_TEMP_C = Tagged(CELSIUS, "surface")
+    SURFACE_TEMP_K = Tagged(K, "surface")
 
     c_to_k_exact = SURFACE_TEMP_C.to(SURFACE_TEMP_K, exact=True)
     assert c_to_k_exact(10) == Fraction(28315, 100)
@@ -534,3 +560,45 @@ def test_convert_logarithmic_fail() -> None:
         DBV.to(V)
     with pytest.raises(ValueError):
         DBV.to(DBM)
+
+
+def test_angle_conversion() -> None:
+    from decimal import Decimal, localcontext
+
+    from isq import DEG, PI, REV, E
+
+    with localcontext() as ctx:
+        assert PI.to_decimal(ctx) == Decimal("3.141592653589793238462643383")
+        assert E.to_decimal(ctx) == Decimal("2.718281828459045235360287471")
+
+    deg_to_rad = DEG.to(RAD)
+    assert deg_to_rad(180) == pytest.approx(math.pi)
+    assert deg_to_rad(360) == pytest.approx(2 * math.pi)
+
+    rad_to_deg = RAD.to(DEG)
+    assert rad_to_deg(math.pi) == pytest.approx(180.0)
+    assert rad_to_deg(1) == pytest.approx(180 / math.pi)
+
+    with localcontext() as ctx:
+        ctx.prec = 100
+        pi_100 = PI.to_decimal(ctx)
+
+        assert DEG.to(RAD, exact=True, ctx=ctx)(180) == pi_100
+        assert RAD.to(DEG, exact=True, ctx=ctx)(Fraction(pi_100)) == 180
+
+    assert REV.to(RAD)(1) == pytest.approx(2 * math.pi)
+    assert RAD.to(REV)(math.pi) == pytest.approx(0.5)
+    assert DEG.to(REV)(360) == pytest.approx(1.0)
+
+
+def test_derived_angle_conversion() -> None:
+    from isq import DEG
+
+    DEG_PER_S = Mul((DEG, Exp(S, -1)))
+    RAD_PER_S = Mul((RAD, Exp(S, -1)))
+
+    assert DEG_PER_S.to(RAD_PER_S)(180) == pytest.approx(math.pi)
+
+    result = DEG_PER_S.to(RAD_PER_S, exact=True)(Fraction(180))
+    assert isinstance(result, Fraction)
+    assert result == pytest.approx(Fraction(math.pi))
