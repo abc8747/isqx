@@ -80,26 +80,26 @@ TEMP_ISA = QtyKind(K, ("static", "isa"))
 IAS = QtyKind(M_PERS, ("airspeed", "indicated"))
 """Indicated airspeed, as measured directly from the airspeed indicator."""
 CAS = QtyKind(M_PERS, ("airspeed", "calibrated"))
-"""Calibrated airspeed, [IAS][isq.aerospace.M_PERS_IAS] corrected for instrument and position errors."""
+"""Calibrated airspeed, [IAS][isq.aerospace.IAS] corrected for instrument and position errors."""
 EAS = QtyKind(M_PERS, ("airspeed", "equivalent"))
 """Equivalent airspeed."""
 TAS = QtyKind(M_PERS, ("airspeed", "true"))
 """True airspeed."""
 GS = QtyKind(M_PERS, ("airspeed", "ground"))
 """Ground speed."""
-WIND = QtyKind(M_PERS, ("wind",))
+WIND_SPEED = QtyKind(M_PERS, ("wind",))
 """Wind speed."""
-SOUND = QtyKind(M_PERS, ("sound",))
+SPEED_OF_SOUND = QtyKind(M_PERS, ("sound",))
 """Speed of sound."""
 
-FT_PER_MIN = Mul((FT, Exp(MIN, -1)), "feet_per_minute")
+FT_PER_MIN = Mul((FT, Exp(MIN, -1)))
 VS = QtyKind(M_PERS, ("vertical_speed"))  # ICAO 4.15
 """Vertical speed, rate of climb or descent.
 Commonly expressed in [feet per minute][isq.aerospace.FT_PER_MIN]."""
 
 MACH = Dimensionless("mach")
-"""Mach number, the ratio between the [TAS][isq.aerospace.M_PERS_TAS]
-and the [speed of sound][isq.aerospace.M_PERS_SOUND]."""
+"""Mach number, the ratio between the [TAS][isq.aerospace.TAS]
+and the [speed of sound][isq.aerospace.SPEED_OF_SOUND]."""
 
 #
 # engine

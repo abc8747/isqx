@@ -31,7 +31,7 @@ At the current state, it merely serves to enable writing machine-readable, struc
     ```py
     from isq import N, KG
 
-    # N = Mul((KG, M, Exp(S, -2)), name='newton')
+    # N = Alias(Mul((KG, M, Exp(S, -2))), name="newton")
     ACCELERATION = Mul((N, Exp(KG, -1)))
     print(ACCELERATION) # Mul((N, Exp(KG, -1)))
     print(ACCELERATION.simplify()) # Mul((M, Exp(S, -2)))
@@ -50,12 +50,12 @@ At the current state, it merely serves to enable writing machine-readable, struc
     print(FT_PER_MIN.to(M_PER_S, exact=True)(1000))  # Fraction(127, 25)
     ```
     The callable is compatible with many libraries, including `numpy` and `jax.jit`. Exact arithmetic is supported, useful for financial applications.
-- Define your own units without DSL with plug-and-play extensibility.
+- Define your own units without DSL.
     ```py
     from fractions import Fraction
     from isq import FT, M, Scaled
 
-    SMOOT = Scaled(FT, factor=5 + Fraction(7, 12), name="smoot")
+    SMOOT = Scaled(FT, factor=5 + Fraction(7, 12))
     print(SMOOT.to(M, exact=True)(Fraction("364.4")))  # 7751699/12500
     ```
 - Different quantities often share the same physical dimension but are semantically distinct. For example:
@@ -66,21 +66,23 @@ At the current state, it merely serves to enable writing machine-readable, struc
     - nominal vs real, capex vs opex (money)
     - force in the x, y and z directions (newtons)
 
-    Use the `Tagged` class to add context to a unit:
+    Create a *kind of quantity* which can materialise to a `Tagged` class:
     ```py
-    from isq import Tagged, M_PERS
+    from isq import QtyKind, Mul, Exp, M_PERS, KNOT
 
-    M_PERS_GS = Tagged(M_PERS, context=("airspeed", "ground"))
-    M_PERS_TAS = Tagged(M_PERS, context=("airspeed", "true"))
+    GS = QtyKind(M_PERS, context=("airspeed", "ground"))
+    TAS = QtyKind(M_PERS, context=("airspeed", "true"))
+    
+    M_PERS_GS = GS[M_PERS] # Tagged(M_PERS, context=("airspeed", "ground"))
+    KNOT_GS = GS[KNOT] # Tagged(KNOT, context=("airspeed", "ground"))
 
-    Mul(M_PERS_GS, Exp(M_PERS_GS, -1)).simplify() # NOT dimensionless.
-    # unit conversion will fail due to context mismatch:
-    # M_PERS_TAS.to(M_PERS_GS) 
+    Mul((TAS[KNOT], Exp(GS[KNOT], -1))).simplify() # NOT dimensionless.
+    # TAS[KNOT].to(GS[KNOT])  # ValueError due to contextual mismatch
     ```
 
 ## TODOs
 
-- enable intuitive construction like `M * S**-1` directly producing new `Expr` objects (impl `__mul__`, `__truediv__`, `__pow__` for `Expr`)
+- enable intuitive construction like `M * S**-1` directly producing new `Expr` objects (impl `__mul__`, `__truediv__`, `__pow__`, `.alias()` for `Expr`)
 - convert `Expr` objects to various string representations (`siunitx`, LaTeX, ASCII, etc).
 - potentially, create a `mkdocs` plugin that serialises them
 

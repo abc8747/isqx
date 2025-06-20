@@ -125,9 +125,7 @@ def test_scaled_simplify_nested() -> None:
 
 
 def test_scaled_simplify_mixed() -> None:
-    expr4s = Mul(
-        (Exp(Scaled(M, 2, "x"), 3), Exp(Scaled(S, 3, "y"), 2))
-    ).simplify()
+    expr4s = Mul((Exp(Scaled(M, 2), 3), Exp(Scaled(S, 3), 2))).simplify()
     assert isinstance(expr4s, Scaled)
     assert expr4s.reference == Mul((Exp(M, 3), Exp(S, 2)))
     assert isinstance(expr4s.factor, LazyFactor)
@@ -192,79 +190,26 @@ def test_scaled_simplify_with_lazy_factor_multiple_terms() -> None:
     assert result.factor.to_approx() == pytest.approx(PSI_TO_PA_FACTOR**2)
 
 
-def test_scaled_simplify_complex() -> None:
-    # https://what-if.xkcd.com/11/
-    from decimal import Decimal
-    from math import pi
-
-    from isq import BaseDimension, BaseUnit
-
-    BIRD = BaseUnit(BaseDimension("bird"), "bird")
-    POOP = BaseUnit(BaseDimension("poop"), "poop")
-    MOUTH = BaseUnit(BaseDimension("mouth"), "mouth")
-    CM = Scaled(M, Decimal("0.01"), "centimeter")
-    KM = Scaled(M, Decimal("1000"), "kilometer")
-
-    BIRD_PERKM2 = Mul((BIRD, Exp(KM, -2)))
-    POOP_PERBIRD_PERHOUR = Mul((POOP, Exp(BIRD, -1), Exp(HOUR, -1)))
-    HOURS_PERDAY = Mul((HOUR, Exp(DAY, -1)))
-    MOUTHS_PERPOOP = Mul((MOUTH, Exp(POOP, -1)))
-    CM2_PERMOUTH = Mul((Exp(CM, 2), Exp(MOUTH, -1)))
-
-    PERIOD = Exp(
-        Mul(
-            (
-                BIRD_PERKM2,
-                POOP_PERBIRD_PERHOUR,
-                HOURS_PERDAY,
-                MOUTHS_PERPOOP,
-                CM2_PERMOUTH,
-            ),
-        ),
-        -1,
-    ).simplify()  # = (km^2 * day) / cm^2
-    assert isinstance(PERIOD, Scaled)
-    assert isinstance(PERIOD.factor, LazyFactor)
-    assert PERIOD.factor.to_exact() == 100_000**2 * 86400
-    assert PERIOD.reference == S
-
-    num_birds = 300e9
-    earth_surface_area = 4 * pi * 6378**2
-    period_s = PERIOD.to(S)(
-        1
-        / (
-            (num_birds / earth_surface_area)  # bird / km^2
-            * 1  # poop / (bird * hour)
-            * 16  # hours / day
-            * 1  # mouth / poop
-            * 15  # cm^2 / mouth
-        )
-    )
-    assert period_s / (365 * 24 * 3600) == pytest.approx(195, abs=0.5)
-
-
 #
 # prefix
 #
 
 
 def test_prefix_invalid() -> None:
-    from isq import GRAM, KG, KILO, W
+    from isq import GRAM, KG, KILO, M_PERS, W
 
     KW = KILO * W
-    assert KW.name == KILO.name + W.name  # type: ignore
+    assert KW.name == KILO.name + W.name
     with pytest.raises(TypeError):
         _ = KILO * KG.dimension  # type: ignore
     with pytest.raises(TypeError):
         _ = KILO * KG
     with pytest.raises(TypeError):
-        _ = KILO * Mul((KG, Exp(S, -1)))
-    with pytest.raises(TypeError):
-        _ = KILO * KW
-    with pytest.raises(TypeError):
         _ = KILO * GRAM
     with pytest.raises(TypeError):
-        _ = KILO * Exp(M, 3)  # type: ignore
+        _ = KILO * M_PERS  # type: ignore
+    with pytest.raises(TypeError):
+        _ = KILO * KW
 
 
 #
@@ -275,12 +220,12 @@ M_ALT_GEOM = ALT_GEOM[M]
 M_ALT_GEOP = ALT_GEOP[M]
 
 
-def test_disambiguated_invalid_construction() -> None:
+def test_tagged_invalid_construction() -> None:
     with pytest.raises(ValueError, match="nesting"):
         _ = Tagged(M_ALT_GEOP, "another_context")
 
 
-def test_disambiguated_simplify_cancellation() -> None:
+def test_tagged_simplify_cancellation() -> None:
     expr_same_ctx = Mul((M_ALT_GEOP, Exp(M_ALT_GEOP, -1)))
     simplified_same = expr_same_ctx.simplify()
     assert isinstance(simplified_same, Dimensionless)
@@ -294,7 +239,7 @@ def test_disambiguated_simplify_cancellation() -> None:
 FT_ALT_GEOP = Tagged(FT, ("altitude", "geopotential"))
 
 
-def test_disambiguated_simplify_propagates_to_reference() -> None:
+def test_tagged_simplify_propagates_to_reference() -> None:
     simplified = FT_ALT_GEOP.simplify()  # Scaled(Disambiguated(M, ...), ...)
     assert isinstance(simplified, Tagged)
     assert simplified.context == M_ALT_GEOP.context
@@ -302,7 +247,7 @@ def test_disambiguated_simplify_propagates_to_reference() -> None:
     assert simplified.reference.reference == M
 
 
-def test_disambiguated_conversion() -> None:
+def test_tagged_conversion() -> None:
     converter_ok = M_ALT_GEOP.to(FT_ALT_GEOP)
     assert converter_ok(1) == pytest.approx(1 / 0.3048)
 
@@ -346,6 +291,20 @@ def test_qty_kind_getitem() -> None:
 
 
 #
+# alias
+#
+
+
+def test_alias_fail() -> None:
+    from isq import DBV, Alias
+
+    with pytest.raises(TypeError):
+        _ = Alias(M, "fail")  # type: ignore
+    with pytest.raises(TypeError):
+        _ = Alias(DBV, "fail")
+
+
+#
 # Unit conversions
 #
 
@@ -368,10 +327,10 @@ def test_convert_base_dimension() -> None:
         _fn = DIM_LENGTH.to(RAD.dimension)  # -> Dimensionless
     assert DIM_TIME.to(DIM_TIME)(1) == 1  # -> BaseDimension
     with pytest.raises(ValueError):
-        _fn = Scaled(DIM_TIME, 1, "s").to(S)  # -> BaseUnit
+        _fn = Scaled(DIM_TIME, 1).to(S)  # -> BaseUnit
     assert DIM_TIME.to(Exp(DIM_TIME, 1))(1) == 1  # -> Exp
-    assert DIM_TIME.to(Mul((DIM_TIME,), "dim_time1"))(1) == 1  # -> Mul
-    assert DIM_TIME.to(Scaled(DIM_TIME, 2, "dim_time1"))(1) == 0.5  # -> Scaled
+    assert DIM_TIME.to(Mul((DIM_TIME,)))(1) == 1  # -> Mul
+    assert DIM_TIME.to(Scaled(DIM_TIME, 2))(1) == 0.5  # -> Scaled
 
 
 def test_convert_base_unit() -> None:
@@ -383,8 +342,8 @@ def test_convert_base_unit() -> None:
     with pytest.raises(ValueError):
         _fn = S.to(S.dimension)  # -> BaseDimension
     assert S.to(Exp(S, 1))(1) == 1  # -> Exp
-    assert S.to(Mul((S,), "s1"))(1) == 1  # -> Mul
-    assert S.to(Scaled(S, 2, "2s1"))(1) == 0.5  # -> Scaled
+    assert S.to(Mul((S,)))(1) == 1  # -> Mul
+    assert S.to(Scaled(S, 2))(1) == 0.5  # -> Scaled
 
 
 def test_convert_exp() -> None:
@@ -397,7 +356,7 @@ def test_convert_exp() -> None:
         _fn = M2.to(M2.dimension)  # unit -> dimension
     assert M2.to(M2)(1) == 1  # -> Exp
     assert M2.to(Mul((M2,)))(1) == 1  # -> Mul
-    assert M2.to(Scaled(M2, 2, "2m^2"))(1) == 0.5  # -> Scaled
+    assert M2.to(Scaled(M2, 2))(1) == 0.5  # -> Scaled
 
 
 def test_convert_mul() -> None:
@@ -406,7 +365,7 @@ def test_convert_mul() -> None:
     with pytest.raises(ValueError):
         _fn = M_PERS.to(RAD)  # -> Dimensionless
     assert M_PERS.to(M_PERS)(1) == 1  # -> Mul
-    assert M_PERS.to(Scaled(M_PERS, 2, "2m/s"))(1) == 0.5  # -> Scaled
+    assert M_PERS.to(Scaled(M_PERS, 2))(1) == 0.5  # -> Scaled
 
     M2_PERS2 = Exp(M_PERS, 2)  # would be simplified to Mul((Exp(...), ...))
     FT2_PERMIN2 = Exp(FT_PERMIN, 2)
@@ -425,7 +384,7 @@ def test_convert_scaled() -> None:
     with pytest.raises(ValueError):
         _value = HOUR.to(S.dimension)  # -> BaseDimension
     assert DAY.to(Exp(S, 1))(1) == 86400  # -> Exp
-    assert DAY.to(Mul((S,), "s1"))(1) == 86400  # -> Mul
+    assert DAY.to(Mul((S,)))(1) == 86400  # -> Mul
     assert MIN.to(HOUR)(60) == 1  # -> Scaled
     assert DAY.to(DAY)(1) == 1
 
@@ -438,7 +397,7 @@ def test_translated_is_terminal() -> None:
     with pytest.raises(ValueError):
         Mul((CELSIUS, M))
     with pytest.raises(ValueError):
-        Scaled(CELSIUS, 2, "scaled_celsius")
+        Scaled(CELSIUS, 2)
     with pytest.raises(TypeError):
         KILO * CELSIUS  # type: ignore
     with pytest.raises(TypeError):
@@ -470,7 +429,7 @@ def test_convert_translated() -> None:
     assert c_to_r(0) == Fraction("273.15") * Fraction(9, 5)
 
 
-def test_convert_disambiguated_translated() -> None:
+def test_convert_tagged_translated() -> None:
     from isq import CELSIUS, K
 
     SURFACE_TEMP_C = Tagged(CELSIUS, "surface")
@@ -488,7 +447,7 @@ def test_convert_disambiguated_translated() -> None:
 
 
 def test_logarithmic_is_terminal() -> None:
-    from isq import DBV, KILO, M
+    from isq import DBV, DIM_LENGTH, KILO
     from isq.core import Exp, Logarithmic, Mul, Scaled
 
     with pytest.raises(ValueError):
@@ -496,18 +455,13 @@ def test_logarithmic_is_terminal() -> None:
     with pytest.raises(ValueError):
         Mul((DBV, M))
     with pytest.raises(ValueError):
-        Scaled(DBV, 2, "scaled_db")
+        Scaled(DBV, 2)
     with pytest.raises(TypeError):
         _ = KILO * DBV
     with pytest.raises(TypeError):
         Logarithmic(DBV, "power", log_base=10, name="fail")  # type: ignore
     with pytest.raises(TypeError):
-        Logarithmic(
-            Dimensionless("reynolds"),  # type: ignore
-            "power",
-            log_base=10,
-            name="fail",
-        )
+        Logarithmic(DIM_LENGTH, "power", log_base=10, name="fail")  # type: ignore
 
 
 def test_convert_logarithmic() -> None:
@@ -602,3 +556,73 @@ def test_derived_angle_conversion() -> None:
     result = DEG_PER_S.to(RAD_PER_S, exact=True)(Fraction(180))
     assert isinstance(result, Fraction)
     assert result == pytest.approx(Fraction(math.pi))
+
+
+#
+# integration test
+#
+
+
+def test_xkcd_whatif_11() -> None:  # https://what-if.xkcd.com/11/
+    from math import pi
+
+    from isq import CENTI, KILO, YEAR, BaseDimension, BaseUnit
+
+    BIRD = BaseUnit(BaseDimension("bird"), "bird")
+    POOP = BaseUnit(BaseDimension("poop"), "poop")
+    MOUTH = BaseUnit(BaseDimension("mouth"), "mouth")
+
+    BIRD_PERKM2 = Mul((BIRD, Exp(KILO * M, -2)))
+    POOP_PERBIRD_PERHOUR = Mul((POOP, Exp(BIRD, -1), Exp(HOUR, -1)))
+    HOURS_PERDAY = Mul((HOUR, Exp(DAY, -1)))
+    MOUTHS_PERPOOP = Mul((MOUTH, Exp(POOP, -1)))
+    CM2_PERMOUTH = Mul((Exp(CENTI * M, 2), Exp(MOUTH, -1)))
+
+    PERIOD = Exp(
+        Mul(
+            (
+                BIRD_PERKM2,
+                POOP_PERBIRD_PERHOUR,
+                HOURS_PERDAY,
+                MOUTHS_PERPOOP,
+                CM2_PERMOUTH,
+            ),
+        ),
+        -1,
+    ).simplify()  # = (km^2 * day) / cm^2
+    assert isinstance(PERIOD, Scaled)
+    assert isinstance(PERIOD.factor, LazyFactor)
+    assert PERIOD.factor.to_exact() == 100_000**2 * 86400
+    assert PERIOD.reference == S
+
+    num_birds = 300e9
+    earth_surface_area = 4 * pi * 6378**2
+    period_yr = PERIOD.to(YEAR)(
+        1
+        / (
+            (num_birds / earth_surface_area)  # bird / km^2
+            * 1  # poop / (bird * hour)
+            * 16  # hours / day
+            * 1  # mouth / poop
+            * 15  # cm^2 / mouth
+        )
+    )
+    assert period_yr == pytest.approx(195, abs=0.7)
+
+    from isq import FL_OZ, MI, MILLI, MPG, YEAR
+
+    MM2 = Exp(MILLI * M, 2)
+    assert Exp(MPG, -1).to(MM2)(1 / 20) == pytest.approx(0.11760729)
+    poop_dropping_rate = 0.5  # fl_oz / (day * bird)
+    total_distance_driven_rate = 3e12  # mi / year
+    assert 1 / (
+        Mul(
+            (
+                BIRD,
+                Mul((FL_OZ, Exp(DAY, -1), Exp(BIRD, -1))),
+                Exp(Mul((MI, Exp(YEAR, -1))), -1),
+            )
+        ).to(Exp(MPG, -1))(
+            num_birds * poop_dropping_rate / total_distance_driven_rate
+        )
+    ) == pytest.approx(7.009, rel=1e-3)  # NOTE: xkcd's 13MPG is wrong

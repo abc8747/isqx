@@ -41,23 +41,28 @@ class Expr(Protocol):
 
     It may be of the following forms:
 
-    | Type                                      | Example                   |
-    | ----------------------------------------- | ------------------------- |
-    | [dimensionless number][isq.Dimensionless] | `Reynolds`, `Prandtl`     |
-    | [base dimension][isq.BaseDimension]       | [length][isq.DIM_LENGTH]  |
-    | [base unit][isq.BaseUnit]                 | [meter][isq.M]            |
-    | [expression raised to a power][isq.Exp]   | `Exp(METER, 2)`           |
-    | [product of expressions][isq.Mul]         | `Mul(NEWTON, METER)`      |
-    | [scaled expression][isq.Scaled]           | [feet][isq.FT] = 0.3048 m |
-    | [tagged][isq.Tagged]                      | true vs ground speed      |
-    | [translated expression][isq.Translated]^  | [celsius][isq.CELSIUS]    |
-    | [logarithmic quantity][isq.Logarithmic]^  | [decibel-volts][isq.DBV]  |
+    | Type                                       | Example                   |
+    | ------------------------------------------ | ------------------------- |
+    | [dimensionless number][isq.Dimensionless]¹ | `Reynolds`, `Prandtl`     |
+    | [base dimension][isq.BaseDimension]¹       | [length][isq.DIM_LENGTH]  |
+    | [base unit][isq.BaseUnit]¹                 | [meter][isq.M]            |
+    | [expression raised to a power][isq.Exp]²   | `Exp(M, 2)`               |
+    | [product of expressions][isq.Mul]²         | `Mul(A, S)`               |
+    | [scaled expression][isq.Scaled]²⁴          | `Scaled(M, 0.3048)`       |
+    | [aliased][isq.Alias]¹                      | [newton][isq.N] = kg m s⁻²|
+    | [translated expression][isq.Translated]³   | `Translated(K, -273.15)`  |
+    | [logarithmic quantity][isq.Logarithmic]¹³  | [decibel-volt][isq.DBV]   |
+    | [tagged][isq.Tagged]⁵                      | true vs ground speed      |
 
-    ^ these expressions are *terminal*, meaning it cannot be further
-      [exponentiated][isq.Exp], [multiplied][isq.Mul], [scaled][isq.Scaled] or
-      [translated][isq.Translated] to form a more complex expression. However,
-      it can be further [tagged][isq.Tagged] (e.g. surface temperature vs
-      ISA temperature).
+    ¹ these expressions are associated with a [name][isq.NamedExpr].
+    ² these expressions can be [aliased with a name][isq.Alias].
+    ³ these expressions are *terminal*, meaning it cannot be further
+      [exponentiated][isq.Exp], [multiplied][isq.Mul], [scaled][isq.Scaled],
+      [translated][isq.Translated] or [aliased][isq.Alias] to form a more
+      complex expression. However, it can be further [tagged][isq.Tagged]
+      (e.g. surface temperature vs ISA temperature).
+    ⁴ can be created by multiplying a [prefix][isq.Prefix] (e.g. `milli`)
+    ⁵ can be created by indexing a [quantity kind][isq.QtyKind] with a unit
     """
 
     @property
@@ -80,7 +85,8 @@ class Expr(Protocol):
     def simplify(self) -> Expr:
         """Flatten a complex tree-like structure into a simple canonical form,
         including: distributing exponents, combining like terms and merging
-        nested scaling factors.
+        nested scaling factors. This strips away [aliases][isq.Alias] but
+        keeps [tags][isq.Tagged] intact.
 
         Examples:
 
@@ -99,6 +105,12 @@ class Expr(Protocol):
     # why: we sometimes want to re-express some unit not in MKS, but CGS
     # that will require linear algebra to solve the dimensional exponents but
     # we're leaving that as optional and far in the future.
+
+
+@runtime_checkable
+class NamedExpr(Expr, Protocol):
+    name: str
+    """A name for this expression, e.g. `meter`, `newton`, `reynolds`"""
 
 
 class ConvertMixin:
@@ -120,7 +132,7 @@ class ConvertMixin:
 
 
 @dataclass(frozen=True)
-class Dimensionless(ConvertMixin, Expr):
+class Dimensionless(ConvertMixin, NamedExpr):
     name: str
     """Name for the dimensionless number, e.g. `reynolds`, `prandtl`"""
 
@@ -137,7 +149,7 @@ class Dimensionless(ConvertMixin, Expr):
 
 
 @dataclass(frozen=True)
-class BaseDimension(ConvertMixin, Expr):
+class BaseDimension(ConvertMixin, NamedExpr):
     name: str
     """Name for the base dimension, e.g. `L`, `M`, `T`"""
 
@@ -154,7 +166,7 @@ class BaseDimension(ConvertMixin, Expr):
 
 
 @dataclass(frozen=True)
-class BaseUnit(ConvertMixin, Expr):
+class BaseUnit(ConvertMixin, NamedExpr):
     _dimension: BaseDimension
     """Reference to the base dimension"""
     name: str
@@ -193,26 +205,26 @@ class Exp(ConvertMixin, Expr):
     def __post_init__(self) -> None:
         if self.exponent == 0:
             raise ValueError("exponent must not be zero, use `Dimensionless`")
-        ref = _unwrap_tagged(self.base)
+        ref = _unwrap_tagged_or_aliased(self.base)
         if isinstance(ref, Translated):
             raise ValueError(
-                f"translated expression `{ref.name}` is terminal: it cannot be"
+                f"translated expression `{ref}` is terminal: it cannot be"
                 f"futher raised to the power of {self.exponent}"
                 f"\nhelp: did you mean to exponentiate {ref.reference}?"
             )  # prevent ℃². J ℃⁻¹ should be written as J K⁻¹
         if isinstance(ref, Logarithmic):
             raise ValueError(
-                f"logarithmic expression `{ref.name}` is terminal: it cannot be"
+                f"logarithmic expression `{ref}` is terminal: it cannot be"
                 f"further raised to the power of {self.exponent}"
             )
 
     @property
-    def kind(self) -> ExpressionKind:
-        return self.base.kind
-
-    @property
     def dimension(self) -> Exp:
         return Exp(self.base.dimension, self.exponent)
+
+    @property
+    def kind(self) -> ExpressionKind:
+        return self.base.kind
 
     def simplify(self) -> Expr:
         """Flattens the expression by distributing exponents inward.
@@ -225,11 +237,7 @@ class Exp(ConvertMixin, Expr):
         _decompose_expr(
             self.base, self.exponent, base_exponent_pairs, derived_conversions
         )
-        return _build_canonical_expr(
-            base_exponent_pairs,
-            derived_conversions,
-            name_hint=f"expr_{hash(self)}",
-        )
+        return _build_canonical_expr(base_exponent_pairs, derived_conversions)
 
 
 @dataclass(frozen=True)
@@ -238,8 +246,6 @@ class Mul(ConvertMixin, Expr):
 
     terms: tuple[Expr, ...]
     """A tuple of expressions to be multiplied, preserving the order."""
-    name: str | None = None
-    """Name for this expression, e.g. `newton`, `joule`"""
 
     def __post_init__(self) -> None:
         n_terms = len(self.terms)
@@ -247,17 +253,17 @@ class Mul(ConvertMixin, Expr):
             raise ValueError("terms must not be empty, use `Dimensionless`")
         kinds = []
         for term in self.terms:
-            ref = _unwrap_tagged(term)
+            ref = _unwrap_tagged_or_aliased(term)
             if isinstance(ref, Translated):
                 raise ValueError(
-                    f"translated expression `{ref.name}` is terminal:"
+                    f"translated expression `{ref}` is terminal:"
                     "it cannot be multiplied with other expressions"
                     "\nhelp: use its absolute reference instead"
                     f": `{ref.reference}`"
                 )  # prevent ℃ * ℃
             if isinstance(ref, Logarithmic):
                 raise ValueError(
-                    f"logarithmic expression `{ref.name}` is terminal: "
+                    f"logarithmic expression `{ref}` is terminal: "
                     "it cannot be multiplied with other expressions"
                 )
             kinds.append(term.kind)
@@ -267,10 +273,7 @@ class Mul(ConvertMixin, Expr):
 
     @property
     def dimension(self) -> Mul:
-        return Mul(
-            tuple(term.dimension for term in self.terms),
-            name=self.name,
-        )
+        return Mul(tuple(term.dimension for term in self.terms))
 
     @property
     def kind(self) -> ExpressionKind:
@@ -290,11 +293,7 @@ class Mul(ConvertMixin, Expr):
         base_exponent_pairs: dict[Expr, Exponent] = {}
         derived_conversions: list[tuple[Scaled, Exponent]] = []
         _decompose_expr(self, 1, base_exponent_pairs, derived_conversions)
-        return _build_canonical_expr(
-            base_exponent_pairs,
-            derived_conversions,
-            name_hint=self.name or f"expr_{hash(self)}",
-        )
+        return _build_canonical_expr(base_exponent_pairs, derived_conversions)
 
 
 @dataclass(frozen=True)
@@ -305,21 +304,150 @@ class Scaled(ConvertMixin, Expr):
     """The exact factor to multiply to this unit to convert it to the reference.
     For example, `1 ft = 0.3048 m`, so the factor is 0.3048.
     """
-    name: str
-    """Name of this unit or dimension, e.g. `feet`."""
-    allow_prefix: bool = False
-    """Whether to allow prefixes to be attached. This should only be true for
-    some units like `liter`, `tonne`, `electronvolt`"""
 
     def __post_init__(self) -> None:
-        ref = _unwrap_tagged(self.reference)
+        ref = _unwrap_tagged_or_aliased(self.reference)
         if isinstance(ref, Translated) or (
             isinstance(ref, Logarithmic) and not ref.allow_prefix
         ):
             raise ValueError(
-                f"expression `{ref.name}` is terminal:"
-                " it cannot be further scaled"
+                f"expression `{self.reference}` is terminal: "
+                "it cannot be further scaled"
             )  # prevent 13 * ℃, milli(decibel)
+
+    @property
+    def dimension(self) -> Expr:
+        return self.reference.dimension
+
+    @property
+    def kind(self) -> ExpressionKind:
+        return self.reference.kind
+
+    def simplify(self) -> Expr:
+        """Merges nested scaling factors into a single canonical expression."""
+        base_exponent_pairs: dict[Expr, Exponent] = {}
+        derived_conversions: list[tuple[Scaled, Exponent]] = []
+        _decompose_expr(self, 1, base_exponent_pairs, derived_conversions)
+        return _build_canonical_expr(base_exponent_pairs, derived_conversions)
+
+
+@dataclass(frozen=True)
+class Prefix:
+    """A factory, which when multiplied by a [base unit][isq.BaseUnit] or
+    [aliased unit][isq.Alias], returns a [scaled unit][isq.Scaled].
+
+    Note that this is not an [isq.Expr][], but a *constructor helper*.
+    """
+
+    factor: Factor
+    name: str
+    """Name of this prefix, e.g. `milli`, `kibi`"""
+
+    def __mul__(self, rhs: BaseUnit | Alias | Logarithmic) -> Alias:
+        if not isinstance(rhs, (BaseUnit, Alias, Logarithmic)):
+            raise TypeError(
+                f"cannot apply prefix `{self.name}` to {rhs=} ({type(rhs)=})"
+                f"\nhelp: rhs must be a `BaseUnit` (e.g. meters, "
+                "except kg) or an aliased unit (e.g. newtons)."
+            )
+
+        if isinstance(rhs, BaseUnit):
+            if rhs.name == "kilogram":
+                raise TypeError(
+                    f"cannot apply prefix `{self.name}` to `KG`."
+                    "\nhelp: use `GRAM` instead, which is an alias."
+                )
+        elif isinstance(rhs, Alias):
+            if not rhs.allow_prefix:
+                raise TypeError(
+                    f"cannot apply prefix `{self.name}` to aliased unit"
+                    f"`{rhs.name}` because it does not allow prefixes."
+                )
+            if self.name == "kilo" and rhs.name == "gram":
+                raise TypeError(
+                    "cannot apply prefix KILO to GRAM"
+                    "\nhelp: use isq.KG directly instead"
+                )
+        elif isinstance(rhs, Logarithmic):
+            if not rhs.allow_prefix:
+                raise TypeError(
+                    f"cannot apply prefix `{self.name}` to logarithmic unit"
+                    f" `{rhs.name}` because it does not allow prefixes."
+                )
+
+        new_name = f"{self.name}{rhs.name}"
+        return Alias(
+            Scaled(rhs, self.factor), name=new_name, allow_prefix=False
+        )
+
+    # NOTE: not defining __rmul__ to avoid confusion
+
+
+@dataclass(frozen=True)
+class Alias(ConvertMixin, NamedExpr):
+    """An alias for an expression, used to give a more readable name.
+
+    Note that unlike a [tagged][isq.Tagged] expression,
+    [simplification][isq.Expr.simplify] will effectively elide this class.
+    """
+
+    reference: Exp | Mul | Scaled | Logarithmic
+    """Expression to be aliased, e.g. `Mul((KG, M, Exp(S, -2)))`"""
+    name: str
+    """Name of this alias, e.g. `newton`"""
+    allow_prefix: bool = False
+    """Whether to allow prefixes to be attached. This should only be true for
+    some units like `liter`."""
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.reference, Logarithmic)
+            and not self.reference.allow_prefix
+        ):
+            raise TypeError(
+                f"reference of aliased expression `{self}` must be a "
+                f"Logarithmic with `allow_prefix=True`"
+            )
+        elif not isinstance(self.reference, (Exp, Mul, Scaled)):
+            raise TypeError(
+                f"reference of aliased expression `{self}` must be an "
+                f"Exp, Mul or Scaled, not `{type(self.reference).__name__}`"
+            )
+
+    @property
+    def dimension(self) -> Expr:
+        return self.reference.dimension
+
+    @property
+    def kind(self) -> ExpressionKind:
+        return self.reference.kind
+
+    def simplify(self) -> Expr:
+        return self.reference.simplify()
+
+
+@dataclass(frozen=True)
+class Translated(ConvertMixin, NamedExpr):
+    """An expression offsetted from some reference unit."""
+
+    reference: Expr
+    """The expression that this expression is based on (e.g., `K` for `DEGC`)"""
+    offset: Factor
+    """The exact offset to add to the reference to get this unit.
+    For example, `℃ = K - 273.15`, so the offset is -273.15."""
+    name: str
+
+    def __post_init__(self) -> None:
+        ref = _unwrap_tagged_or_aliased(self.reference)
+        if isinstance(ref, Translated):
+            raise TypeError(
+                "nesting translated units in `Translated` is not allowed"
+            )
+        if not isinstance(ref, (BaseUnit, Scaled)):
+            raise TypeError(
+                f"reference of translated unit `{self}` must be a"
+                f"BaseUnit or Scaled, not `{type(ref).__name__}`"
+            )
 
     @property
     def kind(self) -> ExpressionKind:
@@ -329,87 +457,79 @@ class Scaled(ConvertMixin, Expr):
     def dimension(self) -> Expr:
         return self.reference.dimension
 
-    def simplify(self) -> Scaled:
-        """Merges nested scaling factors into a single [`LazyFactor`][isq.LazyFactor].
-
-        For example, `Scaled(Scaled(M, 2), Fraction(1, 3))` will be simplified
-        to `Scaled(M, LazyFactor((Fraction(1, 3), 2))))`. Note that we do not
-        eagerly evaluate the multiplication.
-        """
-        products: list[tuple[Factor, Exponent] | Factor] = []
-        expr: Expr = self
-        while True:
-            if not isinstance(expr, Scaled):
-                expr = expr.simplify()
-                break
-            if isinstance(expr.factor, LazyFactor):  # by previous simplify()
-                products.extend(expr.factor.products)
-            else:
-                products.append(expr.factor)
-            expr = expr.reference
-        return Scaled(expr, LazyFactor(tuple(products)), self.name)
+    def simplify(self) -> Translated:
+        return Translated(self.reference.simplify(), self.offset, self.name)
 
 
 @dataclass(frozen=True)
-class Prefix:
-    """A factory, which when multiplied by a [base unit][isq.BaseUnit] or
-    [**named** derived unit][isq.Mul], returns a [scaled unit][isq.Scaled].
+class Logarithmic(ConvertMixin, NamedExpr):
+    r"""A logarithmic unit, representing a level of a quantity.
 
-    Note that this is not an [isq.Expr][], but a *constructor helper*.
+    A level $L$ is defined as the ratio between a quantity to its reference:
+    $$
+    L = k \cdot \log_{b}\left(\frac{Q}{Q_\text{ref}}\right)
+    $$
+    The parameters $k$ and $b$ are determined by the specific unit:
+
+    - Neper (Np): The coherent SI unit for level.
+        - $b = e$
+        - $k=1$ for field quantities (e.g., [V][isq.V], [A][isq.A], [Pa][isq.PA]).
+        - $k=1/2$ for power quantities (e.g., [W][isq.W], W/m²).
+    - Bel (B) and Decibel (dB):
+        - $b = 10$
+        - $k=20$ for field quantities.
+        - $k=10$ for power quantities.
     """
 
-    factor: Factor
+    reference: BaseUnit | Exp | Mul | Scaled | Alias
+    """The linear unit being measured (e.g., V for dBV, W for dBm)"""
+    quantity_type: Literal["power", "field"]
+    """Whether the reference is a power or a field quantity."""
+    log_base: Factor
+    """The base of the logarithm (e.g., 10, 2, [isq.E][])"""
     name: str
-    """Name of this prefix, e.g. `milli`, `kibi`"""
+    allow_prefix: bool = False
+    """Whether prefixes can be applied to the logarithmic unit (e.g., mNp)."""
 
-    def __mul__(self, rhs: BaseUnit | Mul | Scaled | Logarithmic) -> Scaled:
-        if not isinstance(rhs, Logarithmic) and rhs.kind != "unit":
+    def __post_init__(self) -> None:
+        ref = _unwrap_tagged_or_aliased(self.reference)
+        if isinstance(ref, (Logarithmic, Translated)):
             raise TypeError(
-                f"cannot apply prefix `{self.name}` to {rhs=}"
-                f"\nhelp: expected rhs to be a unit, but rhs is `{rhs.kind}`"
+                f"reference of logarithmic unit `{self}` must be not be"
+                f"a Logarithmic or Translated unit, got {type(ref).__name__}"
             )
-        if isinstance(rhs, BaseUnit) and rhs.name == "kilogram":
+        if ref.kind != "unit":
             raise TypeError(
-                f"cannot apply prefix `{self.name}` to `KG`."
-                "\nhelp: apply it to `GRAM` instead."
-            )  # kilo(kilogram)
-        if isinstance(rhs, Mul) and rhs.name is None:
-            raise TypeError(
-                f"cannot apply prefix `{self.name}` to unnamed derived unit"
-                f" {rhs}\nhelp: must be a named derived unit like Newtons."
-            )  # kilo(m s⁻¹)
-        if isinstance(rhs, Scaled):
-            if not rhs.allow_prefix:
-                raise TypeError(
-                    f"cannot apply another prefix `{self.name}` to a unit that"
-                    "does not allow further prefixes"
-                )  # kilo(kilowatt)
-            if self.name == "kilo" and rhs.name == "gram":
-                raise TypeError(
-                    "cannot apply prefix KILO to GRAM"
-                    "\nhelp: use isq.KG directly instead"
-                )
-        ref = _unwrap_tagged(rhs)
-        if isinstance(ref, Translated):
-            raise TypeError(
-                f"cannot apply prefix `{self.name}` to translated unit {rhs=}"
-            )  # kilo(℃)
-        if isinstance(ref, Logarithmic) and not ref.allow_prefix:
-            raise TypeError(
-                f"cannot apply prefix `{self.name}` to logarithmic unit {rhs=} "
-                "because it does not allow prefixes"
-            )  # kilo(dB)
-        if not isinstance(rhs, (BaseUnit, Mul, Scaled, Logarithmic)):
-            raise TypeError(
-                f"cannot apply prefix `{self.name}` to {rhs=} ({type(rhs)=})"
-                f"\nhelp: rhs must be `GRAM`, or a `BaseUnit` (e.g. meters, "
-                "except kg) or a named derived unit (e.g. newtons)."
-            )  # kilo(m³), kilo(Re)
+                f"reference of logarithmic unit `{self}` must be a "
+                f"unit, not a `{ref.kind}`."
+            )
 
-        new_name = f"{self.name}{rhs.name}"
-        return Scaled(rhs, self.factor, name=new_name, allow_prefix=False)
+    @property
+    def level_factor(self) -> Factor:
+        """Determines the multiplicative factor (e.g., 10 or 20 for dB)."""
+        if self.log_base == 10:  # decibels
+            return 10 if self.quantity_type == "power" else 20
+        elif self.log_base is E:  # nepers
+            return 1 if self.quantity_type == "field" else Fraction(1, 2)
+        else:  # bits (log_base=2)
+            return 1
 
-    # NOTE: not defining __rmul__ to avoid confusion
+    @property
+    def dimension(self) -> Dimensionless:
+        return Dimensionless(f"log_level_{hash(self)}")
+
+    @property
+    def kind(self) -> Literal["dimensionless"]:
+        return "dimensionless"
+
+    def simplify(self) -> Logarithmic:
+        return Logarithmic(
+            self.reference.simplify(),  # type: ignore
+            self.quantity_type,
+            self.log_base,
+            self.name,
+            self.allow_prefix,
+        )
 
 
 @dataclass(frozen=True)
@@ -432,12 +552,12 @@ class Tagged(ConvertMixin, Expr):
             )
 
     @property
-    def kind(self) -> ExpressionKind:
-        return self.reference.kind
-
-    @property
     def dimension(self) -> Tagged:
         return Tagged(self.reference.dimension, self.context)
+
+    @property
+    def kind(self) -> ExpressionKind:
+        return self.reference.kind
 
     def simplify(self) -> Tagged:
         simplified_ref = self.reference.simplify()
@@ -473,115 +593,10 @@ class QtyKind:
         return Tagged(unit, context=self.context)
 
 
-@dataclass(frozen=True)
-class Translated(ConvertMixin, Expr):
-    """An expression offsetted from some reference unit."""
-
-    reference: Expr
-    """The expression that this expression is based on (e.g., `K` for `DEGC`)"""
-    offset: Factor
-    """The exact offset to add to the reference to get this unit.
-    For example, `℃ = K - 273.15`, so the offset is -273.15."""
-    name: str
-
-    def __post_init__(self) -> None:
-        ref = _unwrap_tagged(self.reference)
-        if isinstance(ref, Translated):
-            raise TypeError(
-                "nesting translated units in `Translated` is not allowed"
-            )
-        if not isinstance(ref, (BaseUnit, Scaled)):
-            raise TypeError(
-                f"reference of translated unit `{self.name}` must be a"
-                f"BaseUnit or Scaled, not `{type(ref).__name__}`"
-            )
-
-    @property
-    def kind(self) -> ExpressionKind:
-        return self.reference.kind
-
-    @property
-    def dimension(self) -> Expr:
-        return self.reference.dimension
-
-    def simplify(self) -> Translated:
-        return Translated(self.reference.simplify(), self.offset, self.name)
-
-
-@dataclass
-class Logarithmic(ConvertMixin, Expr):
-    r"""A logarithmic unit, representing a level of a quantity.
-
-    A level $L$ is defined as the ratio between a quantity to its reference:
-    $$
-    L = k \cdot \log_{b}\left(\frac{Q}{Q_\text{ref}}\right)
-    $$
-    The parameters $k$ and $b$ are determined by the specific unit:
-
-    - Neper (Np): The coherent SI unit for level.
-        - $b = e$
-        - $k=1$ for field quantities (e.g., [V][isq.V], [A][isq.A], [Pa][isq.PA]).
-        - $k=1/2$ for power quantities (e.g., [W][isq.W], W/m²).
-    - Bel (B) and Decibel (dB):
-        - $b = 10$
-        - $k=20$ for field quantities.
-        - $k=10$ for power quantities.
-    """
-
-    reference: BaseUnit | Exp | Mul | Scaled
-    """The linear unit being measured (e.g., V for dBV, W for dBm)"""
-    quantity_type: Literal["power", "field"]
-    """Whether the reference is a power or a field quantity."""
-    log_base: Factor
-    """The base of the logarithm (e.g., 10, 2, [isq.E][])"""
-    name: str
-    allow_prefix: bool = False
-    """Whether prefixes can be applied to the logarithmic unit (e.g., mNp)."""
-
-    def __post_init__(self) -> None:
-        ref = _unwrap_tagged(self.reference)
-        if isinstance(ref, (Logarithmic, Translated)):
-            raise TypeError(
-                f"reference of logarithmic unit `{self.name}` must be not be"
-                f"a Logarithmic or Translated unit, got {type(ref).__name__}"
-            )
-        if ref.kind != "unit":
-            raise TypeError(
-                f"reference of logarithmic unit `{self.name}` must be a "
-                f"unit, not a `{ref.kind}`."
-            )
-
-    @property
-    def level_factor(self) -> Factor:
-        """Determines the multiplicative factor (e.g., 10 or 20 for dB)."""
-        if self.log_base == 10:  # decibels
-            return 10 if self.quantity_type == "power" else 20
-        elif self.log_base is E:  # nepers
-            return 1 if self.quantity_type == "field" else Fraction(1, 2)
-        else:  # bits (log_base=2)
-            return 1
-
-    @property
-    def dimension(self) -> Dimensionless:
-        return Dimensionless(f"log_level_{self.name}")
-
-    @property
-    def kind(self) -> Literal["dimensionless"]:
-        return "dimensionless"
-
-    def simplify(self) -> Logarithmic:
-        return Logarithmic(
-            self.reference.simplify(),  # type: ignore
-            self.quantity_type,
-            self.log_base,
-            self.name,
-            self.allow_prefix,
-        )
-
-
-def _unwrap_tagged(expr: Expr) -> Expr:
+def _unwrap_tagged_or_aliased(expr: Expr) -> Expr:
     # `Translated` and `Logarithmic` are terminal, this plugs a loophole
-    if isinstance(expr, Tagged):
+    # NOTE: Alias(Alias(...)) and Tagged(Tagged(...)) is not allowed
+    if isinstance(expr, (Tagged, Alias)):
         return expr.reference
     return expr
 
@@ -608,7 +623,24 @@ def _decompose_expr(
             - expr=Expr(S, -2), exponent=1
                 - base_exponent_pairs_mut[S] += -2
     """
-    if isinstance(expr, (Dimensionless, BaseDimension, BaseUnit, Tagged)):
+    if isinstance(expr, Alias):
+        _decompose_expr(
+            expr.reference,
+            exponent,
+            base_exponent_pairs_mut,
+            scaled_conversions_mut,
+        )
+    elif isinstance(
+        expr,
+        (
+            Dimensionless,
+            BaseDimension,
+            BaseUnit,
+            Tagged,
+            Translated,
+            Logarithmic,
+        ),
+    ):
         # we hit a fundamental-like unit (we treat tagged as unique bases).
         # add its accumulated exponent
         base_exponent_pairs_mut.setdefault(expr, 0)
@@ -649,8 +681,6 @@ def _decompose_expr(
 def _build_canonical_expr(
     base_exponent_pairs: Mapping[Expr, Exponent],
     scaled_conversions: list[tuple[Scaled, Exponent]],
-    *,
-    name_hint: str,
 ) -> Expr:
     """Construct a canonical expression from flattened parts.
 
@@ -671,9 +701,7 @@ def _build_canonical_expr(
         key=lambda item: str(item[0]),
     )
     if not base_exponent_pairs_sorted:
-        simplified_expr = Dimensionless(
-            name=f"dimensionless_form_of_{name_hint}"
-        )
+        simplified_expr = Dimensionless(name="generic")
     elif len(base_exponent_pairs_sorted) == 1:
         base, exponent = base_exponent_pairs_sorted[0]
         simplified_expr = base if exponent == 1 else Exp(base, exponent)
@@ -682,8 +710,7 @@ def _build_canonical_expr(
             tuple(
                 base if exponent == 1 else Exp(base, exponent)
                 for base, exponent in base_exponent_pairs_sorted
-            ),
-            name=name_hint if no_conversions_involved else None,
+            )
         )
     if no_conversions_involved:
         return simplified_expr
@@ -691,7 +718,6 @@ def _build_canonical_expr(
     return Scaled(
         reference=simplified_expr,
         factor=LazyFactor.from_derived_conversions(scaled_conversions),
-        name=name_hint,
     )
 
 
@@ -824,7 +850,7 @@ class Converter:
         target_ref_dim = target_simpl.reference.simplify().dimension
         if origin_ref_dim != target_ref_dim:  # e.g. dBV -> dBm
             raise ValueError(
-                f"cannot convert `{origin_simpl.name}` to `{target_simpl.name}`"
+                f"cannot convert `{origin_simpl}` to `{target_simpl}`"
                 f" because their reference units `{origin_simpl.reference}`"
                 f" and `{target_simpl.reference}` have incompatible dimensions:"
                 f" {origin_ref_dim} vs {target_ref_dim}."
@@ -887,12 +913,12 @@ def _flatten(
     expr_simpl: Expr,
 ) -> ConversionInfo:
     """Recursively flattens an expression into its absolute base unit."""
-    # since `Exp(Scaled(x, a), b)` → `Scaled(Exp(x, b), a * b)`
-    # similarly, `Mul((Scaled(...),))` → `Scaled(Mul((...),),)`
     if isinstance(
         expr_simpl,
         (BaseUnit, BaseDimension, Dimensionless, Logarithmic, Exp, Mul),
     ):
+        # since `Exp(Scaled(x, a), b)` → `Scaled(Exp(x, b), a * b)`
+        # similarly, `Mul((Scaled(...),))` → `Scaled(Mul((...),),)`
         return ConversionInfo(expr_simpl, 1, 0)
     elif isinstance(expr_simpl, Scaled):
         # so `Scaled` should always be pushed to outmost level.
@@ -918,7 +944,7 @@ def _flatten(
             (-1, expr_simpl.offset, *_products(info_ref.factor))
         )
         return ConversionInfo(info_ref.expr, info_ref.factor, new_offset)
-    else:  # pragma: no cover
+    else:  # pragma: no cover, NOTE: Alias should be simplified away
         raise ValueError(f"unknown expression {expr_simpl}")
 
 
