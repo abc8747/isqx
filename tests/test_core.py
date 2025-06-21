@@ -20,6 +20,7 @@ from isq import (
     Tagged,
 )
 from isq.aerospace import ALT_GEOM, ALT_GEOP
+from isq.core import DimensionMismatchError, KindMismatchError
 
 #
 # Exp
@@ -27,7 +28,9 @@ from isq.aerospace import ALT_GEOM, ALT_GEOP
 
 
 def test_exp_invalid() -> None:
-    with pytest.raises(ValueError):
+    from isq.core import CompositionError
+
+    with pytest.raises(CompositionError):
         _u1 = Exp(M, 0)
 
 
@@ -58,9 +61,11 @@ def test_exp_simplify() -> None:
 
 
 def test_mul_invalid() -> None:
-    with pytest.raises(ValueError):
+    from isq.core import CompositionError, MixedKindError
+
+    with pytest.raises(CompositionError):
         _u0 = Mul(tuple())
-    with pytest.raises(ValueError):
+    with pytest.raises(MixedKindError):
         _u1 = Mul((M, M.dimension))
 
 
@@ -197,18 +202,19 @@ def test_scaled_simplify_with_lazy_factor_multiple_terms() -> None:
 
 def test_prefix_invalid() -> None:
     from isq import GRAM, KG, KILO, M_PERS, W
+    from isq.core import PrefixError
 
     KW = KILO * W
     assert KW.name == KILO.name + W.name
-    with pytest.raises(TypeError):
+    with pytest.raises(PrefixError):
         _ = KILO * KG.dimension  # type: ignore
-    with pytest.raises(TypeError):
+    with pytest.raises(PrefixError):
         _ = KILO * KG
-    with pytest.raises(TypeError):
+    with pytest.raises(PrefixError):
         _ = KILO * GRAM
-    with pytest.raises(TypeError):
+    with pytest.raises(PrefixError):
         _ = KILO * M_PERS  # type: ignore
-    with pytest.raises(TypeError):
+    with pytest.raises(PrefixError):
         _ = KILO * KW
 
 
@@ -221,7 +227,9 @@ M_ALT_GEOP = ALT_GEOP[M]
 
 
 def test_tagged_invalid_construction() -> None:
-    with pytest.raises(ValueError, match="nesting"):
+    from isq.core import NestingError
+
+    with pytest.raises(NestingError):
         _ = Tagged(M_ALT_GEOP, "another_context")
 
 
@@ -251,17 +259,18 @@ def test_tagged_conversion() -> None:
     converter_ok = M_ALT_GEOP.to(FT_ALT_GEOP)
     assert converter_ok(1) == pytest.approx(1 / 0.3048)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _ = M_ALT_GEOP.to(M_ALT_GEOM)
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _ = M_ALT_GEOP.to(M)
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _ = M.to(M_ALT_GEOP)
 
 
 def test_qty_kind_getitem() -> None:
     from isq import KNOT, M_PERS
     from isq.aerospace import TAS
+    from isq.core import UnitKindMismatchError
 
     tas_mps = TAS[M_PERS]
     assert isinstance(tas_mps, Tagged)
@@ -276,17 +285,17 @@ def test_qty_kind_getitem() -> None:
     mps_to_knots = tas_mps.to(tas_knots)
     assert mps_to_knots(1.0) == pytest.approx(1.94384449)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(UnitKindMismatchError):
         _ = TAS[M]
 
-    with pytest.raises(ValueError):
+    with pytest.raises(UnitKindMismatchError):
         _ = ALT_GEOP[M_PERS]
 
     alt_m = ALT_GEOP[M]
     alt_ft = ALT_GEOP[FT]
     assert alt_m.to(alt_ft)(100) == pytest.approx(328.08399)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _ = tas_mps.to(alt_m)
 
 
@@ -297,10 +306,11 @@ def test_qty_kind_getitem() -> None:
 
 def test_alias_fail() -> None:
     from isq import DBV, Alias
+    from isq.core import ReferenceTypeError
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ReferenceTypeError):
         _ = Alias(M, "fail")  # type: ignore
-    with pytest.raises(TypeError):
+    with pytest.raises(ReferenceTypeError):
         _ = Alias(DBV, "fail")
 
 
@@ -314,19 +324,19 @@ def test_convert_dimensionless() -> None:
 
     assert RAD.to(RAD)(1) == 1  # -> Dimensionless
 
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _fn = RAD.to(SR)  # incompatible dim
 
 
 def test_convert_base_dimension() -> None:
     from isq import DIM_LENGTH, DIM_TIME
 
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _fn = DIM_LENGTH.to(DIM_TIME)  # incompatible dim
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _fn = DIM_LENGTH.to(RAD.dimension)  # -> Dimensionless
     assert DIM_TIME.to(DIM_TIME)(1) == 1  # -> BaseDimension
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _fn = Scaled(DIM_TIME, 1).to(S)  # -> BaseUnit
     assert DIM_TIME.to(Exp(DIM_TIME, 1))(1) == 1  # -> Exp
     assert DIM_TIME.to(Mul((DIM_TIME,)))(1) == 1  # -> Mul
@@ -334,12 +344,12 @@ def test_convert_base_dimension() -> None:
 
 
 def test_convert_base_unit() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _fn = S.to(M)  # incompatible dim
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _fn = S.to(RAD)  # -> Dimensionless
     assert S.to(S)(1) == 1  # -> BaseUnit
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _fn = S.to(S.dimension)  # -> BaseDimension
     assert S.to(Exp(S, 1))(1) == 1  # -> Exp
     assert S.to(Mul((S,)))(1) == 1  # -> Mul
@@ -348,11 +358,11 @@ def test_convert_base_unit() -> None:
 
 def test_convert_exp() -> None:
     M2 = Exp(M, 2)
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _fn = M2.to(M)  # incompatible dim
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _fn = M2.to(RAD)  # -> Dimensionless
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _fn = M2.to(M2.dimension)  # unit -> dimension
     assert M2.to(M2)(1) == 1  # -> Exp
     assert M2.to(Mul((M2,)))(1) == 1  # -> Mul
@@ -360,9 +370,9 @@ def test_convert_exp() -> None:
 
 
 def test_convert_mul() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _fn = M_PERS.to(M)  # incompatible dim
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _fn = M_PERS.to(RAD)  # -> Dimensionless
     assert M_PERS.to(M_PERS)(1) == 1  # -> Mul
     assert M_PERS.to(Scaled(M_PERS, 2))(1) == 0.5  # -> Scaled
@@ -376,12 +386,12 @@ def test_convert_mul() -> None:
 def test_convert_scaled() -> None:
     from isq import MIN
 
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         _fn = DAY.to(M)  # incompatible dim
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _fn = DAY.to(RAD)  # -> Dimensionless
     assert DAY.to(S)(1) == 86400  # -> BaseUnit
-    with pytest.raises(ValueError):
+    with pytest.raises(KindMismatchError):
         _value = HOUR.to(S.dimension)  # -> BaseDimension
     assert DAY.to(Exp(S, 1))(1) == 86400  # -> Exp
     assert DAY.to(Mul((S,)))(1) == 86400  # -> Mul
@@ -391,18 +401,24 @@ def test_convert_scaled() -> None:
 
 def test_translated_is_terminal() -> None:
     from isq import CELSIUS, KILO, Translated
+    from isq.core import (
+        NestingError,
+        PrefixError,
+        ReferenceTypeError,
+        TerminalUnitError,
+    )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TerminalUnitError):
         Exp(CELSIUS, 2)
-    with pytest.raises(ValueError):
+    with pytest.raises(TerminalUnitError):
         Mul((CELSIUS, M))
-    with pytest.raises(ValueError):
+    with pytest.raises(TerminalUnitError):
         Scaled(CELSIUS, 2)
-    with pytest.raises(TypeError):
+    with pytest.raises(PrefixError):
         KILO * CELSIUS  # type: ignore
-    with pytest.raises(TypeError):
+    with pytest.raises(NestingError):
         Translated(CELSIUS, 1, "celsius + 1")
-    with pytest.raises(TypeError):
+    with pytest.raises(ReferenceTypeError):
         Translated(M_PERS, 1, "m/s + 1")
 
 
@@ -440,28 +456,41 @@ def test_convert_tagged_translated() -> None:
     k_to_c_exact = SURFACE_TEMP_K.to(SURFACE_TEMP_C, exact=True)
     assert k_to_c_exact(c_to_k_exact(10)) == 10
 
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         SURFACE_TEMP_C.to(K)
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         K.to(SURFACE_TEMP_C)
 
 
 def test_logarithmic_is_terminal() -> None:
     from isq import DBV, DIM_LENGTH, KILO
-    from isq.core import Exp, Logarithmic, Mul, Scaled
+    from isq.core import (
+        Exp,
+        Logarithmic,
+        Mul,
+        PrefixError,
+        ReferenceTypeError,
+        Scaled,
+        TerminalUnitError,
+    )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TerminalUnitError):
         Exp(DBV, 2)
-    with pytest.raises(ValueError):
+    with pytest.raises(TerminalUnitError):
         Mul((DBV, M))
-    with pytest.raises(ValueError):
+    with pytest.raises(TerminalUnitError):
         Scaled(DBV, 2)
-    with pytest.raises(TypeError):
+    with pytest.raises(PrefixError):
         _ = KILO * DBV
-    with pytest.raises(TypeError):
+    with pytest.raises(ReferenceTypeError):
         Logarithmic(DBV, "power", log_base=10, name="fail")  # type: ignore
-    with pytest.raises(TypeError):
-        Logarithmic(DIM_LENGTH, "power", log_base=10, name="fail")  # type: ignore
+    with pytest.raises(ReferenceTypeError):
+        Logarithmic(
+            DIM_LENGTH,  # type: ignore
+            "power",
+            log_base=10,
+            name="fail",
+        )
 
 
 def test_convert_logarithmic() -> None:
@@ -507,12 +536,13 @@ def test_convert_logarithmic_with_prefix() -> None:
 
 def test_convert_logarithmic_fail() -> None:
     from isq import DBM, DBV, V
+    from isq.core import NonLinearConversionError
 
-    with pytest.raises(TypeError):
+    with pytest.raises(NonLinearConversionError):
         V.to(DBV)
-    with pytest.raises(TypeError):
+    with pytest.raises(NonLinearConversionError):
         DBV.to(V)
-    with pytest.raises(ValueError):
+    with pytest.raises(DimensionMismatchError):
         DBV.to(DBM)
 
 

@@ -203,19 +203,33 @@ class Exp(ConvertMixin, Expr):
     use [isq.Dimensionless][] with a name instead."""
 
     def __post_init__(self) -> None:
+        if not isinstance(self.exponent, (int, Fraction)):
+            raise CompositionError(
+                msg=(
+                    "exponent must be an integer or a fraction, "
+                    f"not {type(self.exponent).__name__}"
+                )
+            )
         if self.exponent == 0:
-            raise ValueError("exponent must not be zero, use `Dimensionless`")
+            raise CompositionError(
+                msg="exponent must not be zero.",
+                help="use `Dimensionless`.",
+            )
         ref = _unwrap_tagged_or_aliased(self.base)
         if isinstance(ref, Translated):
-            raise ValueError(
-                f"translated expression `{ref}` is terminal: it cannot be"
-                f"futher raised to the power of {self.exponent}"
-                f"\nhelp: did you mean to exponentiate {ref.reference}?"
+            raise TerminalUnitError(
+                expr=ref,
+                op=Exp,
+                help=(
+                    "did you mean to exponentiate its "
+                    f"absolute reference `{ref.reference}` instead?"
+                ),
             )  # prevent ℃². J ℃⁻¹ should be written as J K⁻¹
         if isinstance(ref, Logarithmic):
-            raise ValueError(
-                f"logarithmic expression `{ref}` is terminal: it cannot be"
-                f"further raised to the power of {self.exponent}"
+            raise TerminalUnitError(
+                expr=ref,
+                op=Exp,
+                note="logarithmic units cannot be raised to a power.",
             )
 
     @property
@@ -248,28 +262,33 @@ class Mul(ConvertMixin, Expr):
     """A tuple of expressions to be multiplied, preserving the order."""
 
     def __post_init__(self) -> None:
-        n_terms = len(self.terms)
-        if n_terms == 0:
-            raise ValueError("terms must not be empty, use `Dimensionless`")
+        if not self.terms:
+            raise CompositionError(
+                msg="`Mul` terms must not be empty.",
+                help="use `Dimensionless`.",
+            )
         kinds = []
         for term in self.terms:
             ref = _unwrap_tagged_or_aliased(term)
             if isinstance(ref, Translated):
-                raise ValueError(
-                    f"translated expression `{ref}` is terminal:"
-                    "it cannot be multiplied with other expressions"
-                    "\nhelp: use its absolute reference instead"
-                    f": `{ref.reference}`"
+                raise TerminalUnitError(
+                    expr=ref,
+                    op=Mul,
+                    help=(
+                        f"use its absolute reference `{ref.reference}` "
+                        f"in the product instead."
+                    ),
                 )  # prevent ℃ * ℃
             if isinstance(ref, Logarithmic):
-                raise ValueError(
-                    f"logarithmic expression `{ref}` is terminal: "
-                    "it cannot be multiplied with other expressions"
+                raise TerminalUnitError(
+                    expr=ref,
+                    op=Mul,
+                    note="logarithmic units cannot be part of a product.",
                 )
             kinds.append(term.kind)
         unique_kinds = set(kinds) - {"dimensionless"}
         if len(unique_kinds) != 1:
-            raise ValueError("terms must all be either `unit` or `dimension`")
+            raise MixedKindError(terms=self.terms)
 
     @property
     def dimension(self) -> Mul:
@@ -310,9 +329,13 @@ class Scaled(ConvertMixin, Expr):
         if isinstance(ref, Translated) or (
             isinstance(ref, Logarithmic) and not ref.allow_prefix
         ):
-            raise ValueError(
-                f"expression `{self.reference}` is terminal: "
-                "it cannot be further scaled"
+            raise TerminalUnitError(
+                expr=self.reference,
+                op=Scaled,
+                note=(
+                    "translated units (like ℃) and most"
+                    "logarithmic units (like dBV) cannot be scaled."
+                ),
             )  # prevent 13 * ℃, milli(decibel)
 
     @property
@@ -345,34 +368,41 @@ class Prefix:
 
     def __mul__(self, rhs: BaseUnit | Alias | Logarithmic) -> Alias:
         if not isinstance(rhs, (BaseUnit, Alias, Logarithmic)):
-            raise TypeError(
-                f"cannot apply prefix `{self.name}` to {rhs=} ({type(rhs)=})"
-                f"\nhelp: rhs must be a `BaseUnit` (e.g. meters, "
-                "except kg) or an aliased unit (e.g. newtons)."
+            raise PrefixError(
+                prefix=self,
+                target=rhs,
+                note=(
+                    "prefixes can only be applied to a `BaseUnit` or an `Alias`"
+                    f", not `{type(rhs).__name__}`."
+                ),
             )
 
         if isinstance(rhs, BaseUnit):
             if rhs.name == "kilogram":
-                raise TypeError(
-                    f"cannot apply prefix `{self.name}` to `KG`."
-                    "\nhelp: use `GRAM` instead, which is an alias."
+                raise PrefixError(
+                    prefix=self,
+                    target=rhs,
+                    note="cannot prefix KG, apply it to `GRAM` instead.",
                 )
         elif isinstance(rhs, Alias):
             if not rhs.allow_prefix:
-                raise TypeError(
-                    f"cannot apply prefix `{self.name}` to aliased unit"
-                    f"`{rhs.name}` because it does not allow prefixes."
+                raise PrefixError(
+                    prefix=self,
+                    target=rhs,
+                    note=f"aliased unit `{rhs.name}` does not allow prefixes.",
                 )
             if self.name == "kilo" and rhs.name == "gram":
-                raise TypeError(
-                    "cannot apply prefix KILO to GRAM"
-                    "\nhelp: use isq.KG directly instead"
+                raise PrefixError(
+                    prefix=self,
+                    target=rhs,
+                    note="cannot apply `kilo` to `gram`. use `KG` directly.",
                 )
         elif isinstance(rhs, Logarithmic):
             if not rhs.allow_prefix:
-                raise TypeError(
-                    f"cannot apply prefix `{self.name}` to logarithmic unit"
-                    f" `{rhs.name}` because it does not allow prefixes."
+                raise PrefixError(
+                    prefix=self,
+                    target=rhs,
+                    note=f"log unit `{rhs.name}` does not allow prefixes.",
                 )
 
         new_name = f"{self.name}{rhs.name}"
@@ -400,18 +430,21 @@ class Alias(ConvertMixin, NamedExpr):
     some units like `liter`."""
 
     def __post_init__(self) -> None:
-        if (
-            isinstance(self.reference, Logarithmic)
-            and not self.reference.allow_prefix
-        ):
-            raise TypeError(
-                f"reference of aliased expression `{self}` must be a "
-                f"Logarithmic with `allow_prefix=True`"
+        ref = self.reference
+        if isinstance(ref, Logarithmic) and not ref.allow_prefix:
+            raise ReferenceTypeError(
+                expr_type=Alias,
+                ref=ref,
+                allowed_types_msg="a `Logarithmic` unit that allows prefixes.",
+                note=f"`{ref.name}` has `allow_prefix=False`.",
             )
-        elif not isinstance(self.reference, (Exp, Mul, Scaled)):
-            raise TypeError(
-                f"reference of aliased expression `{self}` must be an "
-                f"Exp, Mul or Scaled, not `{type(self.reference).__name__}`"
+        elif not isinstance(self.reference, (Exp, Mul, Scaled, Logarithmic)):
+            raise ReferenceTypeError(
+                expr_type=Alias,
+                ref=ref,
+                allowed_types_msg=(
+                    "an `Exp`, `Mul`, `Scaled`, or `Logarithmic` expression."
+                ),
             )
 
     @property
@@ -440,13 +473,12 @@ class Translated(ConvertMixin, NamedExpr):
     def __post_init__(self) -> None:
         ref = _unwrap_tagged_or_aliased(self.reference)
         if isinstance(ref, Translated):
-            raise TypeError(
-                "nesting translated units in `Translated` is not allowed"
-            )
+            raise NestingError(expr_type=Translated)
         if not isinstance(ref, (BaseUnit, Scaled)):
-            raise TypeError(
-                f"reference of translated unit `{self}` must be a"
-                f"BaseUnit or Scaled, not `{type(ref).__name__}`"
+            raise ReferenceTypeError(
+                expr_type=Translated,
+                ref=ref,
+                allowed_types_msg="a `BaseUnit` or `Scaled` expression.",
             )
 
     @property
@@ -494,14 +526,18 @@ class Logarithmic(ConvertMixin, NamedExpr):
     def __post_init__(self) -> None:
         ref = _unwrap_tagged_or_aliased(self.reference)
         if isinstance(ref, (Logarithmic, Translated)):
-            raise TypeError(
-                f"reference of logarithmic unit `{self}` must be not be"
-                f"a Logarithmic or Translated unit, got {type(ref).__name__}"
+            raise ReferenceTypeError(
+                expr_type=Logarithmic,
+                ref=ref,
+                allowed_types_msg="a linear unit (e.g. `V`, `W`).",
+                note=f"reference cannot be a `{type(ref).__name__}`.",
             )
         if ref.kind != "unit":
-            raise TypeError(
-                f"reference of logarithmic unit `{self}` must be a "
-                f"unit, not a `{ref.kind}`."
+            raise ReferenceTypeError(
+                expr_type=Logarithmic,
+                ref=ref,
+                allowed_types_msg="a reference with a physical unit.",
+                note=f"the reference's kind is `{ref.kind}`, not `unit`.",
             )
 
     @property
@@ -546,9 +582,12 @@ class Tagged(ConvertMixin, Expr):
 
     def __post_init__(self) -> None:
         if isinstance(self.reference, Tagged):
-            raise ValueError(
-                "nesting tagged expressions is not allowed,"
-                "consider using a tuple to store multiple contexts instead"
+            raise NestingError(
+                expr_type=Tagged,
+                help=(
+                    'use a tuple of contexts instead, "'
+                    '"e.g., `context=("airspeed", "true")`.'
+                ),
             )
 
     @property
@@ -585,11 +624,7 @@ class QtyKind:
         dim_unit = unit.simplify().dimension
         dim_unit_self = self.unit_si.simplify().dimension
         if dim_unit != dim_unit_self:
-            raise ValueError(
-                f"cannot attach a specific unit `{unit}` because "
-                f"its dimension (`{dim_unit}`) does not match the expected "
-                f"dimension of the kind `{self.unit_si}` (`{dim_unit_self}`)"
-            )
+            raise UnitKindMismatchError(kind=self, unit=unit)
         return Tagged(unit, context=self.context)
 
 
@@ -675,7 +710,10 @@ def _decompose_expr(
             scaled_conversions_mut,
         )
     else:  # pragma: no cover
-        raise ValueError(f"unknown {type(expr)=}")
+        raise NotImplementedError(f"unknown {type(expr)=}")
+
+
+__DIMENSIONLESS_SIMPLIFIED = Dimensionless(name="from_simplified")
 
 
 def _build_canonical_expr(
@@ -701,7 +739,7 @@ def _build_canonical_expr(
         key=lambda item: str(item[0]),
     )
     if not base_exponent_pairs_sorted:
-        simplified_expr = Dimensionless(name="generic")
+        simplified_expr = __DIMENSIONLESS_SIMPLIFIED
     elif len(base_exponent_pairs_sorted) == 1:
         base, exponent = base_exponent_pairs_sorted[0]
         simplified_expr = base if exponent == 1 else Exp(base, exponent)
@@ -777,17 +815,14 @@ class Converter:
                 offset=final_offset if exact else float(final_offset),
             )
         elif is_origin_log or is_target_log:
-            raise TypeError(
-                "conversion between a logarithmic unit and a linear unit is "
-                "non-linear and requires a reference value (e.g., 1V for dBV). "
-                "this library performs value-agnostic conversions only. "
-                "perform the calculation manually."
+            raise NonLinearConversionError(
+                origin=origin,
+                target=target,
             )  # e.g. V = V_ref * b**(L_dBV / k), L_dbV = k * log_b(V / V_ref)
 
         if origin_simpl.kind != target_simpl.kind:
-            raise ValueError(
-                "expected self and target to have the same kind, "
-                f"but {origin_simpl.kind} != {target_simpl.kind}"
+            raise KindMismatchError(
+                origin_kind=origin_simpl.kind, target_kind=target_simpl.kind
             )
 
         origin_dim = info_origin.expr.dimension
@@ -799,10 +834,7 @@ class Converter:
             target_dim.terms if isinstance(target_dim, Mul) else (target_dim,)
         )
         if origin_dim_terms != target_dim_terms:
-            raise ValueError(
-                f"expected origin and target to have the same dimension, "
-                f"but {origin_dim_terms} != {target_dim_terms}"
-            )
+            raise DimensionMismatchError(origin=origin, target=target)
         # we have:
         #   v_abs = scale_origin * v_origin + offset_origin
         #   v_abs = scale_target * v_target + offset_target
@@ -849,11 +881,8 @@ class Converter:
         origin_ref_dim = origin_simpl.reference.simplify().dimension
         target_ref_dim = target_simpl.reference.simplify().dimension
         if origin_ref_dim != target_ref_dim:  # e.g. dBV -> dBm
-            raise ValueError(
-                f"cannot convert `{origin_simpl}` to `{target_simpl}`"
-                f" because their reference units `{origin_simpl.reference}`"
-                f" and `{target_simpl.reference}` have incompatible dimensions:"
-                f" {origin_ref_dim} vs {target_ref_dim}."
+            raise DimensionMismatchError(
+                origin=origin_simpl.reference, target=target_simpl.reference
             )
 
         ref_converter = Converter.new(
@@ -945,7 +974,7 @@ def _flatten(
         )
         return ConversionInfo(info_ref.expr, info_ref.factor, new_offset)
     else:  # pragma: no cover, NOTE: Alias should be simplified away
-        raise ValueError(f"unknown expression {expr_simpl}")
+        raise NotImplementedError(f"unknown expression {expr_simpl}")
 
 
 def _products(
@@ -968,7 +997,9 @@ def _factor_to_fraction(
     elif isinstance(factor, SupportsDecimal):
         return Fraction(factor.to_decimal(ctx=ctx))
     elif not isinstance(factor, Fraction):
-        raise ValueError(f"unknown {type(factor)=}")  # pragma: no cover
+        raise NotImplementedError(
+            f"unknown {type(factor)=}"
+        )  # pragma: no cover
     return factor
 
 
@@ -1093,11 +1124,11 @@ class LazyFactor(SupportsFloat):
                 elif isinstance(base, int):  # ^
                     base_decimal = Decimal(base, context=ctx)
                 else:  # pragma: no cover
-                    raise ValueError(f"unknown {type(base)=}")
+                    raise NotImplementedError(f"unknown {type(base)=}")
                 exponent_decimal = _fraction_to_decimal(exponent)
                 product_decimal *= ctx.power(base_decimal, exponent_decimal)
             else:  # pragma: no cover
-                raise ValueError(f"unknown {type(exponent)=}")
+                raise NotImplementedError(f"unknown {type(exponent)=}")
         if product_decimal == Decimal(1):
             return product_fraction
         return _fraction_to_decimal(product_fraction) * product_decimal
@@ -1139,6 +1170,178 @@ class _PI(SupportsDecimal):
 
 E: Final = _E()
 PI: Final = _PI()
+
+#
+# errors
+#
+
+
+class IsqError(Exception):
+    """Base exception for all errors raised by the isq library."""
+
+
+# structural
+@dataclass
+class TerminalUnitError(IsqError):
+    expr: Expr
+    op: type[Exp] | type[Mul] | type[Scaled]
+    help: str | None = None
+    note: str | None = None
+
+    def __str__(self) -> str:  # pragma: no cover
+        if self.op is Exp:
+            op_name = "exponentiation"
+        elif self.op is Mul:
+            op_name = "multiplication"
+        elif self.op is Scaled:
+            op_name = "scaling"
+        else:
+            raise NotImplementedError
+        message = (
+            f"cannot perform {op_name} on terminal expression `{self.expr}`."
+            f"\nnote: `{type(self.expr).__name__}` expressions are final and "
+            "cannot be composed further."
+        )
+        if self.help:
+            message += f"\nhelp: {self.help}"
+        if self.note:
+            message += f"\nnote: {self.note}"
+        return message
+
+
+@dataclass
+class ReferenceTypeError(IsqError):
+    expr_type: type[Expr]
+    ref: Expr
+    allowed_types_msg: str
+    note: str | None = None
+
+    def __str__(self) -> str:  # pragma: no cover
+        message = (
+            f"invalid reference for `{self.expr_type.__name__}`."
+            f"\n     got: `{self.ref}` (of type `{type(self.ref).__name__}`)"
+            f"\nexpected: {self.allowed_types_msg}"
+        )
+        if self.note:
+            message += f"\nnote: {self.note}"
+        return message
+
+
+@dataclass
+class NestingError(IsqError):
+    expr_type: type[Expr]
+    help: str | None = None
+
+    def __str__(self) -> str:  # pragma: no cover
+        message = (
+            f"nesting `{self.expr_type.__name__}` expressions is not allowed."
+        )
+        if self.help:
+            message += f"\nhelp: {self.help}"
+        return message
+
+
+@dataclass
+class PrefixError(IsqError):
+    prefix: Prefix
+    target: BaseUnit | Alias | Logarithmic
+    note: str
+
+    def __str__(self) -> str:  # pragma: no cover
+        return (
+            f"cannot apply prefix `{self.prefix.name}` to `{self.target.name}`."
+            f"\nnote: {self.note}"
+        )
+
+
+@dataclass
+class MixedKindError(IsqError):
+    terms: tuple[Expr, ...]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return (
+            "cannot mix expressions of different kinds in a product."
+            f"\n  found kinds: {', '.join(f'`{t.kind}`' for t in self.terms)}"
+            "\nhelp: all terms in a `Mul` expression must be of the same kind "
+            "(e.g., all units like `M` and `S`, or all dimensions like "
+            "`DIM_LENGTH` and `DIM_TIME`)."
+        )
+
+
+@dataclass
+class CompositionError(IsqError):
+    msg: str
+    help: str | None = None
+
+    def __str__(self) -> str:  # pragma: no cover
+        message = self.msg
+        if self.help:
+            message += f"\nhelp: {self.help}"
+        return message
+
+
+# conversion
+@dataclass
+class KindMismatchError(IsqError):
+    origin_kind: ExpressionKind
+    target_kind: ExpressionKind
+
+    def __str__(self) -> str:  # pragma: no cover
+        return (
+            "cannot convert between expressions of different kinds."
+            f"\nnote: origin kind: `{self.origin_kind}`"
+            f"\n      target kind: `{self.target_kind}`"
+        )
+
+
+@dataclass
+class DimensionMismatchError(IsqError):
+    origin: Expr
+    target: Expr
+
+    def __str__(self) -> str:  # pragma: no cover
+        origin_dim = self.origin.simplify().dimension
+        target_dim = self.target.simplify().dimension
+        return (
+            f"cannot convert from `{self.origin}` to `{self.target}` due to "
+            "incompatible dimensions."
+            f"\ndimension of origin: `{origin_dim}`"
+            f"\ndimension of target: `{target_dim}`"
+        )
+
+
+@dataclass
+class UnitKindMismatchError(IsqError):
+    kind: QtyKind
+    unit: Expr
+
+    def __str__(self) -> str:  # pragma: no cover
+        kind_dim = self.kind.unit_si.simplify().dimension
+        unit_dim = self.unit.simplify().dimension
+        return (
+            f"cannot create tagged unit for kind `{self.kind.context}` with "
+            f"unit `{self.unit}`."
+            f"\nexpected kind dimension: `{kind_dim}` (`{self.kind.unit_si}`)"
+            f"\n   found unit dimension: `{unit_dim}` (`{self.unit}`)"
+        )
+
+
+@dataclass
+class NonLinearConversionError(IsqError):
+    origin: Expr
+    target: Expr
+
+    def __str__(self) -> str:  # pragma: no cover
+        return (
+            f"cannot create a value-agnostic converter from `{self.origin}` "
+            f"to `{self.target}`."
+            "conversion between a logarithmic and a linear unit is non-linear."
+            "\nhelp: this requires a reference value (e.g., 1V for dBV), "
+            "but this library only performs value-agnostic conversions. "
+            "please perform the calculation manually."
+        )
+
+
 # NOTE: for a registry, one option is to adopt https://peps.python.org/pep-0487/#subclass-registration:
 # - have a `Registrable` mixin with `__init_subclass__` so the act of defining a class `S` automatically adds it to a global dict
 # - this guarantees completeness with zero boilerplate

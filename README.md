@@ -11,12 +11,12 @@ At the current state, it merely serves to enable writing machine-readable, struc
 - Inspired by modern data validation libraries like [Pydantic](https://github.com/pydantic/pydantic), this library offers metadata objects that can be used in `typing.Annotated[T, x]`:
     ```py
     from typing import Any, Annotated
-    from isq import N, KG, M, S
+    from isq import N, KG, M, S, Mul, Exp
 
     def acceleration(
         force: Annotated[Any, N],
         mass: Annotated[Any, KG]
-    ) -> Annotated[Any, M * S**-2]:
+    ) -> Annotated[Any, Mul((M, Exp(S, -2)))]:
         ...
     ```
     Benefits:
@@ -24,24 +24,24 @@ At the current state, it merely serves to enable writing machine-readable, struc
     - enables powerful runtime introspection of `x` with `typing.get_type_hints()`.
     - delegates the type checking to an [separate tool](#type-checking)
     - centralised source of truth
-    - supports for documentation generators like `mkdocs` and intersphinx
+    - supports documentation generators like `mkdocs` and intersphinx
     - incremental, optional adoption
     - use in `dataclass`, `TypedDict`, `NamedTuple`...
-- Units and dimensions are represented as immutable tree, much like SymPy.
+- Units and dimensions are represented as an immutable expression tree, much like SymPy.
     ```py
-    from isq import N, KG
+    from isq import N, KG, Mul, Exp
 
     # N = Alias(Mul((KG, M, Exp(S, -2))), name="newton")
     ACCELERATION = Mul((N, Exp(KG, -1)))
     print(ACCELERATION) # Mul((N, Exp(KG, -1)))
     print(ACCELERATION.simplify()) # Mul((M, Exp(S, -2)))
     ```
-    Ordering is preserved and units are not aggressively simplified unless the `simplify()` method is called. Simplification reduces reduces the complex nested tree into a flat canonical form (product of base units raised to powers, potentially scaled).
+    Ordering is preserved. The `simplify()` method reduces the complex nested tree into a flat canonical form (product of base units raised to powers, potentially scaled).
 - The `to()` method returns a callable that allow you to convert between compatible units.
     ```py
-    from isq import FT, MIN, M, S, Exp, Mul
+    from isq import FT, MIN, M, S, Mul, Exp
 
-    # FT = Scaled(M, factor=Decimal('0.3048'))
+    # FT = Scaled(M, factor=Decimal("0.3048"))
     # MIN = Scaled(S, factor=60)
     FT_PER_MIN = Mul((FT, Exp(MIN, -1)))
     M_PER_S = Mul((M, Exp(S, -1)))
@@ -77,7 +77,7 @@ At the current state, it merely serves to enable writing machine-readable, struc
     KNOT_GS = GS[KNOT] # Tagged(KNOT, context=("airspeed", "ground"))
 
     Mul((TAS[KNOT], Exp(GS[KNOT], -1))).simplify() # NOT dimensionless.
-    # TAS[KNOT].to(GS[KNOT])  # ValueError due to contextual mismatch
+    # TAS[KNOT].to(GS[KNOT])  # errors due to contextual mismatch
     ```
 
 ## TODOs
