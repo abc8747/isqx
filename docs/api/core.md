@@ -7,6 +7,7 @@
 Default re-exports:
 
 - [`isq.core`][]: All logic for representing and converting between units.
+- [`isq.fmt`][]: Formatting
 - [`isq.si`][]: Definitions for SI base and derived units ([meters][isq.M], [kilograms][isq.KG], [newtons][isq.N], [joules][isq.J], etc.)
 - [`isq.us_customary`][]: Definitions for U.S. customary and British imperial units ([feet][isq.FT], [slugs][isq.SLUG], [pound force][isq.LBF] etc.)
 
@@ -43,6 +44,7 @@ Restrictions for composing [expressions][isq.Expr]:
 12. a [logarithmic][isq.Logarithmic] unit must be based on a linear unit with a physical dimension. it cannot be based on a dimensionless number.
 
 ::: isq.core
+::: isq.fmt
 
 ::: isq.si
 ::: isq.us_customary

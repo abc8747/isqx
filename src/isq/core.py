@@ -9,6 +9,7 @@ from typing import (
     Any,
     Final,
     Generator,
+    Generic,
     Hashable,
     Literal,
     Mapping,
@@ -18,6 +19,7 @@ from typing import (
     Protocol,
     Sequence,
     SupportsFloat,
+    TypeVar,
     Union,
     final,
     overload,
@@ -710,6 +712,7 @@ def _unwrap_tagged_or_aliased(expr: Expr) -> Expr:
 #
 # simplification
 #
+# migrate to pattern matching when we drop support for py3.9
 def _decompose_expr(
     expr: Expr,  # ‾
     exponent: Exponent,  # *
@@ -1248,6 +1251,67 @@ class _PI(SupportsDecimal):
 
 E: Final = _E()
 PI: Final = _PI()
+
+_T = TypeVar("_T")
+
+
+class Visitor(Generic[_T]):
+    """A base class for visiting nodes in an expression tree in post-order."""
+
+    def visit(self, expr: Expr) -> _T:
+        # NOTE: not using getattr hack!
+        if isinstance(expr, Dimensionless):
+            return self.visit_dimensionless(expr)
+        if isinstance(expr, BaseDimension):
+            return self.visit_base_dimension(expr)
+        if isinstance(expr, BaseUnit):
+            return self.visit_base_unit(expr)
+        if isinstance(expr, Exp):
+            return self.visit_exp(expr)
+        if isinstance(expr, Mul):
+            return self.visit_mul(expr)
+        if isinstance(expr, Scaled):
+            return self.visit_scaled(expr)
+        if isinstance(expr, Aliased):
+            return self.visit_aliased(expr)
+        if isinstance(expr, Tagged):
+            return self.visit_tagged(expr)
+        if isinstance(expr, Translated):
+            return self.visit_translated(expr)
+        if isinstance(expr, Logarithmic):
+            return self.visit_logarithmic(expr)
+        raise NotImplementedError(f"no visitor for {type(expr).__name__}")
+
+    def visit_dimensionless(self, expr: Dimensionless) -> _T:
+        raise NotImplementedError
+
+    def visit_base_dimension(self, expr: BaseDimension) -> _T:
+        raise NotImplementedError
+
+    def visit_base_unit(self, expr: BaseUnit) -> _T:
+        raise NotImplementedError
+
+    def visit_exp(self, expr: Exp) -> _T:
+        raise NotImplementedError
+
+    def visit_mul(self, expr: Mul) -> _T:
+        raise NotImplementedError
+
+    def visit_scaled(self, expr: Scaled) -> _T:
+        raise NotImplementedError
+
+    def visit_aliased(self, expr: Aliased) -> _T:
+        raise NotImplementedError
+
+    def visit_tagged(self, expr: Tagged) -> _T:
+        raise NotImplementedError
+
+    def visit_translated(self, expr: Translated) -> _T:
+        raise NotImplementedError
+
+    def visit_logarithmic(self, expr: Logarithmic) -> _T:
+        raise NotImplementedError
+
 
 #
 # errors

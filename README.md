@@ -1,6 +1,6 @@
 # isq
 
-A tiny dependency-free Python library to define, manipulate, and convert physical units/dimensions.
+A tiny dependency-free Python library to define, manipulate, and convert units/dimensions based on the International System of Quantities.
 
 Unlike mature unit-checking libraries like [`astropy.units`](https://github.com/astropy/astropy) which encapsulate your data types in a new object (a `numpy.ndarray` becomes a `Quantity`), this library **does not perform runtime dimensional homogenity checks**.
 
@@ -19,10 +19,9 @@ At the current state, it merely serves to enable writing machine-readable, struc
     ) -> Annotated[Any, M * S**-2]:
         ...
     ```
-    Benefits:
-    - the type is kept intact as `T`, with zero runtime overhead (see [PEP 593](https://peps.python.org/pep-0593/))
+    - the type is kept intact as `T`, with zero runtime overhead (see [PEP 593](https://typing.python.org/en/latest/spec/qualifiers.html#annotated))
     - enables powerful runtime introspection of `x` with `typing.get_type_hints()`.
-    - delegates the type checking to an [separate tool](#type-checking)
+    - delegates the type checking to a [separate tool](#type-checking)
     - centralised source of truth
     - supports documentation generators like `mkdocs` and intersphinx
     - incremental, optional adoption
