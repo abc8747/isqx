@@ -9,7 +9,7 @@ References:
 # TODO: ISO 2533:1975 (standard atmosphere)
 # TODO: ISO 1151
 
-from .core import Dimensionless, Exp, Mul, QtyKind
+from .core import Dimensionless, QtyKind
 from .si import HOUR, KG, KWH, M_PERS, MIN, PA, RAD, K, L, M, W
 from .us_customary import FT
 
@@ -38,7 +38,7 @@ HEIGHT_GEODETIC = QtyKind(M, ("height", "geodetic"))
 HEIGHT_AGL = QtyKind(M, ("height", "above_ground_level"))
 """Height above ground level. Not to be confused with altitude."""  # ICAO 1.7
 
-K_PERM = Mul((K, Exp(M, -1)))
+K_PERM = K * M**-1
 """Kelvin per meter, a unit of temperature gradient. For use in ISA."""
 
 #
@@ -92,7 +92,7 @@ WIND_SPEED = QtyKind(M_PERS, ("wind",))
 SPEED_OF_SOUND = QtyKind(M_PERS, ("sound",))
 """Speed of sound."""
 
-FT_PER_MIN = Mul((FT, Exp(MIN, -1)))
+FT_PER_MIN = FT * MIN**-1
 VS = QtyKind(M_PERS, ("vertical_speed"))  # ICAO 4.15
 """Vertical speed, rate of climb or descent.
 Commonly expressed in [feet per minute][isq.aerospace.FT_PER_MIN]."""
@@ -105,8 +105,8 @@ and the [speed of sound][isq.aerospace.SPEED_OF_SOUND]."""
 # engine
 #
 SHAFT_POWER = QtyKind(W, (_AC, _ENGINE, "shaft"))
-TSFC = QtyKind(Mul((KG, Exp(KWH, -1))), (_AC, _ENGINE))  # ICAO 5.3
-KG_PERS = Mul((KG, Exp(M_PERS, -1)))  # ICAO 5.4
+TSFC = QtyKind(KG * KWH**-1, (_AC, _ENGINE))  # ICAO 5.3
+KG_PERS = KG * M_PERS**-1  # ICAO 5.4
 MASS_FLOW_RATE = QtyKind(KG_PERS, (_AC, _ENGINE))
 
 #

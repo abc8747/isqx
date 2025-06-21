@@ -4,7 +4,7 @@ repo_name: cathaypacific8747/isq
 repo_url: https://github.com/cathaypacific8747/isq
 site_url: https://cathaypacific8747.github.io/isq/
 nav:
-  - "README.md"
+  - Home: "README.md"
   - API Reference:
     - Core (SI + US Customary): "api/core.md"
     - Aerospace: "api/aerospace.md"
@@ -54,6 +54,7 @@ plugins:
             show_source: true
             docstring_style: sphinx
             show_if_no_docstring: true
+            group_by_category: false
       enable_inventory: true
 markdown_extensions:
   - abbr

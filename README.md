@@ -8,15 +8,15 @@ At the current state, it merely serves to enable writing machine-readable, struc
 
 ## Key principles
 
-- Inspired by modern data validation libraries like [Pydantic](https://github.com/pydantic/pydantic), this library offers metadata objects that can be used in `typing.Annotated[T, x]`:
+- Inspired by libraries like [Pydantic](https://github.com/pydantic/pydantic) and [annotated-types](https://github.com/annotated-types/annotated-types), this library offers metadata objects that can be used in `typing.Annotated[T, x]`:
     ```py
     from typing import Any, Annotated
-    from isq import N, KG, M, S, Mul, Exp
+    from isq import N, KG, M, S
 
     def acceleration(
         force: Annotated[Any, N],
         mass: Annotated[Any, KG]
-    ) -> Annotated[Any, Mul((M, Exp(S, -2)))]:
+    ) -> Annotated[Any, M * S**-2]:
         ...
     ```
     Benefits:
@@ -29,12 +29,12 @@ At the current state, it merely serves to enable writing machine-readable, struc
     - use in `dataclass`, `TypedDict`, `NamedTuple`...
 - Units and dimensions are represented as an immutable expression tree, much like SymPy.
     ```py
-    from isq import N, KG, Mul, Exp
+    from isq import N, KG
 
     # N = Alias(Mul((KG, M, Exp(S, -2))), name="newton")
-    ACCELERATION = Mul((N, Exp(KG, -1)))
-    print(ACCELERATION) # Mul((N, Exp(KG, -1)))
-    print(ACCELERATION.simplify()) # Mul((M, Exp(S, -2)))
+    ACCELERATION = N * KG**-1
+    print(ACCELERATION)  # repr: Mul((N, Exp(KG, -1)))
+    print(ACCELERATION.simplify())  # repr: Mul((M, Exp(S, -2)))
     ```
     Ordering is preserved. The `simplify()` method reduces the complex nested tree into a flat canonical form (product of base units raised to powers, potentially scaled).
 - The `to()` method returns a callable that allow you to convert between compatible units.
@@ -43,8 +43,8 @@ At the current state, it merely serves to enable writing machine-readable, struc
 
     # FT = Scaled(M, factor=Decimal("0.3048"))
     # MIN = Scaled(S, factor=60)
-    FT_PER_MIN = Mul((FT, Exp(MIN, -1)))
-    M_PER_S = Mul((M, Exp(S, -1)))
+    FT_PER_MIN = FT * MIN**-1
+    M_PER_S = M * S**-1
     fpm2mps = FT_PER_MIN.to(M_PER_S)
     print(fpm2mps(100.0))  # 0.508
     print(FT_PER_MIN.to(M_PER_S, exact=True)(1000))  # Fraction(127, 25)
@@ -55,7 +55,7 @@ At the current state, it merely serves to enable writing machine-readable, struc
     from fractions import Fraction
     from isq import FT, M, Scaled
 
-    SMOOT = Scaled(FT, factor=5 + Fraction(7, 12))
+    SMOOT = ((5 + Fraction(7, 12)) * FT).alias("smoot")
     print(SMOOT.to(M, exact=True)(Fraction("364.4")))  # 7751699/12500
     ```
 - Different quantities often share the same physical dimension but are semantically distinct. For example:
@@ -73,16 +73,15 @@ At the current state, it merely serves to enable writing machine-readable, struc
     GS = QtyKind(M_PERS, context=("airspeed", "ground"))
     TAS = QtyKind(M_PERS, context=("airspeed", "true"))
     
-    M_PERS_GS = GS[M_PERS] # Tagged(M_PERS, context=("airspeed", "ground"))
-    KNOT_GS = GS[KNOT] # Tagged(KNOT, context=("airspeed", "ground"))
+    M_PERS_GS = GS[M_PERS] # repr: Tagged(M_PERS, context=("airspeed", "ground"))
+    KNOT_GS = GS[KNOT] # repr: Tagged(KNOT, context=("airspeed", "ground"))
 
-    Mul((TAS[KNOT], Exp(GS[KNOT], -1))).simplify() # NOT dimensionless.
+    (TAS[KNOT] / GS[KNOT]).simplify() # NOT dimensionless.
     # TAS[KNOT].to(GS[KNOT])  # errors due to contextual mismatch
     ```
 
 ## TODOs
 
-- enable intuitive construction like `M * S**-1` directly producing new `Expr` objects (impl `__mul__`, `__truediv__`, `__pow__`, `.alias()` for `Expr`)
 - convert `Expr` objects to various string representations (`siunitx`, LaTeX, ASCII, etc).
 - potentially, create a `mkdocs` plugin that serialises them
 

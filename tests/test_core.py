@@ -4,11 +4,14 @@ from fractions import Fraction
 import pytest
 
 from isq import (
+    CELSIUS,
     DAY,
     FT,
     HOUR,
+    M_PERS,
     MIN,
     RAD,
+    A,
     BaseUnit,
     Dimensionless,
     Exp,
@@ -20,7 +23,37 @@ from isq import (
     Tagged,
 )
 from isq.aerospace import ALT_GEOM, ALT_GEOP
-from isq.core import DimensionMismatchError, KindMismatchError
+from isq.core import (
+    DimensionMismatchError,
+    KindMismatchError,
+    TerminalUnitError,
+)
+
+#
+# OpsMixin
+#
+
+
+def test_op_mixin() -> None:
+    # pow
+    assert M**2 == Exp(M, 2)
+    assert M ** Fraction(1, 2) == Exp(M, Fraction(1, 2))
+
+    # mul expr * expr and flattening
+    assert M * S == Mul((M, S))
+    assert S * A * M == Mul((S, A, M))
+    assert S * (A * M) == Mul((S, A, M))
+    # rmul factor * expr, mul expr * factor
+    assert 2 * M == Scaled(M, 2)
+    assert M * 2 == Scaled(M, 2)
+
+    # truediv expr / expr, expr / factor
+    assert M / 2 == Scaled(M, LazyFactor(((2, -1),)))
+    assert M / S == Mul((M, Exp(S, -1)))
+
+    assert (M * 2) / S == Mul((Scaled(M, 2), Exp(S, -1)))
+    assert 3 * (M * 2) == Scaled(Scaled(M, 2), 3)
+
 
 #
 # Exp
@@ -35,22 +68,21 @@ def test_exp_invalid() -> None:
 
 
 def test_exp_eq() -> None:
-    assert Exp(M, 2) == Exp(M, Fraction(4, 2))
+    assert M**2 == Exp(M, Fraction(2))
 
 
 def test_exp_dimension() -> None:
-    assert Exp(M, 2).dimension == Exp(M.dimension, 2)
-    assert Exp(Exp(M, 2), 3).dimension == Exp(Exp(M.dimension, 2), 3)
+    assert (M**2).dimension == Exp(M.dimension, 2)
+    assert ((M**2) ** 3).dimension == Exp(Exp(M.dimension, 2), 3)
 
 
 def test_exp_simplify() -> None:
     # distribute exponent
-
-    expr0s = Exp(Exp(M, 2), Fraction(1, 2)).simplify()
+    expr0s = ((M**2) ** Fraction(1, 2)).simplify()
     assert isinstance(expr0s, BaseUnit)
     assert expr0s == M
 
-    expr0s = Exp(Exp(M, 2), 3).simplify()
+    expr0s = ((M**2) ** 3).simplify()
     assert isinstance(expr0s, Exp)
     assert expr0s == Exp(M, 6)
 
@@ -69,8 +101,7 @@ def test_mul_invalid() -> None:
         _u1 = Mul((M, M.dimension))
 
 
-M_PERS = Mul((M, Exp(S, -1)))
-FT_PERMIN = Mul((FT, Exp(MIN, -1)))
+FT_PERMIN = FT * MIN**-1
 
 
 def test_mul_dimension() -> None:
@@ -79,31 +110,31 @@ def test_mul_dimension() -> None:
 
 def test_mul_simplify_basic() -> None:
     # cancel terms
-    expr1s = Mul((M, Exp(M, -1))).simplify()
+    expr1s = (M * M**-1).simplify()
     assert isinstance(expr1s, Dimensionless)
 
     # distribute inner
-    expr2s = Exp(M_PERS, 2).simplify()
+    expr2s = (M_PERS**2).simplify()
     assert isinstance(expr2s, Mul)
-    assert expr2s.terms == Mul((Exp(M, 2), Exp(S, -2))).terms
+    assert expr2s.terms == (M**2 * S**-2).terms
 
     # combine terms with same base
-    expr_s = Mul((M, Exp(S, -1), Exp(M, 2), Exp(S, -2))).simplify()
+    expr_s = (M * S**-1 * M**2 * S**-2).simplify()
     assert isinstance(expr_s, Mul)
-    assert expr_s.terms == Mul((Exp(M, 3), Exp(S, -3))).terms
+    assert expr_s.terms == (M**3 * S**-3).terms
 
     # return lone term if it is raised to power of one
-    expr_s = Mul((Exp(M, 1),)).simplify()
+    expr_s = Mul((M**1,)).simplify()
     assert isinstance(expr_s, BaseUnit)
     assert expr_s == M
 
 
 def test_mul_simplify_nested() -> None:
-    assert isinstance(Mul((M_PERS, Exp(M_PERS, -1))).simplify(), Dimensionless)
+    assert isinstance((M_PERS * M_PERS**-1).simplify(), Dimensionless)
 
 
 def test_mul_simplify_ordering() -> None:
-    PERSM = Mul((Exp(S, -1), M)).simplify()
+    PERSM = (S**-1 * M).simplify()
     assert isinstance(PERSM, Mul)
     assert PERSM.terms == M_PERS.terms
 
@@ -130,9 +161,9 @@ def test_scaled_simplify_nested() -> None:
 
 
 def test_scaled_simplify_mixed() -> None:
-    expr4s = Mul((Exp(Scaled(M, 2), 3), Exp(Scaled(S, 3), 2))).simplify()
+    expr4s = ((M * 2) ** 3 * (S * 3) ** 2).simplify()
     assert isinstance(expr4s, Scaled)
-    assert expr4s.reference == Mul((Exp(M, 3), Exp(S, 2)))
+    assert expr4s.reference == (M**3 * S**2)
     assert isinstance(expr4s.factor, LazyFactor)
     assert expr4s.factor.to_exact() == 2**3 * 3**2
 
@@ -144,11 +175,11 @@ def test_scaled_simplify_mixed() -> None:
 
 
 def test_scaled_simplify_dimensionless() -> None:
-    expr5s = Mul((HOUR, Exp(DAY, -1))).simplify()
+    expr5s = (HOUR * DAY**-1).simplify()
     assert isinstance(expr5s, Scaled)
     assert isinstance(expr5s.reference, Dimensionless)
     assert isinstance(expr5s.factor, LazyFactor)
-    assert expr5s.factor.to_exact() == Fraction(1, 24)  # day per hour
+    assert expr5s.factor.to_exact() == Fraction(1, 24)
 
 
 def test_scaled_simplify_with_lazy_factor() -> None:
@@ -157,20 +188,19 @@ def test_scaled_simplify_with_lazy_factor() -> None:
     result = Exp(IN.simplify(), 2).simplify()
 
     assert isinstance(result, Scaled)
-    assert result.reference == Exp(M, 2)
+    assert result.reference == M**2
     assert isinstance(result.factor, LazyFactor)
 
     assert result.factor.to_approx() == pytest.approx((0.3048 / 12) ** 2)
 
 
 def test_scaled_simplify_with_lazy_factor_multiple_terms() -> None:
-    from isq import PSI  # defined by lbf -> lbm -> kg and in -> ft -> m
+    from isq import PA, PSI  # defined by lbf -> lbm -> kg and in -> ft -> m
 
     psi_simplified = PSI.simplify()  # Scaled(PA.simplify(), LazyFactor(...))
     assert isinstance(psi_simplified, Scaled)
     assert isinstance(psi_simplified.factor, LazyFactor)
     assert isinstance(psi_simplified.reference, Mul)
-    from isq import PA
 
     pa_simplified = PA.simplify()
     assert isinstance(pa_simplified, Mul)
@@ -178,11 +208,11 @@ def test_scaled_simplify_with_lazy_factor_multiple_terms() -> None:
     PSI_TO_PA_FACTOR = (0.45359237 * 9.80665) / ((0.3048 / 12) ** 2)
     assert psi_simplified.factor.to_approx() == pytest.approx(PSI_TO_PA_FACTOR)
 
-    result = Exp(psi_simplified, 2).simplify()
+    result = (psi_simplified**2).simplify()
     assert isinstance(result, Scaled)
     assert isinstance(result.factor, LazyFactor)
 
-    from isq import KG, M, S
+    from isq import KG
 
     result_ref_simplified = result.reference.simplify()
     assert isinstance(result_ref_simplified, Mul)
@@ -190,7 +220,7 @@ def test_scaled_simplify_with_lazy_factor_multiple_terms() -> None:
     #      = ((M*L*T**-2) / L**2)**2
     #      = (M * L**-1 * T**-2)**2
     assert set(result_ref_simplified.terms) == set(
-        (Exp(KG, 2), Exp(M, -2), Exp(S, -4))
+        (KG**2 * M**-2 * S**-4).terms
     )
     assert result.factor.to_approx() == pytest.approx(PSI_TO_PA_FACTOR**2)
 
@@ -201,7 +231,7 @@ def test_scaled_simplify_with_lazy_factor_multiple_terms() -> None:
 
 
 def test_prefix_invalid() -> None:
-    from isq import GRAM, KG, KILO, M_PERS, W
+    from isq import GRAM, KG, KILO, W
     from isq.core import PrefixError
 
     KW = KILO * W
@@ -234,11 +264,11 @@ def test_tagged_invalid_construction() -> None:
 
 
 def test_tagged_simplify_cancellation() -> None:
-    expr_same_ctx = Mul((M_ALT_GEOP, Exp(M_ALT_GEOP, -1)))
+    expr_same_ctx = M_ALT_GEOP * M_ALT_GEOP**-1
     simplified_same = expr_same_ctx.simplify()
     assert isinstance(simplified_same, Dimensionless)
 
-    expr_diff_ctx = Mul((M_ALT_GEOP, Exp(M_ALT_GEOM, -1)))
+    expr_diff_ctx = M_ALT_GEOP * M_ALT_GEOM**-1
     simplified_diff = expr_diff_ctx.simplify()
     assert isinstance(simplified_diff, Mul)  # shouldn't cancel
     assert set(simplified_diff.terms) == set(expr_diff_ctx.terms)
@@ -248,7 +278,7 @@ FT_ALT_GEOP = Tagged(FT, ("altitude", "geopotential"))
 
 
 def test_tagged_simplify_propagates_to_reference() -> None:
-    simplified = FT_ALT_GEOP.simplify()  # Scaled(Disambiguated(M, ...), ...)
+    simplified = FT_ALT_GEOP.simplify()
     assert isinstance(simplified, Tagged)
     assert simplified.context == M_ALT_GEOP.context
     assert isinstance(simplified.reference, Scaled)
@@ -268,7 +298,7 @@ def test_tagged_conversion() -> None:
 
 
 def test_qty_kind_getitem() -> None:
-    from isq import KNOT, M_PERS
+    from isq import KNOT
     from isq.aerospace import TAS
     from isq.core import UnitKindMismatchError
 
@@ -305,13 +335,13 @@ def test_qty_kind_getitem() -> None:
 
 
 def test_alias_fail() -> None:
-    from isq import DBV, Alias
+    from isq import DBV, Aliased
     from isq.core import ReferenceTypeError
 
     with pytest.raises(ReferenceTypeError):
-        _ = Alias(M, "fail")  # type: ignore
+        _ = Aliased(M, "fail")  # type: ignore
     with pytest.raises(ReferenceTypeError):
-        _ = Alias(DBV, "fail")
+        _ = Aliased(DBV, "fail")  # type: ignore
 
 
 #
@@ -337,10 +367,10 @@ def test_convert_base_dimension() -> None:
         _fn = DIM_LENGTH.to(RAD.dimension)  # -> Dimensionless
     assert DIM_TIME.to(DIM_TIME)(1) == 1  # -> BaseDimension
     with pytest.raises(KindMismatchError):
-        _fn = Scaled(DIM_TIME, 1).to(S)  # -> BaseUnit
-    assert DIM_TIME.to(Exp(DIM_TIME, 1))(1) == 1  # -> Exp
+        _fn = (1 * DIM_TIME).to(S)  # -> BaseUnit
+    assert DIM_TIME.to(DIM_TIME**1)(1) == 1  # -> Exp
     assert DIM_TIME.to(Mul((DIM_TIME,)))(1) == 1  # -> Mul
-    assert DIM_TIME.to(Scaled(DIM_TIME, 2))(1) == 0.5  # -> Scaled
+    assert DIM_TIME.to(2 * DIM_TIME)(1) == 0.5  # -> Scaled
 
 
 def test_convert_base_unit() -> None:
@@ -351,13 +381,13 @@ def test_convert_base_unit() -> None:
     assert S.to(S)(1) == 1  # -> BaseUnit
     with pytest.raises(KindMismatchError):
         _fn = S.to(S.dimension)  # -> BaseDimension
-    assert S.to(Exp(S, 1))(1) == 1  # -> Exp
+    assert S.to(S**1)(1) == 1  # -> Exp
     assert S.to(Mul((S,)))(1) == 1  # -> Mul
-    assert S.to(Scaled(S, 2))(1) == 0.5  # -> Scaled
+    assert S.to(2 * S)(1) == 0.5  # -> Scaled
 
 
 def test_convert_exp() -> None:
-    M2 = Exp(M, 2)
+    M2 = M**2
     with pytest.raises(DimensionMismatchError):
         _fn = M2.to(M)  # incompatible dim
     with pytest.raises(KindMismatchError):
@@ -366,7 +396,7 @@ def test_convert_exp() -> None:
         _fn = M2.to(M2.dimension)  # unit -> dimension
     assert M2.to(M2)(1) == 1  # -> Exp
     assert M2.to(Mul((M2,)))(1) == 1  # -> Mul
-    assert M2.to(Scaled(M2, 2))(1) == 0.5  # -> Scaled
+    assert M2.to(2 * M2)(1) == 0.5  # -> Scaled
 
 
 def test_convert_mul() -> None:
@@ -375,10 +405,10 @@ def test_convert_mul() -> None:
     with pytest.raises(KindMismatchError):
         _fn = M_PERS.to(RAD)  # -> Dimensionless
     assert M_PERS.to(M_PERS)(1) == 1  # -> Mul
-    assert M_PERS.to(Scaled(M_PERS, 2))(1) == 0.5  # -> Scaled
+    assert M_PERS.to(2 * M_PERS)(1) == 0.5  # -> Scaled
 
-    M2_PERS2 = Exp(M_PERS, 2)  # would be simplified to Mul((Exp(...), ...))
-    FT2_PERMIN2 = Exp(FT_PERMIN, 2)
+    M2_PERS2 = M_PERS**2  # would be simplified to Mul((Exp(...), ...))
+    FT2_PERMIN2 = FT_PERMIN**2
     assert M2_PERS2.to(FT2_PERMIN2)(1) == 60**2 * 0.3048**-2
     assert M2_PERS2.to(M2_PERS2)(1) == 1
 
@@ -393,33 +423,32 @@ def test_convert_scaled() -> None:
     assert DAY.to(S)(1) == 86400  # -> BaseUnit
     with pytest.raises(KindMismatchError):
         _value = HOUR.to(S.dimension)  # -> BaseDimension
-    assert DAY.to(Exp(S, 1))(1) == 86400  # -> Exp
+    assert DAY.to(S**1)(1) == 86400  # -> Exp
     assert DAY.to(Mul((S,)))(1) == 86400  # -> Mul
     assert MIN.to(HOUR)(60) == 1  # -> Scaled
     assert DAY.to(DAY)(1) == 1
 
 
 def test_translated_is_terminal() -> None:
-    from isq import CELSIUS, KILO, Translated
+    from isq import KILO, Translated
     from isq.core import (
         NestingError,
         PrefixError,
         ReferenceTypeError,
-        TerminalUnitError,
     )
 
     with pytest.raises(TerminalUnitError):
-        Exp(CELSIUS, 2)
+        _ = CELSIUS**2
     with pytest.raises(TerminalUnitError):
-        Mul((CELSIUS, M))
+        _ = CELSIUS * M
     with pytest.raises(TerminalUnitError):
-        Scaled(CELSIUS, 2)
+        _ = CELSIUS * 2
     with pytest.raises(PrefixError):
-        KILO * CELSIUS  # type: ignore
+        _ = KILO * CELSIUS  # type: ignore
     with pytest.raises(NestingError):
-        Translated(CELSIUS, 1, "celsius + 1")
+        _ = Translated(CELSIUS, 1, "celsius + 1")
     with pytest.raises(ReferenceTypeError):
-        Translated(M_PERS, 1, "m/s + 1")
+        _ = Translated(M_PERS, 1, "m/s + 1")
 
 
 def test_convert_translated() -> None:
@@ -465,21 +494,17 @@ def test_convert_tagged_translated() -> None:
 def test_logarithmic_is_terminal() -> None:
     from isq import DBV, DIM_LENGTH, KILO
     from isq.core import (
-        Exp,
         Logarithmic,
-        Mul,
         PrefixError,
         ReferenceTypeError,
-        Scaled,
-        TerminalUnitError,
     )
 
     with pytest.raises(TerminalUnitError):
-        Exp(DBV, 2)
+        _ = DBV**2
     with pytest.raises(TerminalUnitError):
-        Mul((DBV, M))
+        _ = DBV * M
     with pytest.raises(TerminalUnitError):
-        Scaled(DBV, 2)
+        _ = DBV * 2
     with pytest.raises(PrefixError):
         _ = KILO * DBV
     with pytest.raises(ReferenceTypeError):
@@ -578,8 +603,8 @@ def test_angle_conversion() -> None:
 def test_derived_angle_conversion() -> None:
     from isq import DEG
 
-    DEG_PER_S = Mul((DEG, Exp(S, -1)))
-    RAD_PER_S = Mul((RAD, Exp(S, -1)))
+    DEG_PER_S = DEG * S**-1
+    RAD_PER_S = RAD * S**-1
 
     assert DEG_PER_S.to(RAD_PER_S)(180) == pytest.approx(math.pi)
 
@@ -602,23 +627,15 @@ def test_xkcd_whatif_11() -> None:  # https://what-if.xkcd.com/11/
     POOP = BaseUnit(BaseDimension("poop"), "poop")
     MOUTH = BaseUnit(BaseDimension("mouth"), "mouth")
 
-    BIRD_PERKM2 = Mul((BIRD, Exp(KILO * M, -2)))
-    POOP_PERBIRD_PERHOUR = Mul((POOP, Exp(BIRD, -1), Exp(HOUR, -1)))
-    HOURS_PERDAY = Mul((HOUR, Exp(DAY, -1)))
-    MOUTHS_PERPOOP = Mul((MOUTH, Exp(POOP, -1)))
-    CM2_PERMOUTH = Mul((Exp(CENTI * M, 2), Exp(MOUTH, -1)))
-
-    PERIOD = Exp(
-        Mul(
-            (
-                BIRD_PERKM2,
-                POOP_PERBIRD_PERHOUR,
-                HOURS_PERDAY,
-                MOUTHS_PERPOOP,
-                CM2_PERMOUTH,
-            ),
-        ),
-        -1,
+    PERIOD = (
+        (
+            (BIRD * (KILO * M) ** -2)
+            * (POOP * BIRD**-1 * HOUR**-1)
+            * (HOUR * DAY**-1)
+            * (MOUTH * POOP**-1)
+            * ((CENTI * M) ** 2 * MOUTH**-1)
+        )
+        ** -1
     ).simplify()  # = (km^2 * day) / cm^2
     assert isinstance(PERIOD, Scaled)
     assert isinstance(PERIOD.factor, LazyFactor)
@@ -641,18 +658,16 @@ def test_xkcd_whatif_11() -> None:  # https://what-if.xkcd.com/11/
 
     from isq import FL_OZ, MI, MILLI, MPG, YEAR
 
-    MM2 = Exp(MILLI * M, 2)
-    assert Exp(MPG, -1).to(MM2)(1 / 20) == pytest.approx(0.11760729)
+    MM2 = (MILLI * M) ** 2
+    assert (MPG**-1).to(MM2)(1 / 20) == pytest.approx(0.11760729)
     poop_dropping_rate = 0.5  # fl_oz / (day * bird)
     total_distance_driven_rate = 3e12  # mi / year
     assert 1 / (
-        Mul(
-            (
-                BIRD,
-                Mul((FL_OZ, Exp(DAY, -1), Exp(BIRD, -1))),
-                Exp(Mul((MI, Exp(YEAR, -1))), -1),
-            )
-        ).to(Exp(MPG, -1))(
+        (
+            BIRD  #
+            * (FL_OZ * DAY**-1 * BIRD**-1)
+            * (MI * YEAR**-1) ** -1
+        ).to(MPG**-1)(
             num_birds * poop_dropping_rate / total_distance_driven_rate
         )
-    ) == pytest.approx(7.009, rel=1e-3)  # NOTE: xkcd's 13MPG is wrong
+    ) == pytest.approx(7.009, rel=1e-3)  #  xkcd's 13MPG is wrong

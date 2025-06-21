@@ -20,6 +20,7 @@ from typing import (
     SupportsFloat,
     Union,
     final,
+    overload,
     runtime_checkable,
 )
 
@@ -49,16 +50,16 @@ class Expr(Protocol):
     | [expression raised to a power][isq.Exp]²   | `Exp(M, 2)`               |
     | [product of expressions][isq.Mul]²         | `Mul(A, S)`               |
     | [scaled expression][isq.Scaled]²⁴          | `Scaled(M, 0.3048)`       |
-    | [aliased][isq.Alias]¹                      | [newton][isq.N] = kg m s⁻²|
+    | [aliased][isq.Aliased]¹                    | [newton][isq.N] = kg m s⁻²|
     | [translated expression][isq.Translated]³   | `Translated(K, -273.15)`  |
     | [logarithmic quantity][isq.Logarithmic]¹³  | [decibel-volt][isq.DBV]   |
     | [tagged][isq.Tagged]⁵                      | true vs ground speed      |
 
     ¹ these expressions are associated with a [name][isq.NamedExpr].
-    ² these expressions can be [aliased with a name][isq.Alias].
+    ² these expressions can be [aliased with a name][isq.Aliased].
     ³ these expressions are *terminal*, meaning it cannot be further
       [exponentiated][isq.Exp], [multiplied][isq.Mul], [scaled][isq.Scaled],
-      [translated][isq.Translated] or [aliased][isq.Alias] to form a more
+      [translated][isq.Translated] or [aliased][isq.Aliased] to form a more
       complex expression. However, it can be further [tagged][isq.Tagged]
       (e.g. surface temperature vs ISA temperature).
     ⁴ can be created by multiplying a [prefix][isq.Prefix] (e.g. `milli`)
@@ -85,7 +86,7 @@ class Expr(Protocol):
     def simplify(self) -> Expr:
         """Flatten a complex tree-like structure into a simple canonical form,
         including: distributing exponents, combining like terms and merging
-        nested scaling factors. This strips away [aliases][isq.Alias] but
+        nested scaling factors. This strips away [aliases][isq.Aliased] but
         keeps [tags][isq.Tagged] intact.
 
         Examples:
@@ -113,6 +114,27 @@ class NamedExpr(Expr, Protocol):
     """A name for this expression, e.g. `meter`, `newton`, `reynolds`"""
 
 
+class AliasMixin:
+    def alias(self, name: str, *, allow_prefix: bool = False) -> Aliased:
+        """Wrap this expression with a name.
+
+        :param name: Name of this alias, e.g. `newton`
+        :param allow_prefix: Whether to allow [prefixes][isq.Prefix] to be
+        attached. This should only be true for some units like `liter`
+        """
+        return Aliased(self, name=name, allow_prefix=allow_prefix)  # type: ignore
+
+
+class TagMixin:
+    def tag(self, context: Hashable) -> Tagged:
+        """Wrap this expression with some context.
+
+        :param context: A hashable identifier, e.g. `geopotential`, or
+        a tuple of contexts
+        """
+        return Tagged(self, context=context)  # type: ignore
+
+
 class ConvertMixin:
     def to(
         self: Expr,
@@ -131,8 +153,56 @@ class ConvertMixin:
         return Converter.new(origin=self, target=target, exact=exact, ctx=ctx)
 
 
+class OpsMixin:
+    """Operator overloads to allow ergonomic expression construction.
+
+    !!! note
+        While dividing expressions is supported, it is strongly discouraged as
+        it can lead to operator precedence ambiguity. For instance, while Python
+        interprets `J / KG / K` as `(J / KG) / K`, it is often clearer to
+        represent it as `J * KG**-1 * K**-1`.
+    """
+
+    def __pow__(self: Expr, exponent: Exponent) -> Exp:
+        return Exp(self, exponent)
+
+    @overload
+    def __mul__(self: Expr, rhs: Expr) -> Mul: ...
+
+    @overload
+    def __mul__(self: Expr, rhs: LazyFactor | Factor) -> Scaled: ...
+
+    def __mul__(self: Expr, rhs: Expr | LazyFactor | Factor) -> Mul | Scaled:
+        if isinstance(
+            rhs, (LazyFactor, SupportsDecimal, Decimal, Fraction, float, int)
+        ):
+            return Scaled(self, rhs)
+        # make sure KG * M * S becomes flat, not Mul((Mul((KG, M)), S))
+        terms_self = self.terms if isinstance(self, Mul) else (self,)
+        terms_other = rhs.terms if isinstance(rhs, Mul) else (rhs,)
+        return Mul(tuple([*terms_self, *terms_other]))
+
+    def __rmul__(self: Expr, lhs: LazyFactor | Factor) -> Scaled:
+        return Scaled(self, lhs)
+
+    @overload
+    def __truediv__(self: Expr, rhs: Expr) -> Mul: ...
+
+    @overload
+    def __truediv__(self: Expr, rhs: LazyFactor | Factor) -> Scaled: ...
+
+    def __truediv__(
+        self: Expr, rhs: Expr | LazyFactor | Factor
+    ) -> Mul | Scaled:
+        if not isinstance(rhs, Expr):  # M / 2 => Scaled(M, Fraction(1, 2))
+            return Scaled(
+                self, LazyFactor(tuple(f for f in _products_inverse(rhs)))
+            )
+        return self * rhs**-1  # type: ignore
+
+
 @dataclass(frozen=True)
-class Dimensionless(ConvertMixin, NamedExpr):
+class Dimensionless(OpsMixin, ConvertMixin, TagMixin, NamedExpr):
     name: str
     """Name for the dimensionless number, e.g. `reynolds`, `prandtl`"""
 
@@ -149,7 +219,7 @@ class Dimensionless(ConvertMixin, NamedExpr):
 
 
 @dataclass(frozen=True)
-class BaseDimension(ConvertMixin, NamedExpr):
+class BaseDimension(OpsMixin, ConvertMixin, TagMixin, NamedExpr):
     name: str
     """Name for the base dimension, e.g. `L`, `M`, `T`"""
 
@@ -166,7 +236,7 @@ class BaseDimension(ConvertMixin, NamedExpr):
 
 
 @dataclass(frozen=True)
-class BaseUnit(ConvertMixin, NamedExpr):
+class BaseUnit(OpsMixin, ConvertMixin, TagMixin, NamedExpr):
     _dimension: BaseDimension
     """Reference to the base dimension"""
     name: str
@@ -190,7 +260,7 @@ or a fraction, but not zero"""
 
 
 @dataclass(frozen=True)
-class Exp(ConvertMixin, Expr):
+class Exp(OpsMixin, ConvertMixin, TagMixin, AliasMixin, Expr):
     """An expression raised to an exponent.
     For example, `BaseUnit("meter", Dimension("L")), 2)` is m².
     Can be recursively nested, e.g. `Exp(Exp(METER, 2), Fraction(1, 2))`
@@ -207,7 +277,7 @@ class Exp(ConvertMixin, Expr):
             raise CompositionError(
                 msg=(
                     "exponent must be an integer or a fraction, "
-                    f"not {type(self.exponent).__name__}"
+                    f"not {self.exponent} ({type(self.exponent).__name__})"
                 )
             )
         if self.exponent == 0:
@@ -255,7 +325,7 @@ class Exp(ConvertMixin, Expr):
 
 
 @dataclass(frozen=True)
-class Mul(ConvertMixin, Expr):
+class Mul(OpsMixin, ConvertMixin, TagMixin, AliasMixin, Expr):
     """Products of powers of an expression."""
 
     terms: tuple[Expr, ...]
@@ -316,7 +386,7 @@ class Mul(ConvertMixin, Expr):
 
 
 @dataclass(frozen=True)
-class Scaled(ConvertMixin, Expr):
+class Scaled(OpsMixin, ConvertMixin, TagMixin, AliasMixin, Expr):
     reference: Expr
     """The unit or dimension that this unit or dimension is based on."""
     factor: Factor | LazyFactor
@@ -325,6 +395,16 @@ class Scaled(ConvertMixin, Expr):
     """
 
     def __post_init__(self) -> None:
+        if not isinstance(
+            self.factor,
+            (LazyFactor, SupportsDecimal, Decimal, Fraction, float, int),
+        ):
+            raise CompositionError(
+                msg=(
+                    f"factor must be a number, "
+                    f"not {self.factor} ({type(self.factor).__name__})"
+                )
+            )
         ref = _unwrap_tagged_or_aliased(self.reference)
         if isinstance(ref, Translated) or (
             isinstance(ref, Logarithmic) and not ref.allow_prefix
@@ -357,7 +437,7 @@ class Scaled(ConvertMixin, Expr):
 @dataclass(frozen=True)
 class Prefix:
     """A factory, which when multiplied by a [base unit][isq.BaseUnit] or
-    [aliased unit][isq.Alias], returns a [scaled unit][isq.Scaled].
+    [aliased unit][isq.Aliased], returns a [scaled unit][isq.Scaled].
 
     Note that this is not an [isq.Expr][], but a *constructor helper*.
     """
@@ -366,8 +446,8 @@ class Prefix:
     name: str
     """Name of this prefix, e.g. `milli`, `kibi`"""
 
-    def __mul__(self, rhs: BaseUnit | Alias | Logarithmic) -> Alias:
-        if not isinstance(rhs, (BaseUnit, Alias, Logarithmic)):
+    def __mul__(self, rhs: BaseUnit | Aliased | Logarithmic) -> Aliased:
+        if not isinstance(rhs, (BaseUnit, Aliased, Logarithmic)):
             raise PrefixError(
                 prefix=self,
                 target=rhs,
@@ -384,7 +464,7 @@ class Prefix:
                     target=rhs,
                     note="cannot prefix KG, apply it to `GRAM` instead.",
                 )
-        elif isinstance(rhs, Alias):
+        elif isinstance(rhs, Aliased):
             if not rhs.allow_prefix:
                 raise PrefixError(
                     prefix=self,
@@ -406,7 +486,7 @@ class Prefix:
                 )
 
         new_name = f"{self.name}{rhs.name}"
-        return Alias(
+        return Aliased(
             Scaled(rhs, self.factor), name=new_name, allow_prefix=False
         )
 
@@ -414,37 +494,28 @@ class Prefix:
 
 
 @dataclass(frozen=True)
-class Alias(ConvertMixin, NamedExpr):
+class Aliased(OpsMixin, ConvertMixin, TagMixin, NamedExpr):
     """An alias for an expression, used to give a more readable name.
 
     Note that unlike a [tagged][isq.Tagged] expression,
     [simplification][isq.Expr.simplify] will effectively elide this class.
     """
 
-    reference: Exp | Mul | Scaled | Logarithmic
+    reference: Exp | Mul | Scaled
     """Expression to be aliased, e.g. `Mul((KG, M, Exp(S, -2)))`"""
     name: str
     """Name of this alias, e.g. `newton`"""
     allow_prefix: bool = False
-    """Whether to allow prefixes to be attached. This should only be true for
-    some units like `liter`."""
+    """Whether to allow [prefixes][isq.Prefix] to be attached.
+    This should only be true for some units like `liter`."""
 
     def __post_init__(self) -> None:
         ref = self.reference
-        if isinstance(ref, Logarithmic) and not ref.allow_prefix:
+        if not isinstance(self.reference, (Exp, Mul, Scaled)):
             raise ReferenceTypeError(
-                expr_type=Alias,
+                expr_type=Aliased,
                 ref=ref,
-                allowed_types_msg="a `Logarithmic` unit that allows prefixes.",
-                note=f"`{ref.name}` has `allow_prefix=False`.",
-            )
-        elif not isinstance(self.reference, (Exp, Mul, Scaled, Logarithmic)):
-            raise ReferenceTypeError(
-                expr_type=Alias,
-                ref=ref,
-                allowed_types_msg=(
-                    "an `Exp`, `Mul`, `Scaled`, or `Logarithmic` expression."
-                ),
+                allowed_types_msg=("an `Exp`, `Mul`, or `Scaled` expression."),
             )
 
     @property
@@ -460,7 +531,7 @@ class Alias(ConvertMixin, NamedExpr):
 
 
 @dataclass(frozen=True)
-class Translated(ConvertMixin, NamedExpr):
+class Translated(OpsMixin, ConvertMixin, TagMixin, NamedExpr):
     """An expression offsetted from some reference unit."""
 
     reference: Expr
@@ -494,7 +565,7 @@ class Translated(ConvertMixin, NamedExpr):
 
 
 @dataclass(frozen=True)
-class Logarithmic(ConvertMixin, NamedExpr):
+class Logarithmic(OpsMixin, ConvertMixin, TagMixin, NamedExpr):
     r"""A logarithmic unit, representing a level of a quantity.
 
     A level $L$ is defined as the ratio between a quantity to its reference:
@@ -513,7 +584,7 @@ class Logarithmic(ConvertMixin, NamedExpr):
         - $k=10$ for power quantities.
     """
 
-    reference: BaseUnit | Exp | Mul | Scaled | Alias
+    reference: BaseUnit | Exp | Mul | Scaled | Aliased
     """The linear unit being measured (e.g., V for dBV, W for dBm)"""
     quantity_type: Literal["power", "field"]
     """Whether the reference is a power or a field quantity."""
@@ -569,7 +640,7 @@ class Logarithmic(ConvertMixin, NamedExpr):
 
 
 @dataclass(frozen=True)
-class Tagged(ConvertMixin, Expr):
+class Tagged(OpsMixin, ConvertMixin, Expr):
     """An concrete unit expression decorated with a semantic context tag.
 
     This is used to disambiguate between quantities that share the same
@@ -631,7 +702,7 @@ class QtyKind:
 def _unwrap_tagged_or_aliased(expr: Expr) -> Expr:
     # `Translated` and `Logarithmic` are terminal, this plugs a loophole
     # NOTE: Alias(Alias(...)) and Tagged(Tagged(...)) is not allowed
-    if isinstance(expr, (Tagged, Alias)):
+    if isinstance(expr, (Tagged, Aliased)):
         return expr.reference
     return expr
 
@@ -658,7 +729,7 @@ def _decompose_expr(
             - expr=Expr(S, -2), exponent=1
                 - base_exponent_pairs_mut[S] += -2
     """
-    if isinstance(expr, Alias):
+    if isinstance(expr, Aliased):
         _decompose_expr(
             expr.reference,
             exponent,
@@ -713,7 +784,7 @@ def _decompose_expr(
         raise NotImplementedError(f"unknown {type(expr)=}")
 
 
-__DIMENSIONLESS_SIMPLIFIED = Dimensionless(name="from_simplified")
+__DIMENSIONLESS_SIMPLIFIED: Final = Dimensionless(name="from_simplified")
 
 
 def _build_canonical_expr(
@@ -843,13 +914,9 @@ class Converter:
         #              (offset_origin - offset_target) / scale_target
         scale_origin = list(_products(info_origin.factor))
 
-        inv_scale_target: list[tuple[Factor, Exponent] | Factor] = []
-        for item in _products(info_target.factor):
-            if isinstance(item, tuple):
-                base, exponent = item
-                inv_scale_target.append((base, -exponent))
-            else:
-                inv_scale_target.append((item, -1))
+        inv_scale_target = tuple(
+            f for f in _products_inverse(info_target.factor)
+        )
         scale = LazyFactor(tuple([*scale_origin, *inv_scale_target]))
 
         offset_numerator = _factor_to_fraction(
@@ -985,6 +1052,17 @@ def _products(
             yield product
     else:
         yield factor
+
+
+def _products_inverse(
+    factor: Factor | LazyFactor,
+) -> Generator[tuple[Factor, Exponent] | Factor]:
+    for item in _products(factor):
+        if isinstance(item, tuple):
+            base, exponent = item
+            yield (base, -exponent)
+        else:
+            yield (item, -1)
 
 
 def _factor_to_fraction(
@@ -1244,7 +1322,7 @@ class NestingError(IsqError):
 @dataclass
 class PrefixError(IsqError):
     prefix: Prefix
-    target: BaseUnit | Alias | Logarithmic
+    target: BaseUnit | Aliased | Logarithmic
     note: str
 
     def __str__(self) -> str:  # pragma: no cover
