@@ -14,7 +14,7 @@ References:
 from decimal import Decimal
 from fractions import Fraction
 
-from .core import PI, LazyFactor, Translated
+from .core import PI, LazyProduct, Translated
 from .si import (
     CONST_DENSITY_H2O,
     CONST_DENSITY_HG,
@@ -102,7 +102,7 @@ SQ_BUILDING = (100 * SQ_FT).alias("square_building")
 """Square building, used in the U.S. construction industry."""
 SQ_MI = MI**2
 SQ_MIL = MIL**2
-CIRCULAR_MIL = (LazyFactor((PI, (4, -1))) * SQ_MIL).alias("circular_mil")
+CIRCULAR_MIL = (LazyProduct((PI, (4, -1))) * SQ_MIL).alias("circular_mil")
 """Circular mil, a unit of area for wire cross-sections."""  # SP811 B.8
 
 #
@@ -277,11 +277,11 @@ KSI = (1000 * PSI).alias("ksi")
 """Kilo-pound-force per square inch, a unit of pressure."""
 PSF = (LBF * SQ_FT**-1).alias("psf")
 """Pound-force per square foot, a unit of pressure."""
-INHG = (LazyFactor((CONST_DENSITY_HG, CONST_STANDARD_GRAVITY)) * IN).alias(
+INHG = (LazyProduct((CONST_DENSITY_HG, CONST_STANDARD_GRAVITY)) * IN).alias(
     "inch_of_hg"
 )
 """Inch of mercury, a unit of pressure."""  # SP811 B.8
-INH2O = (LazyFactor((CONST_DENSITY_H2O, CONST_STANDARD_GRAVITY)) * IN).alias(
+INH2O = (LazyProduct((CONST_DENSITY_H2O, CONST_STANDARD_GRAVITY)) * IN).alias(
     "inch_of_h2o"
 )
 """Inch of water (conventional), a unit of pressure."""

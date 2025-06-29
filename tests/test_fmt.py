@@ -1,12 +1,53 @@
-def test_fmt_basic() -> None:
-    from isq import BTU, FT, HOUR, IN, R
-    from isq.fmt import BasicFormatter
+from fractions import Fraction
 
-    K_VALUE = BTU * IN / (HOUR * FT**2 * R)
-    fmt = BasicFormatter(verbose=True)
+from isq import CENTI, GRAM, HOUR, M, S, simplify
+from isq.fmt import BasicFormatter, fmt
+from isq.us_customary import BTU, FAHRENHEIT, FT, IN, R
+
+K_VALUE = BTU * IN / (HOUR * FT**2 * R)
+CM = CENTI * M
+DYN = (GRAM * CM * S**-2).alias("dyn")
+STATC = (DYN ** Fraction(1, 2) * M).alias("statc")
+
+
+def test_fmt_basic_tagged() -> None:
+    from isq import M_PERS
+    from isq.aerospace import TAS
+
+    M_PERS_TAS = TAS[M_PERS]
     assert (
-        fmt.format(K_VALUE)
-        == """btu_it · inch · (hour · foot² · rankine)⁻¹, where:
+        fmt(M_PERS_TAS, fmt=BasicFormatter())
+        == """(meter · second⁻¹)(context=('airspeed', 'true'))"""
+    )
+
+
+def test_fmt_basic_translated() -> None:
+    assert (
+        fmt(FAHRENHEIT, fmt=BasicFormatter(verbose=True))
+        == """fahrenheit
+- fahrenheit = rankine - 459.67
+  - rankine = 5/9 · kelvin"""
+    )
+
+
+def test_fmt_basic_logarithmic() -> None:
+    from isq import NPV
+
+    assert (
+        fmt(NPV, fmt=BasicFormatter(verbose=True))
+        == """NpV
+- NpV = field level, reference value of volt (base 𝑒, allows prefix)
+  - volt = watt · ampere⁻¹
+    - watt = joule · second⁻¹
+      - joule = newton · meter
+        - newton = kilogram · meter · second⁻²"""
+    )
+
+
+def test_fmt_basic_k_value() -> None:
+    assert (
+        fmt(K_VALUE, fmt=BasicFormatter(verbose=True))
+        == """btu_it · inch · (hour · foot² · rankine)⁻¹
 - btu_it = 1055.05585262 · joule
   - joule = newton · meter
     - newton = kilogram · meter · second⁻²
@@ -17,6 +58,20 @@ def test_fmt_basic() -> None:
 - rankine = 5/9 · kelvin"""
     )
     assert (
-        fmt.format(K_VALUE.simplify())
-        == "1055.05585262 · 1/12 · 0.3048 · 60⁻¹ · 60⁻¹ · 0.3048⁻² · 5/9⁻¹ · (meter · kilogram · second⁻³ · kelvin⁻¹)"
+        fmt(simplify(K_VALUE), fmt=BasicFormatter(verbose=True))
+        == "1055.05585262 · 1/12 · 0.3048 · 60⁻¹ · 60⁻¹ · 0.3048⁻² · (5/9)⁻¹ · (meter · kilogram · second⁻³ · kelvin⁻¹)"
+    )
+
+
+def test_fmt_basic_statc() -> None:
+    assert (
+        fmt(STATC, fmt=BasicFormatter(verbose=True))
+        == """statc
+- statc = dyn¹⸍² · meter
+  - dyn = gram · centimeter · second⁻²
+    - gram = 1/1000 · kilogram"""
+    )
+    assert (
+        fmt(simplify(STATC), fmt=BasicFormatter(verbose=True))
+        == "(1/1000)¹⸍² · (1/100)¹⸍² · (meter³⸍² · kilogram¹⸍² · second⁻¹)"
     )

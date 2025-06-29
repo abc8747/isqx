@@ -6,7 +6,9 @@ site_url: https://cathaypacific8747.github.io/isq/
 nav:
   - Home: "README.md"
   - API Reference:
-    - Core (SI + US Customary): "api/core.md"
+    - Core: "api/core.md"
+    - SI units: "api/si.md"
+    - U.S. Customary units: "api/us_customary.md"
     - Aerospace: "api/aerospace.md"
 
 theme:
@@ -39,6 +41,10 @@ plugins:
             - https://docs.python.org/3/objects.inv
             - https://numpy.org/doc/stable/objects.inv
           options:
+            # NOTE: bug in upstream, with `annotations_path: brief` top level SI unit definitions like `(KG * M * S**-2).alias("newton")` gets incorrectly rendered as `.alias("newton")`
+            # https://github.com/mkdocstrings/python/blob/bac553d8bd87c2ca9a1cd67fc473e2686a4eedc2/src/mkdocstrings_handlers/python/templates/material/_base/expression.html.jinja#L92
+            # this should have the check ` and expression.first.classname in ("ExprName", "ExprAttribute")`
+            annotations_path: source # temporary fix
             inherited_members: true
             members_order: source
             separate_signature: true
@@ -46,14 +52,14 @@ plugins:
             merge_init_into_class: true
             docstring_section_style: table
             signature_crossrefs: true
+            show_if_no_docstring: true
+            show_submodules: false
+            show_source: true
             show_symbol_type_heading: true
             show_symbol_type_toc: true
             show_root_heading: true
             show_root_full_path: false
-            show_submodules: false
-            show_source: true
             docstring_style: sphinx
-            show_if_no_docstring: true
             group_by_category: false
       enable_inventory: true
 markdown_extensions:

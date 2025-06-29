@@ -71,8 +71,8 @@ ENDURANCE = QtyKind(HOUR, ("aircraft", "endurance"))  # ICAO 1.6
 # - Cp, Cv, R, Rhat...
 
 # temperature 6.7
-TEMP_SAT = QtyKind(K, ("static"))
-TEMP_TAT = QtyKind(K, ("total"))
+TEMP_SAT = QtyKind(K, ("static",))
+TEMP_TAT = QtyKind(K, ("total",))
 TEMP_ISA = QtyKind(K, ("static", "isa"))
 """static air temperature (international standard atmosphere)."""
 
@@ -93,7 +93,7 @@ SPEED_OF_SOUND = QtyKind(M_PERS, ("sound",))
 """Speed of sound."""
 
 FT_PER_MIN = FT * MIN**-1
-VS = QtyKind(M_PERS, ("vertical_speed"))  # ICAO 4.15
+VS = QtyKind(M_PERS, ("vertical_speed",))  # ICAO 4.15
 """Vertical speed, rate of climb or descent.
 Commonly expressed in [feet per minute][isq.aerospace.FT_PER_MIN]."""
 
@@ -117,7 +117,7 @@ MASS_FLOW_RATE = QtyKind(KG_PERS, (_AC, _ENGINE))
 #
 # pilot specific
 #
-PRESSURE_ALTIMETER = QtyKind(PA, ("altimeter"))
+PRESSURE_ALTIMETER = QtyKind(PA, ("altimeter",))
 """Altimeter setting."""
 RUNWAY_LENGTH = QtyKind(M, ("runway", "length"))  # ICAO 1.12
 RVR = QtyKind(M, ("runway", "visual_range"))  # ICAO 1.13

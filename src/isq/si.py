@@ -13,21 +13,26 @@ References:
     International System of Units (SI)," NIST, Available: https://www.nist.gov/pml/special-publication-811
 """
 
+from __future__ import annotations
+
 from decimal import Decimal
 from fractions import Fraction
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from .core import PI as _PI
 from .core import (
     BaseDimension,
     BaseUnit,
     Dimensionless,
-    LazyFactor,
+    LazyProduct,
     Logarithmic,
     Prefix,
     Translated,
 )
 from .core import E as _E
+
+if TYPE_CHECKING:
+    from .core import Aliased, Exp, Mul, Scaled, Tagged
 
 #
 # base units [SI page 130 & section 2.3.3] [IUPAP1 page 20 & table 4]
@@ -158,22 +163,27 @@ YOBI = Prefix(1024**8, "yobi")
 MIN = (60 * S).alias("minute")
 HOUR = (60 * MIN).alias("hour")
 DAY = (24 * HOUR).alias("day")
-YEAR = (Decimal("365.25") * DAY).alias("year")  # approx, on average
-DECADE = (10 * YEAR).alias("decade")
-CENTURY = (10 * DECADE).alias("century")
+YEAR = (Decimal("365.25") * DAY).alias("year")
+ANNUS = (Decimal("365.25") * DAY).alias("annus", allow_prefix=True)
 
 # length
 AU = (149_597_870_700 * M).alias("astronomical_unit")
 """Astronomical unit, as defined by IAU 2012 Resolution B2."""
+PC = (LazyProduct((648_000, (_PI, -1))) * AU).alias("parsec")
+"""Parsec"""
+CONST_SPEED_OF_LIGHT: Annotated[int, M_PERS] = 299_792_458
+"""Speed of light in vacuum, defined by the 17th CGPM in 1983."""
+LY = (CONST_SPEED_OF_LIGHT * YEAR).alias("light_year", allow_prefix=True)
+"""Light-year"""
 
 # plane and phase angle
-DEG = (LazyFactor((_PI, (180, -1))) * RAD).alias("degree")
+DEG = (LazyProduct((_PI, (180, -1))) * RAD).alias("degree")
 """Degrees (°), a unit of plane angle."""
 MIN_ANGLE = (Fraction(1, 60) * DEG).alias("minute_angle")
 """Minutes (′), a unit of plane angle."""
 SEC_ANGLE = (Fraction(1, 60) * MIN_ANGLE).alias("second_angle")
 """Seconds (″) or arcseconds in astronomy, a unit of plane angle."""
-REV = (LazyFactor((2, _PI)) * RAD).alias("revolution")
+REV = (LazyProduct((2, _PI)) * RAD).alias("revolution")
 """Revolutions, a unit of plane angle."""
 
 # area
@@ -189,7 +199,8 @@ L = (Fraction(1, 10**3) * CU_M).alias("liter", allow_prefix=True)
 
 # mass
 TONNE = (1_000 * KG).alias("tonne", allow_prefix=True)
-"""Tonne, also known as the [`metric ton`][isq.TON_METRIC] in the U.S."""
+"""Tonne, also known as the [`metric ton`][isq.us_customary.TON_METRIC] in the
+U.S."""
 U = (Decimal("1.660538782e-27") * KG).alias("unified_atomic_mass_unit")
 # NOTE: `amu` is not acceptable [SP811 Table 7]
 """Unified atomic mass unit, also known as the `dalton`."""
@@ -200,19 +211,46 @@ EV = (CONST_ELEMENTARY_CHARGE * J).alias("electronvolt", allow_prefix=True)
 """Electronvolt, the kinetic energy acquired by an electron in passing through a
 potential difference of 1 [volt][isq.V] in vacuum."""
 
-# logarithmic quantities [ISO 80000-3:2006] [SP811 8.7]
-# NOTE: not defining the abstract neper, bel and decibel. maybe use factory fn?
-DBV = Logarithmic(V, quantity_type="field", log_base=10, name="dBV")
-DBUV = Logarithmic(MICRO * V, quantity_type="field", log_base=10, name="dBμV")
-NPV = Logarithmic(
-    V, quantity_type="field", log_base=_E, name="NpV", allow_prefix=True
-)
 
-DBM = Logarithmic(MILLI * W, quantity_type="power", log_base=10, name="dBm")
-DBW = Logarithmic(W, quantity_type="power", log_base=10, name="dBW")
-NPW = Logarithmic(
-    W, quantity_type="power", log_base=_E, name="NpW", allow_prefix=True
-)
+# logarithmic quantities [ISO 80000-3:2006] [SP811 8.7]
+# TODO: bel
+def decibel(
+    reference: BaseUnit | Exp | Mul | Scaled | Aliased | Tagged,
+    quantity_type: Literal["field", "power"],
+    name: str,
+) -> Logarithmic:
+    if not name.startswith("dB"):
+        raise ValueError(f"{name=} should start with `dB`")
+    return Logarithmic(
+        reference, quantity_type=quantity_type, log_base=10, name=name
+    )
+
+
+def neper(
+    reference: BaseUnit | Exp | Mul | Scaled | Aliased | Tagged,
+    quantity_type: Literal["field", "power"],
+    name: str,
+) -> Logarithmic:
+    if not name.startswith("Np"):
+        raise ValueError(f"{name=} should start with `Np`")
+    return Logarithmic(
+        reference,
+        quantity_type=quantity_type,
+        log_base=_E,
+        name=name,
+        allow_prefix=True,
+    )
+
+
+# TODO: a-weighting
+DBV = decibel(V, "field", "dBV")
+DBUV = decibel(MICRO * V, "field", "dBμV")
+DBZ = decibel((MILLI * M) ** 6 * M**-3, "field", "dBZ")
+NPV = neper(V, quantity_type="field", name="NpV")
+
+DBM = decibel(MILLI * W, "power", "dBm")
+DBW = decibel(W, "power", "dBW")
+NPW = neper(W, quantity_type="power", name="NpW")
 # information theory [ISO 80000-1, Annex C]
 # TODO: bit, baud, erlang
 _NUMBER = BaseUnit(BaseDimension("_number"), name="number")
@@ -242,13 +280,13 @@ CONST_STANDARD_GRAVITY: Annotated[Decimal, M_PERS2] = Decimal("9.80665")
 """Standard acceleration of gravity, defined by the 3rd CGPM (1901)."""
 G0 = CONST_STANDARD_GRAVITY * M_PERS2  # for KGF and LBF
 MMHG = (
-    LazyFactor((CONST_DENSITY_HG, CONST_STANDARD_GRAVITY)) * (MILLI * M)
+    LazyProduct((CONST_DENSITY_HG, CONST_STANDARD_GRAVITY)) * (MILLI * M)
 ).alias("millimeter_of_hg")
 """Millimeter of mercury, a unit of pressure."""
 CONST_DENSITY_H2O: Annotated[int, KG * CU_M**-1] = 1000
 """Conventional density of water. For use in [isq.MMH2O][]."""
 MMH2O = (
-    LazyFactor((CONST_DENSITY_H2O, CONST_STANDARD_GRAVITY)) * (MILLI * M)
+    LazyProduct((CONST_DENSITY_H2O, CONST_STANDARD_GRAVITY)) * (MILLI * M)
 ).alias("millimeter_of_h2o")
 """Millimeter of water (conventional), a unit of pressure."""  # [H44 C-59, footnote 12]
 CURIE = (Decimal("3.7e10") * BQ).alias("curie")
@@ -257,7 +295,7 @@ The SI unit [becquerel][isq.BQ] is preferred."""
 ROENTGEN = (Decimal("2.58e-4") * (C * KG**-1)).alias("roentgen")
 """Roentgen, a legacy unit of exposure to ionizing radiation.
 The SI unit [coulomb][isq.C] per [kilogram][isq.KG] is preferred."""
-RAD_ABSORBED = (Fraction(1, 100) * GY).alias("rd")
+RD_ABSORBED = (Fraction(1, 100) * GY).alias("rd")
 """Rad, a legacy unit of absorbed dose. The SI unit [gray][isq.GY] is preferred.
 Not to be confused with the [radian][isq.RAD]."""
 REM = (Fraction(1, 100) * SV).alias("rem")

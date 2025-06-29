@@ -11,8 +11,8 @@ from fractions import Fraction
 import pytest
 
 from isq import (
-    Factor,
-    LazyFactor,
+    LazyProduct,
+    Number,
 )
 
 LP = 8
@@ -22,7 +22,7 @@ HP = 50
 
 @dataclass
 class LFCase:
-    products_input: tuple[tuple[Factor, Fraction | int] | Factor, ...]
+    products_input: tuple[tuple[Number, Fraction | int] | Number, ...]
     expected_value: Fraction | str | None
     precision: int | None
     expected_exception: type[Exception] | None
@@ -143,7 +143,7 @@ LF_CASES = [
 def test_lazy_product(
     tc: LFCase,
 ) -> None:
-    lpwe = LazyFactor(tc.products_input)
+    lpwe = LazyProduct(tc.products_input)
 
     with localcontext() as ctx:
         if tc.precision is not None:

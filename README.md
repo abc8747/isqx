@@ -2,7 +2,7 @@
 
 A tiny dependency-free Python library to define, manipulate, and convert units/dimensions based on the International System of Quantities.
 
-Unlike mature unit-checking libraries like [`astropy.units`](https://github.com/astropy/astropy) which encapsulate your data types in a new object (a `numpy.ndarray` becomes a `Quantity`), this library **does not perform runtime dimensional homogenity checks**.
+Unlike mature unit-checking libraries like [`astropy.units`](https://github.com/astropy/astropy) which encapsulate numerical values in a new object (a `numpy.ndarray * unit` becomes a `Quantity`), this library **does not perform runtime dimensional homogenity checks**.
 
 At the current state, it merely serves to enable writing machine-readable, structured documentation.
 
@@ -20,69 +20,85 @@ At the current state, it merely serves to enable writing machine-readable, struc
         ...
     ```
     - the type is kept intact as `T`, with zero runtime overhead (see [PEP 593](https://typing.python.org/en/latest/spec/qualifiers.html#annotated))
-    - enables powerful runtime introspection of `x` with `typing.get_type_hints()`.
+    - powerful runtime introspection of `x` with `typing.get_type_hints()`.
     - delegates the type checking to a [separate tool](#type-checking)
     - centralised source of truth
     - supports documentation generators like `mkdocs` and intersphinx
     - incremental, optional adoption
     - use in `dataclass`, `TypedDict`, `NamedTuple`...
-- Units and dimensions are represented as an immutable expression tree, much like SymPy.
-    ```py
-    from isq import N, KG
-
-    # N = Alias(Mul((KG, M, Exp(S, -2))), name="newton")
-    ACCELERATION = N * KG**-1
-    print(ACCELERATION)  # repr: Mul((N, Exp(KG, -1)))
-    print(ACCELERATION.simplify())  # repr: Mul((M, Exp(S, -2)))
+- Units and dimensions are represented as an immutable expression tree, much like SymPy. The `simplify` function folds it into a flat, canonical form.
+    ```pycon
+    >>> from isq.us_customary import PSI
+    >>> print(PSI)
+    psi
+    - psi = lbf · inch⁻²
+      - lbf = pound · 9.80665 · (meter · second⁻²)
+        - pound = 0.45359237 · kilogram
+      - inch = 1/12 · foot
+        - foot = 0.3048 · meter
+    >>> from isq import simplify
+    >>> print(simplify(PSI))
+    0.45359237 · 9.80665 · (1/12)⁻² · 0.3048⁻² · (kilogram · meter⁻¹ · second⁻²)
     ```
-    Ordering is preserved. The `simplify()` method reduces the complex nested tree into a flat canonical form (product of base units raised to powers, potentially scaled).
-- The `to()` method returns a callable that allow you to convert between compatible units.
-    ```py
-    from isq import FT, MIN, M, S, Mul, Exp
-
-    # FT = Scaled(M, factor=Decimal("0.3048"))
-    # MIN = Scaled(S, factor=60)
-    FT_PER_MIN = FT * MIN**-1
-    M_PER_S = M * S**-1
-    fpm2mps = FT_PER_MIN.to(M_PER_S)
-    print(fpm2mps(100.0))  # 0.508
-    print(FT_PER_MIN.to(M_PER_S, exact=True)(1000))  # Fraction(127, 25)
+    The final factor is lazily evaluated, enabling exact arithmetic for financial applications.
+- The `convert` function returns a callable that allow you to convert between compatible units.
+    ```pycon
+    >>> from isq import M, S, MIN, convert
+    >>> from isq.us_customary import FT
+    >>> fpm2mps = convert(FT * MIN**-1, M * S**-1)
+    >>> fpm2mps
+    Converter(scale=0.00508, offset=0.0)
+    >>> fpm2mps(7200.0)
+    36.576
+    >>> convert(M, FT, exact=True)(11000)
+    Fraction(13750000, 381)
     ```
-    The callable is compatible with many libraries, including `numpy` and `jax.jit`. Exact arithmetic is supported, useful for financial applications.
+    The callable is compatible with many libraries, including `numpy` and `jax.jit`.
 - Define your own units without DSL.
-    ```py
-    from fractions import Fraction
-    from isq import FT, M, Scaled
-
-    SMOOT = ((5 + Fraction(7, 12)) * FT).alias("smoot")
-    print(SMOOT.to(M, exact=True)(Fraction("364.4")))  # 7751699/12500
+    ```pycon
+    >>> from fractions import Fraction
+    >>> from isq import M, convert
+    >>> from isq.us_customary import FT
+    >>> SMOOT = ((5 + Fraction(7, 12)) * FT).alias("smoot")
+    >>> print(SMOOT)
+    smoot
+    - smoot = 67/12 · foot
+      - foot = 0.3048 · meter
+    >>> convert(SMOOT, M, exact=True)(Fraction("364.4"))
+    Fraction(7751699, 12500)
     ```
 - Different quantities often share the same physical dimension but are semantically distinct. For example:
-    - geopotential vs geometric altitude (ft)
-    - true vs ground speed (knots)
+    - geopotential vs geometric altitude (ft), true vs ground speed (knots), $V_\text{rms}$ vs $V_\text{pp}$
     - inertial vs body vs wind reference frames
+    - Reynolds number of pipe diameter vs. chord
     - $\Delta U = Q - W$, kinetic vs potential vs enthalpy vs Gibbs free energy (joules)
     - nominal vs real, capex vs opex (money)
     - force in the x, y and z directions (newtons)
 
     Create a *kind of quantity* which can materialise to a `Tagged` class:
-    ```py
-    from isq import QtyKind, Mul, Exp, M_PERS, KNOT
-
-    GS = QtyKind(M_PERS, context=("airspeed", "ground"))
-    TAS = QtyKind(M_PERS, context=("airspeed", "true"))
-    
-    M_PERS_GS = GS[M_PERS] # repr: Tagged(M_PERS, context=("airspeed", "ground"))
-    KNOT_GS = GS[KNOT] # repr: Tagged(KNOT, context=("airspeed", "ground"))
-
-    (TAS[KNOT] / GS[KNOT]).simplify() # NOT dimensionless.
-    # TAS[KNOT].to(GS[KNOT])  # errors due to contextual mismatch
+    ```pycon
+    >>> from isq.aerospace import TAS, IAS
+    >>> TAS
+    QtyKind(unit_si=..., context=('airspeed', 'true'))
+    >>> IAS
+    QtyKind(unit_si=..., context=('airspeed', 'indicated'))
+    >>> from isq.us_customary import KNOT
+    >>> TAS[KNOT]
+    Tagged(reference=..., context=('airspeed', 'true'))
+    >>> from isq import simplify, convert, M, S
+    >>> simplify(TAS[KNOT] / IAS[KNOT]) # does not reduce to dimensionless!
+    Mul(terms=(Exp(Tagged(...), -1), Tagged(...)))
+    >>> convert(TAS[KNOT], TAS[M * S**-1]) # only works for matching context
+    Converter(scale=0.5144444444444445, offset=0.0)
+    >>> convert(IAS[KNOT], TAS[KNOT]) # fails!
+    isq.core.DimensionMismatchError: ...
     ```
 
 ## TODOs
 
-- convert `Expr` objects to various string representations (`siunitx`, LaTeX, ASCII, etc).
-- potentially, create a `mkdocs` plugin that serialises them
+- support more string representations (e.g. LaTeX)
+  - compile LaTeX to SVG and manipulate symbols
+- mindmap
 
 ### Type checking
 

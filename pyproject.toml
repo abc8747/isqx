@@ -9,20 +9,24 @@ description = "A system for representing physical units"
 readme = "README.md"
 authors = [{ name = "Abraham Cheung", email = "abraham@ylcheung.com" }]
 requires-python = ">=3.9"
-dependencies = []
 
 [dependency-groups]
 dev = ["ipykernel>=6.29.5"]
 lint = ["ruff>=0.11.12"]
-test = [
-    "pytest>=8.3.5",
-    "pytest-cov>=6.1.1",
-]
+test = ["pytest>=8.3.5", "pytest-cov>=6.1.1"]
 typing = ["mypy>=1.16.0"]
-docs = ["mkdocs-material[imaging]>=9.6.14", "mkdocstrings-python>=1.16.11"]
+docs = [
+    "mkdocs-material[imaging]>=9.6.14",
+    "mkdocstrings-python>=1.16.11",
+    "griffe",
+]
 
 [tool.uv]
 default-groups = "all"
+
+# remove once https://github.com/mkdocstrings/griffe/pull/389 is merged
+[tool.uv.sources]
+griffe = { git = "https://github.com/cathaypacific8747/griffe.git", rev = "fix/expression-parentheses" }
 
 [tool.ruff]
 line-length = 80
