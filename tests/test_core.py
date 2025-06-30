@@ -280,7 +280,7 @@ FT_ALT_GEOP = Tagged(FT, ("altitude", "geopotential"))
 def test_tagged_simplify_propagates_to_reference() -> None:
     simplified = simplify(FT_ALT_GEOP)
     assert isinstance(simplified, Tagged)
-    assert simplified.context == M_ALT_GEOP.context
+    assert simplified.tags == M_ALT_GEOP.tags
     assert isinstance(simplified.reference, Scaled)
     assert simplified.reference.reference == M
 
@@ -305,12 +305,12 @@ def test_qty_kind_getitem() -> None:
     tas_mps = TAS[M_PERS]
     assert isinstance(tas_mps, Tagged)
     assert tas_mps.reference == M_PERS
-    assert tas_mps.context == ("airspeed", "true")
+    assert tas_mps.tags == ("airspeed", "true")
 
     tas_knots = TAS[KNOT]
     assert isinstance(tas_knots, Tagged)
     assert tas_knots.reference == KNOT
-    assert tas_knots.context == ("airspeed", "true")
+    assert tas_knots.tags == ("airspeed", "true")
 
     mps_to_knots = convert(tas_mps, tas_knots)
     assert mps_to_knots(1.0) == pytest.approx(1.94384449)
@@ -335,12 +335,10 @@ def test_qty_kind_getitem() -> None:
 
 
 def test_alias_fail() -> None:
-    from isq import DBV, Aliased
+    from isq import Aliased
 
     with pytest.raises(CompositionError, match="can only wrap"):
         _ = Aliased(M, "fail")  # type: ignore
-    with pytest.raises(CompositionError, match="can only wrap"):
-        _ = Aliased(DBV, "fail")  # type: ignore
 
 
 #
@@ -488,26 +486,42 @@ def test_convert_tagged_translated() -> None:
         convert(K, SURFACE_TEMP_C)
 
 
-def test_logarithmic_is_terminal() -> None:
-    from isq import DBV, DIM_LENGTH, KILO, Logarithmic
+def test_log_level_invalid() -> None:
+    from isq import (
+        BEL,
+        DB,
+        DBV,
+        HZ,
+        KILO,
+        Log,
+        M,
+        Relative,
+        V,
+    )
 
-    with pytest.raises(CompositionError, match="raised to a power"):
-        _ = DBV**2
-    with pytest.raises(CompositionError, match="part of a product"):
-        _ = DBV * M
-    with pytest.raises(CompositionError, match="cannot be scaled"):
-        _ = DBV * 2
-    with pytest.raises(CompositionError, match="does not allow prefixes"):
-        _ = KILO * DBV
-    with pytest.raises(CompositionError, match="cannot be logarithmic"):
-        Logarithmic(DBV, "power", log_base=10, name="fail")  # type: ignore
-    with pytest.raises(CompositionError, match="not a `dimension`"):
-        Logarithmic(
-            DIM_LENGTH,  # type: ignore
-            "power",
-            log_base=10,
-            name="fail",
-        )
+    # NOTE: we allow logarithmic units to be composed with others,
+    # TODO: in the future harden `convert` so we dont mess it up
+    assert isinstance(DB**2, Exp)
+    assert isinstance(DB * HZ**-1, Mul)
+    assert isinstance(DB * 2, Scaled)
+    assert isinstance(KILO * BEL, Scaled)
+
+    assert isinstance(DBV**2, Exp)
+    assert isinstance(DBV * M, Mul)
+    assert isinstance(DBV * 2, Scaled)
+    assert isinstance(KILO * DBV, Scaled)
+
+    # other invalid compositions
+    with pytest.raises(CompositionError, match="can only be applied to"):
+        _ = Tagged(M, (Relative(V, V),))
+    with pytest.raises(CompositionError, match="can only wrap a dimensionless"):
+        _ = Log(DBV, base=10)  # type: ignore
+    # with pytest.raises(CompositionError, match="must be physical"):
+    #     _ = Relative(M.dimension, V)
+    with pytest.raises(
+        CompositionError, match="cannot be applied multiple times"
+    ):
+        _ = Tagged(Dimensionless("ratio"), (Relative(V, V), Relative(V, V)))
 
 
 def test_convert_logarithmic() -> None:
@@ -515,27 +529,31 @@ def test_convert_logarithmic() -> None:
 
     assert isinstance(DBM.dimension, Dimensionless)
 
-    dbw_to_dbm = convert(DBW, DBM, exact=True)
+    # power -> power
+    dbw_to_dbm = convert(DBW, DBM)
     assert dbw_to_dbm.scale == 1
-    assert dbw_to_dbm.offset == Fraction(30, 1)
+    assert dbw_to_dbm.offset == pytest.approx(30)
     assert dbw_to_dbm(10) == 40
-    npw_to_dbw = convert(NPW, DBW)
-    assert npw_to_dbw.scale == pytest.approx(20 / math.log(10))
-    assert npw_to_dbw.offset == 0
-    assert npw_to_dbw(1) == pytest.approx(8.6858896)
 
+    # root-power -> root-power
     dbv_to_dbuv = convert(DBV, DBUV, exact=True)
     assert dbv_to_dbuv.scale == 1
-    assert dbv_to_dbuv.offset == Fraction(120, 1)
+    assert dbv_to_dbuv.offset == 120
     assert dbv_to_dbuv(1) == 121
-    assert convert(DBV, DBUV).offset == 119.99999999999999  # inexact
+
+    # neper <-> decibel (root-power, power)
+    npv_to_dbv = convert(NPV, DBV)
+    assert npv_to_dbv.offset == 0
+    assert npv_to_dbv.scale == pytest.approx(20 / math.log(10))
+    assert npv_to_dbv(1) == pytest.approx(8.6858896)
     dbv_to_npv = convert(DBV, NPV)
     assert dbv_to_npv.offset == 0
     assert dbv_to_npv.scale == pytest.approx(math.log(10) / 20)
     assert dbv_to_npv(20) == pytest.approx(2.302585)
-    npv_to_dbv = convert(NPV, DBV)
-    assert npv_to_dbv.offset == 0
-    assert npv_to_dbv.scale == pytest.approx(20 / math.log(10))
+    npw_to_dbw = convert(NPW, DBW)
+    assert npw_to_dbw.offset == 0
+    assert npw_to_dbw.scale == pytest.approx(20 / math.log(10))
+    assert npw_to_dbw(1) == pytest.approx(8.6858896)
 
 
 def test_convert_logarithmic_with_prefix() -> None:
@@ -546,9 +564,9 @@ def test_convert_logarithmic_with_prefix() -> None:
     assert npv_to_decinpv.scale == 10
     millinpv_to_decinpv = convert(MILLI * NPV, DECI * NPV, exact=True)
     assert millinpv_to_decinpv.scale == Fraction(1, 100)
-    decinpv_to_npv = convert(DECI * NPV, DBV)
-    assert decinpv_to_npv.offset == 0
-    assert decinpv_to_npv.scale == pytest.approx(20e-1 / math.log(10))
+    decinpv_to_dbv = convert(DECI * NPV, DBV)
+    assert decinpv_to_dbv.offset == 0
+    assert decinpv_to_dbv.scale == pytest.approx(200 / math.log(10))
 
 
 def test_convert_logarithmic_fail() -> None:

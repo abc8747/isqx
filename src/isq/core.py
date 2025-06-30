@@ -30,7 +30,7 @@ from typing import (
 from typing_extensions import TypeAlias, assert_never
 
 if TYPE_CHECKING:
-    from .fmt import _FormatSpec, _Formatter
+    from .fmt import Formatter, _FormatSpec
 
 
 @runtime_checkable
@@ -69,7 +69,7 @@ class AliasMixin:
 
 
 class FormatMixin:
-    def __format__(self, fmt: _FormatSpec | str | _Formatter) -> str:
+    def __format__(self, fmt: _FormatSpec | str | Formatter) -> str:
         from .fmt import fmt as format_
 
         return format_(self, fmt=fmt)  # type: ignore
@@ -93,7 +93,7 @@ class ExprBase(ABC, FormatMixin):
     | [scaled expression][isq.Scaled]²⁴          | `Scaled(M, 0.3048)`       |
     | [aliased][isq.Aliased]¹                    | [newton][isq.N] = kg m s⁻²|
     | [translated expression][isq.Translated]³   | `Translated(K, -273.15)`  |
-    | [logarithmic quantity][isq.Logarithmic]¹³  | [decibel-volt][isq.DBV]   |
+    | [logarithmic expression][isq.Log]¹³        | [dB][isq.DB]              |
     | [tagged][isq.Tagged]⁵                      | true vs ground speed      |
 
     ¹ these expressions are associated with a [name][isq.NamedExpr].
@@ -166,7 +166,9 @@ class ExprBase(ABC, FormatMixin):
     def __truediv__(self, rhs: LazyProduct | Number) -> Scaled: ...
 
     def __truediv__(self, rhs: Expr | LazyProduct | Number) -> Mul | Scaled:
-        if isinstance(rhs, Expr):  # type: ignore
+        if not isinstance(
+            rhs, (LazyProduct, SupportsDecimal, Decimal, Fraction, float, int)
+        ):
             return self * rhs**-1  # type: ignore
 
         return Scaled(
@@ -264,12 +266,6 @@ class Exp(AliasMixin, ExprBase):
                     f"absolute reference `{ref.reference}` instead?"
                 ),
             )  # prevent ℃². J ℃⁻¹ should be written as J K⁻¹
-        elif isinstance(ref, Logarithmic):
-            raise CompositionError(
-                outer=Exp,
-                inner=ref,
-                msg="logarithmic units are terminal and cannot be raised to a power.",
-            )
 
     @property
     def dimension(self) -> Exp:
@@ -305,12 +301,6 @@ class Mul(AliasMixin, ExprBase):
                     msg="`Translated` units (like ℃) are terminal and cannot be part of a product.",
                     help=f"use its absolute reference `{ref.reference}` instead.",
                 )  # prevent ℃ * ℃
-            elif isinstance(ref, Logarithmic):
-                raise CompositionError(
-                    outer=Mul,
-                    inner=ref,
-                    msg="`Logarithmic` units are terminal and cannot be part of a product.",
-                )
             kinds.append(term.kind)
         unique_kinds = set(kinds) - {"dimensionless"}
         if len(unique_kinds) != 1:
@@ -333,7 +323,7 @@ class Mul(AliasMixin, ExprBase):
 
 @dataclass(frozen=True)
 class Scaled(AliasMixin, ExprBase):
-    reference: BaseUnit | Exp | Mul | Scaled | Aliased | Tagged | Logarithmic
+    reference: BaseUnit | Exp | Mul | Scaled | Aliased | Tagged | Log
     """The unit or dimension that this unit or dimension is based on."""
     factor: Number | LazyProduct | Prefix
     """The exact factor to multiply to this unit to convert it to the reference.
@@ -359,18 +349,13 @@ class Scaled(AliasMixin, ExprBase):
                 msg=f"factor must be a number, not {type(self.factor).__name__}.",
             )
         ref = _unwrap_tagged_or_aliased(self.reference)
-        if isinstance(ref, Translated) or (
-            isinstance(ref, Logarithmic) and not ref.allow_prefix
-        ):
+        if isinstance(ref, Translated):
             raise CompositionError(
                 outer=Scaled,
                 inner=self.reference,
-                msg=(
-                    "`Translated` units (like ℃) and most logarithmic units "
-                    "(like dBV) cannot be scaled."
-                ),
-            )  # prevent 13 * ℃, milli(decibel)
-        # TODO: prevent BaseDimension and Dimensionless from being scaled
+                msg=f"`{type(self.factor).__name__} cannot be scaled.",
+            )  # prevent 13 * ℃
+        # TODO: prevent BaseDimension from being scaled
 
     @property
     def dimension(self) -> Expr:
@@ -382,6 +367,37 @@ class Scaled(AliasMixin, ExprBase):
 
 
 @dataclass(frozen=True)
+class Log(AliasMixin, ExprBase):
+    """The logarithm of a dimensionless expression."""
+
+    reference: Dimensionless | Tagged
+    """A dimensionless expression"""
+    # NOTE: while we should support Exp: log(a^b) = b * log(a), the latter is actually the more "simple" version
+    # NOTE: we should also support Mul: log(a * a**-1) is fine, but again we must simplify before we know if its really dimensionless.
+    base: Number
+    """The base of the logarithm, e.g. 10 for bel, e for neper."""
+
+    def __post_init__(self) -> None:
+        if not isinstance(inner := self.reference, (Dimensionless, Tagged)) or (
+            isinstance(inner, Tagged)
+            and not isinstance(inner.reference, Dimensionless)
+        ):
+            raise CompositionError(
+                outer=Log,
+                inner=inner,
+                msg="`Log` can only wrap a dimensionless number",
+            )
+
+    @property
+    def dimension(self) -> Dimensionless:
+        return Dimensionless(f"log_{repr(self.reference)}")
+
+    @property
+    def kind(self) -> Literal["dimensionless"]:
+        return "dimensionless"
+
+
+@dataclass(frozen=True)
 class Aliased(Named, ExprBase):
     """An alias for an expression, used to give a more readable name.
 
@@ -389,7 +405,7 @@ class Aliased(Named, ExprBase):
     [simplification][isq.simplify] will effectively elide this class.
     """
 
-    reference: Exp | Mul | Scaled
+    reference: Exp | Mul | Scaled | Tagged | Log
     """Expression to be aliased, e.g. `Mul((KG, M, Exp(S, -2)))`"""
     name: Name
     """Name of this alias, e.g. `newton`"""
@@ -398,12 +414,13 @@ class Aliased(Named, ExprBase):
     This should only be true for some units like `liter`."""
 
     def __post_init__(self) -> None:
-        ref = self.reference
-        if not isinstance(self.reference, (Exp, Mul, Scaled)):
+        if not isinstance(
+            ref := self.reference, (Exp, Mul, Scaled, Tagged, Log)
+        ):
             raise CompositionError(
                 outer=Aliased,
                 inner=ref,
-                msg="`Aliased` can only wrap an `Exp`, `Mul`, or `Scaled` expression.",
+                msg="`Aliased` can only wrap an `Exp`, `Mul`, `Scaled`, `Tagged`, or `Log` expression.",
             )
 
     @property
@@ -451,100 +468,77 @@ class Translated(Named, ExprBase):
 
 
 @dataclass(frozen=True)
-class Logarithmic(Named, ExprBase):
-    r"""A logarithmic unit, representing a level of a quantity.
+class Tagged(AliasMixin, ExprBase):
+    """An expression decorated with one of more semantic context tag.
 
-    A level $L$ is defined as the ratio between a quantity to its reference:
-    $$
-    L = k \cdot \log_{b}\left(\frac{Q}{Q_\text{ref}}\right)
-    $$
-    The parameters $k$ and $b$ are determined by the specific unit:
+    Similar to how:
+    - `Annotated[T, M1, M2, ...]` attaches metadata to some type `T`,
+    - `Tagged(E, (C1, C2, ...))` attaches context to an [expression][isq.Expr].
 
-    - Neper (Np): The coherent SI unit for level.
-        - $b = e$
-        - $k=1$ for field quantities (e.g., [V][isq.V], [A][isq.A], [Pa][isq.PA]).
-        - $k=1/2$ for power quantities (e.g., [W][isq.W], W/m²).
-    - Bel (B) and Decibel (dB):
-        - $b = 10$
-        - $k=20$ for field quantities.
-        - $k=10$ for power quantities.
+    This allows one to "disambiguate" between quantities that share the same
+    physical dimension, but have different meanings, e.g.
+    geopotential altitude vs. geometric altitude.
     """
 
-    reference: BaseUnit | Exp | Mul | Scaled | Aliased | Tagged
-    """The linear unit being measured (e.g., V for dBV, W for dBm)"""
-    quantity_type: Literal["power", "field"]
-    """Whether the reference is a power or a field quantity."""
-    log_base: Number
-    """The base of the logarithm (e.g., 10, 2, [isq.E][])"""
-    name: Name
-    allow_prefix: bool = False
-    """Whether prefixes can be applied to the logarithmic unit (e.g., mNp)."""
-
-    def __post_init__(self) -> None:
-        ref = _unwrap_tagged_or_aliased(self.reference)
-        if isinstance(ref, (Logarithmic, Translated)):
-            raise CompositionError(
-                outer=Logarithmic,
-                inner=ref,
-                msg="reference for a `Logarithmic` cannot be logarithmic or translated.",
-                help="it must be a linear unit (e.g. `V`, `W`).",
-            )
-        if ref.kind != "unit":
-            raise CompositionError(
-                outer=Logarithmic,
-                inner=ref,
-                msg=f"reference must be a physical unit, not a `{ref.kind}`.",
-                help="a logarithmic unit must be based on a quantity with a physical unit.",
-            )
-
-    @property
-    def level_factor(self) -> Number:
-        """Determines the multiplicative factor (e.g., 10 or 20 for dB)."""
-        if self.log_base == 10:  # decibels
-            return 10 if self.quantity_type == "power" else 20
-        elif self.log_base is E:  # nepers
-            return 1 if self.quantity_type == "field" else Fraction(1, 2)
-        else:  # bits (log_base=2)
-            return 1
-
-    @property
-    def dimension(self) -> Dimensionless:
-        return Dimensionless(f"log_level_{hash(self)}")
-
-    @property
-    def kind(self) -> Literal["dimensionless"]:
-        return "dimensionless"
-
-
-@dataclass(frozen=True)
-class Tagged(ExprBase):
-    """An concrete unit expression decorated with a semantic context tag.
-
-    This is used to disambiguate between quantities that share the same
-    physical dimension but have different meanings, e.g.,
-    geopotential altitude vs. geometric altitude."""
-
     reference: _TaggedAllowedExpr
-    context: tuple[Hashable, ...]
-    """A tuple of hashable tags, e.g. `("alt", "geopotential")`."""
+    tags: tuple[Tag, ...]
 
     def __post_init__(self) -> None:
         if isinstance(self.reference, Tagged):
             raise CompositionError(
                 outer=Tagged,
                 inner=self.reference,
-                msg="nesting `Tagged` expressions is not allowed.",
-                help='use a tuple of contexts instead, e.g. `("alt", "geopotential")`.',
+                msg="nesting `Tagged` expressions is not allowed. to add tags, use `Tagged.add()`.",
             )
+        for tag in self.tags:
+            if isinstance(tag, SupportsTagCheck):
+                tag.__tag_check__(self.reference, self.tags)
 
     @property
-    def dimension(self) -> Tagged:
-        return Tagged(self.reference.dimension, self.context)  # type: ignore
+    def dimension(self) -> Tagged | Expr:
+        ref_dim = self.reference.dimension
+        # note: log level's dimension is always dimensionless
+        # so we need to strip away tags that dont make any more sense
+        tags = []
+        for tag in self.tags:
+            if isinstance(tag, SupportsTagCheck):
+                try:
+                    tag.__tag_check__(ref_dim, self.tags)
+                except CompositionError:
+                    continue
+            tags.append(tag)
+        if not tags:
+            return ref_dim
+        return Tagged(ref_dim, tuple(tags))  # type: ignore
 
     @property
     def kind(self) -> ExprKind:
         return self.reference.kind
 
+
+@runtime_checkable
+class SupportsTagCheck(Hashable, Protocol):
+    def __tag_check__(
+        self,
+        reference: Expr,
+        tags: tuple[Tag, ...],
+    ) -> None:
+        """Validate that this tag can be applied to the given expression.
+
+        For example, this can be used to ensure:
+        - `decibel` (log level) with log reference unit `voltage` but not
+        - `reynolds number` with log reference unit `voltage`.
+
+        :param reference: The expression to apply the tags to.
+        :param tags: The tags being applied to the expression.
+            This can be used to enforce complex rules (e.g. no duplicates)
+        :raises CompositionError: if the tag cannot be applied to the expression
+        """
+        ...
+
+
+Tag: TypeAlias = Union[SupportsTagCheck, Hashable]
+"""Any hashable object, for example, frozen dataclasses or strings."""
 
 # using sealed unions instead of ExprBase to facilitate static type checking
 Expr: TypeAlias = Union[
@@ -556,11 +550,11 @@ Expr: TypeAlias = Union[
     Scaled,
     Aliased,
     Translated,
-    Logarithmic,
+    Log,
     Tagged,
 ]
 NamedExpr: TypeAlias = Union[
-    Dimensionless, BaseDimension, BaseUnit, Aliased, Translated, Logarithmic
+    Dimensionless, BaseDimension, BaseUnit, Aliased, Translated
 ]
 _TaggedAllowedExpr: TypeAlias = Union[
     Dimensionless,
@@ -571,14 +565,25 @@ _TaggedAllowedExpr: TypeAlias = Union[
     Scaled,
     Aliased,
     Translated,
-    Logarithmic,  # e.g. dB(A)
+    Log,
 ]  # avoid nesting tags
 _ComposableExpr: TypeAlias = Union[
-    Dimensionless, BaseDimension, BaseUnit, Exp, Mul, Scaled, Aliased, Tagged
-]  # avoid terminal (translated/logarithmic) from being further composed
+    Dimensionless,
+    BaseDimension,
+    BaseUnit,
+    Exp,
+    Mul,
+    Scaled,
+    Aliased,
+    Tagged,
+    Log,  # dB/m and dB/Hz should be allowed, though with extra care in conversion
+]  # avoid terminal (translated) from being further composed
+PhysicalUnit: TypeAlias = Union[
+    BaseUnit, Exp, Mul, Scaled, Aliased, Tagged
+]  # for use in relative
 
 #
-# factories for expressions
+# other objects that are not expressions but key to the system
 #
 
 
@@ -594,8 +599,8 @@ class Prefix:
     name: str
     """Name of this prefix, e.g. `milli`, `kibi`"""
 
-    def mul(self, rhs: BaseUnit | Aliased | Tagged | Logarithmic) -> Scaled:
-        if not isinstance(rhs, (BaseUnit, Aliased, Tagged, Logarithmic)):
+    def mul(self, rhs: BaseUnit | Aliased | Tagged) -> Scaled:
+        if not isinstance(rhs, (BaseUnit, Aliased, Tagged)):
             raise CompositionError(
                 outer=Scaled,
                 inner=rhs,
@@ -626,7 +631,7 @@ class Prefix:
                 )
         elif isinstance(rhs, Tagged) and not isinstance(
             (ref := _unwrap_tagged_or_aliased(rhs)),
-            (BaseUnit, Aliased, Logarithmic),
+            (BaseUnit, Aliased),
         ):
             raise CompositionError(
                 outer=Scaled,
@@ -634,13 +639,7 @@ class Prefix:
                 msg="prefixes cannot be applied to this type of tagged expression.",
                 help=f"the inner reference is `{type(ref).__name__}`, which cannot be prefixed.",
             )
-        elif isinstance(rhs, Logarithmic):
-            if not rhs.allow_prefix:
-                raise CompositionError(
-                    outer=Scaled,
-                    inner=rhs,
-                    msg=f"the logarithmic unit `{rhs.name}` does not allow prefixes.",
-                )
+        # TODO: robustly handle Scaled(Log())
         return Scaled(rhs, self)
 
 
@@ -655,32 +654,60 @@ class QtyKind:
 
     unit_si: _TaggedAllowedExpr
     """The SI unit, e.g. `M_PERS` for speed"""
-    context: tuple[Hashable, ...]
-    """A tuple of hashable tags, e.g. `("alt", "geopotential")`."""
+    tags: tuple[Tag, ...]
 
     def __getitem__(self, unit: _TaggedAllowedExpr) -> Tagged:
         """Attach a specific unit to this kind of quantity."""
         if unit is self.unit_si:
-            return Tagged(self.unit_si, context=self.context)
+            return Tagged(self.unit_si, tags=self.tags)
 
         dim_unit = simplify(unit).dimension
         dim_unit_self = simplify(self.unit_si).dimension
         if dim_unit != dim_unit_self:
             raise UnitKindMismatchError(self, unit, dim_unit_self, dim_unit)
-        return Tagged(unit, context=self.context)
+        return Tagged(unit, tags=self.tags)
 
 
-SimplifiedExpr: TypeAlias = Union[
-    Dimensionless,
-    BaseDimension,
-    BaseUnit,
-    Exp,
-    Mul,
-    Scaled,
-    Translated,
-    Logarithmic,
-    Tagged,
-]  # no Aliased
+# special tags
+
+
+@dataclass(frozen=True)
+class Relative(SupportsTagCheck):
+    measured: PhysicalUnit
+    reference: PhysicalUnit
+
+    def __tag_check__(
+        self,
+        reference: Expr,
+        tags: tuple[Tag, ...],
+    ) -> None:
+        if not isinstance(reference, Dimensionless):
+            raise CompositionError(
+                outer=Relative,
+                inner=reference,
+                msg="tag `Relative` can only be applied to a `Dimensionless` expression.",
+            )
+        # TODO: check that measured/reference are actually units
+        _check_duplicate_tags(self, tags)
+
+    def __hash__(self) -> int:
+        return hash((self.__class__.__name__, self.measured, self.reference))
+
+
+def _check_duplicate_tags(
+    tag: Tag,
+    tags: tuple[Tag, ...],
+) -> None:
+    if (n_tags := tags.count(tag)) > 1:
+        raise CompositionError(
+            outer=Tagged,
+            inner=tag,
+            msg=(
+                f"tag {type(tag).__name__} cannot be applied multiple times, "
+                f"found {n_tags} occurrences."
+            ),
+        )
+
 
 #
 # simplify
@@ -690,6 +717,18 @@ SimplifiedExpr: TypeAlias = Union[
 # that will require linear algebra to solve the dimensional exponents but
 # we're leaving that as optional and far in the future.
 
+SimplifiedExpr: TypeAlias = Union[
+    Dimensionless,
+    BaseDimension,
+    BaseUnit,
+    Exp,
+    Mul,
+    Scaled,
+    Translated,
+    Log,
+    Tagged,
+]  # no Aliased
+
 
 @overload
 def simplify(expr: Dimensionless) -> Dimensionless: ...
@@ -698,11 +737,11 @@ def simplify(expr: BaseDimension) -> BaseDimension: ...
 @overload
 def simplify(expr: BaseUnit) -> BaseUnit: ...
 @overload
-def simplify(expr: Translated) -> Translated: ...
-@overload
 def simplify(expr: Aliased) -> SimplifiedExpr: ...
 @overload
-def simplify(expr: Logarithmic) -> Logarithmic: ...
+def simplify(expr: Translated) -> Translated: ...
+@overload
+def simplify(expr: Log) -> Log: ...
 @overload
 def simplify(expr: Tagged) -> Tagged: ...
 @overload
@@ -716,11 +755,9 @@ def simplify(
     Mul,
     Scaled,
     Translated,
-    Logarithmic,
 ]: ...
 
 
-# TODO: Expr is too wide: alias should never be returned.
 def simplify(expr: Expr) -> SimplifiedExpr:
     if isinstance(expr, (Dimensionless, BaseDimension, BaseUnit)):
         return expr
@@ -732,16 +769,8 @@ def simplify(expr: Expr) -> SimplifiedExpr:
             expr.offset,
             expr.name,
         )
-    if isinstance(expr, Logarithmic):
-        return Logarithmic(
-            simplify(expr.reference),  # type: ignore
-            expr.quantity_type,
-            expr.log_base,
-            expr.name,
-            expr.allow_prefix,
-        )
     if isinstance(expr, Tagged):
-        return Tagged(simplify(expr.reference), expr.context)  # type: ignore
+        return Tagged(simplify(expr.reference), expr.tags)  # type: ignore
     base_exponent_pairs: dict[SimplifiedExpr, Exponent] = {}
     scaled_conversions: list[tuple[Scaled, Exponent]] = []
     _decompose_expr(expr, 1, base_exponent_pairs, scaled_conversions)
@@ -777,14 +806,7 @@ def _decompose_expr(
         )
     elif isinstance(
         expr,
-        (
-            Dimensionless,
-            BaseDimension,
-            BaseUnit,
-            Tagged,
-            Translated,
-            Logarithmic,
-        ),
+        (Dimensionless, BaseDimension, BaseUnit, Tagged, Translated, Log),
     ):
         # we hit a fundamental-like unit (we treat tagged as unique bases).
         # add its accumulated exponent
@@ -891,6 +913,38 @@ class Converter:
         return value * self.scale + self.offset
 
 
+class _LogInfo(NamedTuple):
+    k: Number | LazyProduct
+    b: Number
+    q_measured: PhysicalUnit
+    q_ref: PhysicalUnit
+    other_tags: tuple[Tag, ...]
+
+
+def _get_log_info(info: _ConversionInfo) -> _LogInfo | None:
+    if not isinstance(info.expr, Log):
+        return None
+    log_expr = info.expr
+    if not isinstance(log_expr.reference, Tagged):
+        return None
+    relative_tag = None
+    other_tags: list[Tag] = []
+    for tag in log_expr.reference.tags:
+        if isinstance(tag, Relative):
+            relative_tag = tag
+        else:
+            other_tags.append(tag)
+    if relative_tag is None:
+        return None
+    return _LogInfo(
+        k=info.factor,
+        b=log_expr.base,
+        q_measured=relative_tag.measured,
+        q_ref=relative_tag.reference,
+        other_tags=tuple(other_tags),
+    )
+
+
 def convert(
     origin: Expr,
     target: Expr,
@@ -909,35 +963,23 @@ def convert(
 
     info_origin = _flatten(origin_simpl)
     info_target = _flatten(target_simpl)
-    origin_core_expr = info_origin.expr
-    target_core_expr = info_target.expr
-    is_origin_log = isinstance(origin_core_expr, Logarithmic)
-    is_target_log = isinstance(target_core_expr, Logarithmic)
-    if is_origin_log and is_target_log:
-        # NOTE: convert_logarithmic calls convert again, which is not ideal for
-        # performance.
-        base_converter = _convert_logarithmic(
-            origin_core_expr,  # type: ignore
-            target_core_expr,  # type: ignore
-            exact=exact,
-            ctx=ctx,
-        )
-        # prefixed log units:
-        # v_target_prefixed = (scale_base * v_origin_prefixed) + offset_base
-        # v_target = (scale_base * factor_origin / factor_target) * v_origin
-        #            + (offset_base / factor_target)
-        origin_prefix_f = _factor_to_fraction(info_origin.factor, ctx=ctx)
-        target_prefix_f = _factor_to_fraction(info_target.factor, ctx=ctx)
-        base_scale_f = _factor_to_fraction(base_converter.scale, ctx=ctx)
-        base_offset_f = _factor_to_fraction(base_converter.offset, ctx=ctx)
 
-        final_scale = base_scale_f * origin_prefix_f / target_prefix_f
-        final_offset = base_offset_f / target_prefix_f
-        return Converter(
-            scale=final_scale if exact else float(final_scale),
-            offset=final_offset if exact else float(final_offset),
-        )
-    elif is_origin_log or is_target_log:
+    log_info_origin = _get_log_info(info_origin)
+    log_info_target = _get_log_info(info_target)
+
+    if log_info_origin and log_info_target:
+        if not (
+            log_info_origin.b == log_info_target.b
+            and log_info_origin.q_measured == log_info_target.q_measured
+            and log_info_origin.q_ref == log_info_target.q_ref
+            and log_info_origin.other_tags == log_info_target.other_tags
+        ):
+            return _convert_logarithmic(
+                log_info_origin, log_info_target, exact=exact, ctx=ctx
+            )
+        # if the underlying log unit is the same (same base and reference qty type),
+        # then it's a simple linear scaling (e.g. Np -> dNp)
+    elif log_info_origin or log_info_target:
         raise NonLinearConversionError(
             origin=origin,
             target=target,
@@ -981,8 +1023,8 @@ def convert(
 
 
 def _convert_logarithmic(
-    origin_simpl: Logarithmic,
-    target_simpl: Logarithmic,
+    origin_info: _LogInfo,
+    target_info: _LogInfo,
     *,
     exact: bool,
     ctx: decimal.Context,
@@ -990,49 +1032,51 @@ def _convert_logarithmic(
     r"""
     With $L_1 = k_1 \log_{b_1}\left(\frac{Q}{Q_{\text{ref}_1}}\right)$,
     $L_2 = k_2 \log_{b_2}\left(\frac{Q}{Q_{\text{ref}_2}}\right)
-    = \underbrace{\left(\frac{k_2\ln b_1}{k_1\ln b_2}\right)}_\text{scale}
+    = \underbrace{\left(\frac{k_2}{k_1}\frac{\ln b_1}{\ln b_2}\right)}_\text{scale}
     L_1 + \underbrace{k_2 \log_{b_2}\left(\frac{Q_{\text{ref}_1}}
     {Q_{\text{ref}_2}}\right)}_\text{offset}$
     """
-    origin_ref_dim = simplify(origin_simpl.reference).dimension
-    target_ref_dim = simplify(target_simpl.reference).dimension
-    if origin_ref_dim != target_ref_dim:  # e.g. dBV -> dBm
+    if origin_info.other_tags != target_info.other_tags:
         raise DimensionMismatchError(
-            origin_simpl.reference,
-            target_simpl.reference,
-            origin_ref_dim,
-            target_ref_dim,
+            origin_info.q_measured,
+            target_info.q_measured,
+            simplify(origin_info.q_measured).dimension,
+            simplify(target_info.q_measured).dimension,
         )
 
     ref_converter = convert(
-        origin=origin_simpl.reference,
-        target=target_simpl.reference,
-        exact=exact,
+        origin=origin_info.q_ref,
+        target=target_info.q_ref,
+        exact=True,
         ctx=ctx,
-    )  # needed for e.g. dBm <-> dBW, dBV <-> dBμV
-    ref_ratio = ref_converter.scale  # Q_ref1 / Q_ref2, e.g. W -> mW: 1000
+    )
+    if ref_converter.offset != 0:
+        raise NonLinearConversionError(origin_info.q_ref, target_info.q_ref)
 
-    b1 = origin_simpl.log_base
-    b2 = target_simpl.log_base
-    k1 = _factor_to_fraction(origin_simpl.level_factor, ctx=ctx)
-    k2 = _factor_to_fraction(target_simpl.level_factor, ctx=ctx)
+    k1 = _factor_to_fraction(origin_info.k, ctx=ctx)
+    k2 = _factor_to_fraction(target_info.k, ctx=ctx)
+    b1 = origin_info.b
+    b2 = target_info.b
+    ref_ratio_f = _factor_to_fraction(ref_converter.scale, ctx=ctx)
     k_ratio = k2 / k1
-    if exact:  # ln is transcendental, tiny precision loss expected
+
+    if exact:
         b1_d = _fraction_to_decimal(_factor_to_fraction(b1, ctx=ctx))
-        ln_b2_d = _fraction_to_decimal(_factor_to_fraction(b2, ctx=ctx)).ln(ctx)
-        ln_ref_ratio_d = _fraction_to_decimal(
-            _factor_to_fraction(ref_ratio, ctx=ctx)
-        ).ln(ctx)
-        return Converter(
-            scale=k_ratio * Fraction(b1_d.ln(ctx)) / Fraction(ln_b2_d),
-            offset=k2 * Fraction(ln_ref_ratio_d / ln_b2_d),
-        )
+        b2_d = _fraction_to_decimal(_factor_to_fraction(b2, ctx=ctx))
+        ref_ratio_d = _fraction_to_decimal(ref_ratio_f)
+
+        ln_b1_d = b1_d.ln(ctx)
+        ln_b2_d = b2_d.ln(ctx)
+        ln_ref_ratio_d = ref_ratio_d.ln(ctx)
+
+        scale = k_ratio * Fraction(ln_b1_d) / Fraction(ln_b2_d)
+        offset = k2 * Fraction(ln_ref_ratio_d) / Fraction(ln_b2_d)
+        return Converter(scale=scale, offset=offset)
     else:
-        ln_b2_f = math.log(float(b2))
-        return Converter(
-            scale=float(k_ratio) * math.log(float(b1)) / ln_b2_f,
-            offset=float(k2) * (math.log(float(ref_ratio)) / ln_b2_f),
-        )
+        ln_b2_fl = math.log(float(b2))
+        scale_fl = float(k_ratio) * math.log(float(b1)) / ln_b2_fl
+        offset_fl = float(k2) * math.log(float(ref_ratio_f)) / ln_b2_fl
+        return Converter(scale=scale_fl, offset=offset_fl)
 
 
 class _ConversionInfo(NamedTuple):
@@ -1050,7 +1094,7 @@ def _flatten(
     """Recursively flattens an expression into its absolute base unit."""
     if isinstance(
         expr_simpl,
-        (BaseUnit, BaseDimension, Dimensionless, Logarithmic, Exp, Mul),
+        (BaseUnit, BaseDimension, Dimensionless, Log, Exp, Mul),
     ):
         # since `Exp(Scaled(x, a), b)` → `Scaled(Exp(x, b), a * b)`
         # similarly, `Mul((Scaled(...),))` → `Scaled(Mul((...),),)`
@@ -1064,7 +1108,7 @@ def _flatten(
     elif isinstance(expr_simpl, Tagged):
         info_ref = _flatten(expr_simpl.reference)  # type: ignore
         return _ConversionInfo(
-            Tagged(info_ref.expr, expr_simpl.context),  # type: ignore
+            Tagged(info_ref.expr, expr_simpl.tags),  # type: ignore
             info_ref.factor,
             info_ref.offset,
         )
@@ -1090,10 +1134,11 @@ def _flatten(
 
 
 def _unwrap_tagged_or_aliased(expr: Expr) -> Expr:
-    # `Translated` and `Logarithmic` are terminal, this plugs a loophole
-    # NOTE: Alias(Alias(...)) and Tagged(Tagged(...)) is not allowed
+    # `Translated` and `Log` are terminal, this plugs a loophole
+    # NOTE: while Aliased(Aliased(...)) and Tagged(Tagged(...)) are disallowed,
+    # Aliased(Tagged(...)) is allowed, so we need to unwrap recursively.
     if isinstance(expr, (Tagged, Aliased)):
-        return expr.reference
+        return _unwrap_tagged_or_aliased(expr.reference)
     return expr
 
 
@@ -1283,6 +1328,9 @@ class _E(SupportsDecimal):
     def __abs__(self) -> _E:
         return self
 
+    def __str__(self) -> str:
+        return "𝑒"
+
 
 @final
 class _PI(SupportsDecimal):
@@ -1309,6 +1357,9 @@ class _PI(SupportsDecimal):
     def __abs__(self) -> _PI:
         return self
 
+    def __str__(self) -> str:
+        return "π"
+
 
 E: Final = _E()
 PI: Final = _PI()
@@ -1325,7 +1376,7 @@ class IsqError(Exception):
 
 @dataclass
 class CompositionError(IsqError):
-    outer: type[Expr]
+    outer: type
     inner: Any
     msg: str
     help: str | None = None
@@ -1384,8 +1435,8 @@ class DimensionMismatchError(IsqError):
 
     def __str__(self) -> str:  # pragma: no cover
         return (
-            f"cannot convert from `{self.origin}` to `{self.target}` due to "
-            "incompatible dimensions."
+            f"cannot convert from `{self.origin}` to `{self.target}`."
+            "\nhelp: expected compatible dimensions, but found:"
             f"\ndimension of origin: `{self.dim_origin}`"
             f"\ndimension of target: `{self.dim_target}`"
         )
@@ -1400,7 +1451,7 @@ class UnitKindMismatchError(IsqError):
 
     def __str__(self) -> str:  # pragma: no cover
         return (
-            f"cannot create tagged unit for kind `{self.kind.context}` with "
+            f"cannot create tagged unit for kind `{self.kind.tags}` with "
             f"unit `{self.unit}`."
             f"\nexpected dimension of kind: `{self.dim_kind}`"
             f" (`{self.kind.unit_si}`)"

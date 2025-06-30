@@ -17,7 +17,7 @@ def test_fmt_basic_tagged() -> None:
     M_PERS_TAS = TAS[M_PERS]
     assert (
         fmt(M_PERS_TAS, fmt=BasicFormatter())
-        == """(meter · second⁻¹)(context=('airspeed', 'true'))"""
+        == "(meter · second⁻¹)['airspeed', 'true']"
     )
 
 
@@ -30,13 +30,23 @@ def test_fmt_basic_translated() -> None:
     )
 
 
-def test_fmt_basic_logarithmic() -> None:
-    from isq import NPV
+def test_fmt_basic_log() -> None:
+    from isq import DB
 
     assert (
-        fmt(NPV, fmt=BasicFormatter(verbose=True))
-        == """NpV
-- NpV = field level, reference value of volt (base 𝑒, allows prefix)
+        fmt(DB, fmt=BasicFormatter(verbose=True))
+        == """decibel
+- bel = log₁₀(ratio)"""
+    )
+
+
+def test_fmt_basic_log_level() -> None:
+    from isq import DBU
+
+    assert (
+        fmt(DBU, fmt=BasicFormatter(verbose=True))
+        == """dBu
+- dBu = 20 · log₁₀(ratio[`volt` relative to `(0.6¹⸍² · volt)`])
   - volt = watt · ampere⁻¹
     - watt = joule · second⁻¹
       - joule = newton · meter

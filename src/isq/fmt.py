@@ -17,7 +17,6 @@ from typing import (
 from typing_extensions import TypeAlias, assert_never
 
 from .core import (
-    PI,
     Aliased,
     BaseDimension,
     BaseUnit,
@@ -27,39 +26,44 @@ from .core import (
     Exponent,
     Expr,
     LazyProduct,
-    Logarithmic,
+    Log,
     Mul,
     Name,
     NamedExpr,
     Number,
     Prefix,
+    Relative,
     Scaled,
     Tagged,
     Translated,
 )
 
 _FormatSpec: TypeAlias = Literal["basic"]
-_DefinableExpr: TypeAlias = Union[Aliased, Translated, Logarithmic, Tagged]
+_DefinableExpr: TypeAlias = Union[Aliased, Translated, Log, Tagged]
 
 
-def fmt(expr: Expr, fmt: _FormatSpec | str | _Formatter = "basic") -> str:
-    if isinstance(fmt, _Formatter):
+def fmt(expr: Expr, fmt: _FormatSpec | str | Formatter = "basic") -> str:
+    if isinstance(fmt, Formatter):
         return "".join(fmt.fmt(expr))
     if fmt == "" or fmt == "basic":
-        return "".join(BasicFormatter().fmt(expr))
+        return "".join(BasicFormatter(verbose=True).fmt(expr))
     raise NotImplementedError(f"unknown format {fmt=}")
 
 
 @runtime_checkable
-class _Formatter(Protocol):
+class Formatter(Protocol):
     def fmt(self, expr: Expr) -> Generator[str, None, None]: ...
 
 
 class Precedence(IntEnum):
     NONE = auto()
-    """Virtual precedence, not a Python expression."""
+    """Virtual precedence, not a Python expression.
+    
+    Use this when the parent already is in a parenthesised group and you want to
+    guarantee that the child will not add any additional parentheses."""
     MUL = auto()
     SCALED = auto()
+    LOG = auto()
     TAGGED = auto()
     EXP = auto()
     ATOM = auto()
@@ -70,6 +74,8 @@ def precedence(expr: Expr) -> Precedence:
         return Precedence.MUL
     elif isinstance(expr, Scaled):
         return Precedence.SCALED
+    elif isinstance(expr, Log):
+        return Precedence.LOG
     elif isinstance(expr, Tagged):
         return Precedence.TAGGED
     elif isinstance(expr, Exp):
@@ -82,7 +88,6 @@ def precedence(expr: Expr) -> Precedence:
             Dimensionless,
             Aliased,
             Translated,
-            Logarithmic,
         ),
     ):
         return Precedence.ATOM
@@ -115,9 +120,7 @@ class Visitor(Protocol[_VisitorState, _VisitorResult]):
         self, expr: Translated, state: _VisitorState
     ) -> _VisitorResult: ...
 
-    def visit_logarithmic(
-        self, expr: Logarithmic, state: _VisitorState
-    ) -> _VisitorResult: ...
+    def visit_log(self, expr: Log, state: _VisitorState) -> _VisitorResult: ...
 
 
 def visit_expr(
@@ -137,13 +140,14 @@ def visit_expr(
         return visitor.visit_tagged(expr, state)
     elif isinstance(expr, Translated):
         return visitor.visit_translated(expr, state)
-    elif isinstance(expr, Logarithmic):
-        return visitor.visit_logarithmic(expr, state)
+    elif isinstance(expr, Log):
+        return visitor.visit_log(expr, state)
     else:
         assert_never(expr)
 
 
 _BASIC_EXPONENT_MAP = str.maketrans("0123456789-/", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻⸍")
+_BASIC_SUBSCRIPT_MAP = str.maketrans("0123456789-/", "₀₁₂₃₄₅₆₇₈₉₋⸝")
 
 
 @dataclass
@@ -165,7 +169,7 @@ class _BasicFormatterState:
 
 @dataclass
 class BasicFormatter(
-    Visitor[_BasicFormatterState, Generator[str, None, None]], _Formatter
+    Visitor[_BasicFormatterState, Generator[str, None, None]], Formatter
 ):
     overrides: dict[Name, str] = field(default_factory=dict)
     verbose: bool = False
@@ -199,24 +203,13 @@ class BasicFormatter(
         yield f"\n{'  ' * depth}- {name} = "
 
         state = _BasicFormatterState()
-        expr_gen = self.visit(expr.reference, state)
         if isinstance(expr, Translated):
-            yield from expr_gen
+            yield from self.visit(expr.reference, state)
             yield (
                 f" + {o}" if float(o := expr.offset) >= 0 else f" - {abs(o)}"
             )
-        elif isinstance(expr, Logarithmic):
-            yield f"{expr.quantity_type} level, reference value of "
-            yield from expr_gen
-            yield " (base "
-            yield (
-                "𝑒" if (b := expr.log_base) is E else "π" if b is PI else str(b)
-            )
-            if expr.allow_prefix:
-                yield ", allows prefix"
-            yield ")"
         else:
-            yield from expr_gen
+            yield from self.visit(expr.reference, state)
 
         for sub_name, sub_expr in state.definitions.items():
             yield from self._fmt_definition(
@@ -246,7 +239,7 @@ class BasicFormatter(
         name_formatted = self.overrides.get(name, name)
         yield name_formatted
         if (
-            isinstance(expr, (Aliased, Translated, Logarithmic))
+            isinstance(expr, (Aliased, Translated))
             and name_formatted not in state.definitions
         ):
             state.definitions[name_formatted] = expr
@@ -254,9 +247,25 @@ class BasicFormatter(
     def visit_tagged(
         self, expr: Tagged, state: _BasicFormatterState
     ) -> Generator[str, None, None]:
-        with state._set_parent_precedence(precedence(expr)):
+        precedence_expr = precedence(expr)
+        with state._set_parent_precedence(precedence_expr):
             yield from self.visit(expr.reference, state)
-        yield f"(context={expr.context})"
+        yield "["
+        num_tags = len(expr.tags)
+        for i, tag in enumerate(expr.tags):
+            if isinstance(tag, Relative):
+                yield "`"
+                with state._set_parent_precedence(precedence_expr):
+                    yield from self.visit(tag.measured, state)
+                yield "` relative to `"
+                with state._set_parent_precedence(precedence_expr):
+                    yield from self.visit(tag.reference, state)
+                yield "`"
+            else:
+                yield repr(tag)
+            if i < num_tags - 1:
+                yield ", "
+        yield "]"
 
     def visit_exp(
         self, expr: Exp, state: _BasicFormatterState
@@ -291,10 +300,18 @@ class BasicFormatter(
     ) -> Generator[Name, None, None]:
         yield from self.visit_named(expr, state)
 
-    def visit_logarithmic(
-        self, expr: Logarithmic, state: _BasicFormatterState
+    def visit_log(
+        self, expr: Log, state: _BasicFormatterState
     ) -> Generator[Name, None, None]:
-        yield from self.visit_named(expr, state)
+        if expr.base is E:
+            yield "ln"
+        else:
+            yield "log"
+            yield str(expr.base).translate(_BASIC_SUBSCRIPT_MAP)
+        yield "("
+        with state._set_parent_precedence(precedence(expr)):
+            yield from self.visit(expr.reference, state)
+        yield ")"
 
     @staticmethod
     def _fmt_product(term: Number | tuple[Number, Exponent]) -> str:

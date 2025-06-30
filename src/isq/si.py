@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from fractions import Fraction
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import Annotated
 
 from .core import PI as _PI
 from .core import (
@@ -25,14 +25,13 @@ from .core import (
     BaseUnit,
     Dimensionless,
     LazyProduct,
-    Logarithmic,
+    Log,
     Prefix,
+    Relative,
+    Tagged,
     Translated,
 )
 from .core import E as _E
-
-if TYPE_CHECKING:
-    from .core import Aliased, Exp, Mul, Scaled, Tagged
 
 #
 # base units [SI page 130 & section 2.3.3] [IUPAP1 page 20 & table 4]
@@ -71,7 +70,7 @@ RAD = Dimensionless("radian")
 """Radian, a unit of plane angle. Not to be confused with m m⁻¹."""
 SR = Dimensionless("steradian")
 """Steradian, a unit of solid angle. Not to be confused with m² m⁻²."""
-HZ = (S**-1).alias("hertz", allow_prefix=True)
+HZ = (Tagged(S**-1, ("frequency",))).alias("hertz", allow_prefix=True)
 """Hertz, a unit of frequency. Shall only be used for periodic phenomena."""
 M_PERS = M * S**-1
 M_PERS2 = M * S**-2
@@ -109,13 +108,15 @@ LM = (CD * SR).alias("lumen", allow_prefix=True)
 """Lumen, a unit of luminous flux."""
 LX = (LM * M**-2).alias("lux", allow_prefix=True)
 """Lux, a unit of illuminance."""
-BQ = (S**-1).alias("becquerel", allow_prefix=True)
+BQ = (Tagged(S**-1, ("activity",))).alias("becquerel", allow_prefix=True)
 """Becquerel, a unit of activity referred to a radionuclide. Shall only be used for
 stochastic processes in activity referred to a radionuclide.
 Not to be confused with "radioactivity"."""
-GY = (J * KG**-1).alias("gray", allow_prefix=True)
+GY = (Tagged(J * KG**-1, ("absorbed_dose",))).alias("gray", allow_prefix=True)
 """Gray, a unit of absorbed dose and kerma."""
-SV = (J * KG**-1).alias("sievert", allow_prefix=True)
+SV = (Tagged(J * KG**-1, ("dose_equivalent",))).alias(
+    "sievert", allow_prefix=True
+)
 """Sievert, a unit of dose equivalent."""
 KAT = (MOL * S**-1).alias("katal", allow_prefix=True)
 """Katal, a unit of catalytic activity."""
@@ -213,59 +214,83 @@ potential difference of 1 [volt][isq.V] in vacuum."""
 
 
 # logarithmic quantities [ISO 80000-3:2006] [SP811 8.7]
-# TODO: bel
-def decibel(
-    reference: BaseUnit | Exp | Mul | Scaled | Aliased | Tagged,
-    quantity_type: Literal["field", "power"],
-    name: str,
-) -> Logarithmic:
-    if not name.startswith("dB"):
-        raise ValueError(f"{name=} should start with `dB`")
-    return Logarithmic(
-        reference, quantity_type=quantity_type, log_base=10, name=name
-    )
+RATIO = Dimensionless("ratio")
+"""A generic ratio of two quantities."""
+BEL = Log(RATIO, base=10).alias("bel", allow_prefix=True)
+r"""Bel, a logarithmic unit of a generic ratio.
+When used for a power quantity, it is $L_B = \log_{10}(P/P_{ref})$.
+The decibel (dB) is more commonly used."""
+NEPER = Log(RATIO, base=_E).alias("neper", allow_prefix=True)
+r"""Neper, a logarithmic unit of a generic ratio.
+When used for a root-power quantity, it is $L_{Np} = \ln(F/F_{ref})$."""
 
+DB = DB_POWER = DECI * BEL
+r"""A decibel level for a power quantity,
+$L_{dB} = 10 \log_{10}(\text{ratio})$."""
+DB_ROOT_POWER = 2 * (DECI * BEL)
+r"""A decibel level for a root-power (field) quantity,
+$L_{dB} = 20 \log_{10}(\text{ratio})$."""
 
-def neper(
-    reference: BaseUnit | Exp | Mul | Scaled | Aliased | Tagged,
-    quantity_type: Literal["field", "power"],
-    name: str,
-) -> Logarithmic:
-    if not name.startswith("Np"):
-        raise ValueError(f"{name=} should start with `Np`")
-    return Logarithmic(
-        reference,
-        quantity_type=quantity_type,
-        log_base=_E,
-        name=name,
-        allow_prefix=True,
-    )
+# decibel levels for root-power quantities (voltage)
+DBV = (20 * Log(Tagged(RATIO, (Relative(V, V),)), base=10)).alias(
+    "dBV", allow_prefix=True
+)
+"""Decibel, voltage relative to 1 volt, regardless of impedance."""
+_DBU_REF = LazyProduct(((Decimal("0.6"), Fraction(1, 2)),)) * V
+DBU = (20 * Log(Tagged(RATIO, (Relative(V, _DBU_REF),)), base=10)).alias(
+    "dBu", allow_prefix=True
+)
+"""Decibel, voltage relative to ~0.775 V (the voltage that dissipates 1 mW in a 600 Ω load)."""
+DBMV = (20 * Log(Tagged(RATIO, (Relative(V, MILLI * V),)), base=10)).alias(
+    "dBmV", allow_prefix=True
+)
+"""Decibel, voltage relative to 1 millivolt."""
+DBUV = (20 * Log(Tagged(RATIO, (Relative(V, MICRO * V),)), base=10)).alias(
+    "dBμV", allow_prefix=True
+)
+"""Decibel, voltage relative to 1 microvolt."""
 
+# decibel levels for power quantities
+Z_METEO = (MILLI * M) ** 6 * M**-3
+DBZ = (10 * Log(Tagged(RATIO, (Relative(Z_METEO, Z_METEO),)), base=10)).alias(
+    "dBZ", allow_prefix=True
+)
+"""Decibel, reflectivity factor Z for weather radar."""
+DBM = (10 * Log(Tagged(RATIO, (Relative(W, MILLI * W),)), base=10)).alias(
+    "dBm", allow_prefix=True
+)
+"""Decibel, power relative to 1 milliwatt."""
+DBW = (10 * Log(Tagged(RATIO, (Relative(W, W),)), base=10)).alias(
+    "dBW", allow_prefix=True
+)
+"""Decibel, power relative to 1 watt."""
 
-# TODO: a-weighting
-DBV = decibel(V, "field", "dBV")
-DBUV = decibel(MICRO * V, "field", "dBμV")
-DBZ = decibel((MILLI * M) ** 6 * M**-3, "field", "dBZ")
-NPV = neper(V, quantity_type="field", name="NpV")
+# neper levels
+NPV = Log(Tagged(RATIO, (Relative(V, V),)), base=_E).alias(
+    "NpV", allow_prefix=True
+)
+"""Neper, voltage relative to 1 volt."""
+NPW = (Fraction(1, 2) * Log(Tagged(RATIO, (Relative(W, W),)), base=_E)).alias(
+    "NpW", allow_prefix=True
+)
+r"""Neper, power relative to 1 watt."""
 
-DBM = decibel(MILLI * W, "power", "dBm")
-DBW = decibel(W, "power", "dBW")
-NPW = neper(W, quantity_type="power", name="NpW")
 # information theory [ISO 80000-1, Annex C]
-# TODO: bit, baud, erlang
-_NUMBER = BaseUnit(BaseDimension("_number"), name="number")
-SHANNON = Logarithmic(
-    reference=_NUMBER, quantity_type="field", log_base=2, name="shannon"
-)
-"""Logarithmic unit of information (base 2)."""
-NAT = Logarithmic(
-    reference=_NUMBER, quantity_type="field", log_base=_E, name="nat"
-)
-"""Natural unit of information (base e)."""
-HARTLEY = Logarithmic(
-    reference=_NUMBER, quantity_type="field", log_base=10, name="hartley"
-)
-"""Logarithmic unit of information (base 10), also known as a `ban` or `dit`."""
+# TODO: baud, erlang
+BIT = Dimensionless("bit")
+SHANNON = Log(BIT, base=2).alias("shannon")
+"""Logarithmic level of information (base 2)."""
+NAT = Log(BIT, base=_E).alias("nat")
+"""Natural level of information (base e)."""
+HARTLEY = Log(BIT, base=10).alias("hartley")
+"""Logarithmic level of information (base 10), also known as a `ban` or `dit`."""
+# misc
+ACTIVITY = Dimensionless("activity")
+"""Activity, a measure of the effective concentration of a species in a mixture."""
+KA = Dimensionless("Ka")
+"""Acid dissociation constant, a measure of the strength of an acid in solution."""
+PH = (-1 * Log(Tagged(ACTIVITY, ("H+",)), base=10)).alias("pH")
+PKA = (-1 * Log(KA, base=10)).alias("pKa")
 
 # [SP811 table 9]
 ANGSTROM = (Fraction(1, 10**10) * M).alias("angstrom")
