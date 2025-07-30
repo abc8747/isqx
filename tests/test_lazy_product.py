@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import (
     Decimal,
     InvalidOperation,
+    getcontext,
     localcontext,
 )
 from fractions import Fraction
@@ -145,12 +146,13 @@ def test_lazy_product(
 ) -> None:
     lpwe = LazyProduct(tc.products_input)
 
+    ctx_old = getcontext()
     with localcontext() as ctx:
         if tc.precision is not None:
             ctx.prec = tc.precision
         if tc.expected_exception:
             with pytest.raises(tc.expected_exception):
-                lpwe.to_exact()
+                lpwe.to_exact(ctx=ctx_old)
         else:
             result_exact = lpwe.to_exact(ctx=ctx)
             result_approx = lpwe.to_approx()

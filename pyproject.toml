@@ -5,28 +5,32 @@ build-backend = "hatchling.build"
 [project]
 name = "isq"
 version = "0.1.0"
-description = "A system for representing physical units"
+description = "Units and quantity kinds defined by ISO/IEC 80000."
 readme = "README.md"
 authors = [{ name = "Abraham Cheung", email = "abraham@ylcheung.com" }]
 requires-python = ">=3.9"
+dependencies = ["typing-extensions>=4.0.0; python_version<'3.10'"]
 
 [dependency-groups]
-dev = ["ipykernel>=6.29.5"]
+dev = ["ipykernel>=6.29.5", "typer>=0.16.0"]
 lint = ["ruff>=0.11.12"]
 test = ["pytest>=8.3.5", "pytest-cov>=6.1.1"]
 typing = ["mypy>=1.16.0"]
 docs = [
     "mkdocs-material[imaging]>=9.6.14",
     "mkdocstrings-python>=1.16.11",
-    "griffe",
+    "griffe>=1.8.0",
 ]
+wikidata = ["httpx>=0.28.1", "polars>=1.31.0"]
+
+[project.entry-points."mkdocs.plugins"]
+isq = "isq.mkdocs.plugin:IsqPlugin"
+
+[project.entry-points."mkdocstrings.python.templates"]
+isq = "isq.mkdocs.extension:get_templates_path"
 
 [tool.uv]
 default-groups = "all"
-
-# remove once https://github.com/mkdocstrings/griffe/pull/389 is merged
-[tool.uv.sources]
-griffe = { git = "https://github.com/cathaypacific8747/griffe.git", rev = "fix/expression-parentheses" }
 
 [tool.ruff]
 line-length = 80
@@ -43,14 +47,13 @@ strict = true
 check_untyped_defs = true
 ignore_missing_imports = true
 warn_no_return = true
-warn_return_any = true
 warn_redundant_casts = true
 warn_unused_configs = true
 warn_unused_ignores = true
-disable_error_code = "has-type" # avoid need to spam N: Mul = Mul
 
 [tool.coverage.report]
 exclude_also = [
     # ellipsis in protocol
     "\\.\\.\\.",
+    "assert_never\\(.*\\)",
 ]

@@ -1,35 +1,58 @@
 """
 Units and quantities common in aerospace engineering.
 
-References:
-
-- [ICAO] "Annex 5 - Units of Measurement to be Used in the Air and Ground Services," ICAO. [Online].
-    Available: https://store.icao.int/en/annex-5-units-of-measurement-to-be-used-in-the-air-and-ground-services
+See: [isq._citations.ICAO][]
 """
 # TODO: ISO 2533:1975 (standard atmosphere)
 # TODO: ISO 1151
 
-from .core import Dimensionless, QtyKind
-from .si import HOUR, KG, KWH, M_PERS, MIN, PA, RAD, K, L, M, W
-from .us_customary import FT
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Annotated, Literal
+
+from ._core import DELTA, Dimensionless, OriginAt, QtyKind, Quantity, slots
+from ._iso80000 import (
+    ALTITUDE,
+    DYNAMIC_PRESSURE,
+    HOUR,
+    KG,
+    M_PERS,
+    MASS,
+    MASS_FLOW_RATE,
+    MIN,
+    PA,
+    POWER,
+    PRESSURE,
+    RAD,
+    TEMPERATURE,
+    K,
+    L,
+    M,
+    N,
+    S,
+)
+from .usc import FT
 
 #
 # aircraft performance: state
 #
 
 # heading: [0, 360) degrees
-HEADING_TRUE = QtyKind(RAD, ("heading", "true"))
-HEADING_MAG = QtyKind(RAD, ("heading", "magnetic"))
-HEADING_TRUE_WIND = QtyKind(RAD, ("heading", "true", "wind"))
-HEADING_MAG_WIND = QtyKind(RAD, ("heading", "magnetic", "wind"))
+HEADING = QtyKind(RAD, ("heading",))
+HEADING_TRUE = HEADING["true"]
+HEADING_MAG = HEADING["magnetic"]
+HEADING_TRUE_WIND = HEADING_TRUE["wind"]
+HEADING_MAG_WIND = HEADING_MAG["wind"]
 
-ALT_PRESSURE = QtyKind(M, ("altitude", "pressure"))
+PRESSURE_ALTITUDE = ALTITUDE["pressure"]
 """Pressure altitude, as measured by the altimeter."""
-ALT_DENSITY = QtyKind(M, ("altitude", "density"))
+DENSITY_ALTITUDE = ALTITUDE["density"]
 """Density altitude, as measured by the altimeter."""
-ALT_GEOP = QtyKind(M, ("altitude", "geopotential"))
+GEOPOTENTIAL_ALTITUDE = ALTITUDE["geopotential"]
 """Geopotential altitude, as measured from mean sea level."""
-ALT_GEOM = QtyKind(M, ("altitude", "geometric"))
+GEOMETRIC_ALTITUDE = ALTITUDE["geometric"]
 """Geometric altitude, as measured from mean sea level."""
 # height: measured from *specific* datum
 ELEVATION = QtyKind(M, ("elevation",))  # ICAO 1.5
@@ -42,50 +65,59 @@ K_PERM = K * M**-1
 """Kelvin per meter, a unit of temperature gradient. For use in ISA."""
 
 #
-# aircraft parameters and geometry
+# aircraft design
 #
 
 _AC = "aircraft"
 _ENGINE = "engine"
 _MAX = "maximum"
 # mass: ICAO 2.8
-GROSS = QtyKind(KG, (_AC, "gross"))
-CARGO_CAPACITY = QtyKind(KG, (_AC, "cargo_capacity"))
-FUEL_CAPACITY = QtyKind(KG, (_AC, "fuel_capacity", "gravimetric"))
-MTOW = QtyKind(KG, (_AC, "takeoff_weight", _MAX))
-MZFW = QtyKind(KG, (_AC, "zero_fuel_weight", _MAX))
-PAYLOAD = QtyKind(KG, (_AC, "payload"))
-LANDING_WEIGHT = QtyKind(KG, (_AC, "landing_weight"))
-MLW = QtyKind(KG, (_AC, "landing_weight", _MAX))
+AIRCRAFT_MASS = MASS[_AC]
+GROSS = AIRCRAFT_MASS["gross"]
+CARGO_CAPACITY = AIRCRAFT_MASS["cargo_capacity"]
+FUEL_CAPACITY = AIRCRAFT_MASS["fuel_capacity"]
+TAKEOFF_WEIGHT = AIRCRAFT_MASS["takeoff_weight"]
+MTOW = TAKEOFF_WEIGHT[_MAX]
+ZFW = AIRCRAFT_MASS["zero_fuel_weight"]
+MZFW = ZFW[_MAX]
+PAYLOAD = AIRCRAFT_MASS["payload"]
+LANDING_WEIGHT = AIRCRAFT_MASS["landing_weight"]
+MLW = LANDING_WEIGHT[_MAX]
 
 TANK_CAPACITY = QtyKind(L, (_AC, "tank_capacity"))  # ICAO 1.14
 
-ENDURANCE = QtyKind(HOUR, ("aircraft", "endurance"))  # ICAO 1.6
+ENDURANCE = QtyKind(HOUR, (_AC, "endurance"))  # ICAO 1.6
 
 #
 # aircraft performance: state vector
 #
-# TODO: move to .fluid mod
-# - static, dynamic, total temperature
-# - static, dynamic, impact, total pressure
-# - Cp, Cv, R, Rhat...
 
 # temperature 6.7
-TEMP_SAT = QtyKind(K, ("static",))
-TEMP_TAT = QtyKind(K, ("total",))
-TEMP_ISA = QtyKind(K, ("static", "isa"))
-"""static air temperature (international standard atmosphere)."""
+STATIC_TEMPERATURE = TEMPERATURE["static"]
+TOTAL_TEMPERATURE = TEMPERATURE["total"]
+"""Also known as stagnation temperature."""
+CONST_TEMPERATURE_ISA: Annotated[Decimal, STATIC_TEMPERATURE(K)] = Decimal(
+    "288.15"
+)
+TEMPERATURE_DEVIATION_ISA = STATIC_TEMPERATURE[
+    DELTA, OriginAt(Quantity(CONST_TEMPERATURE_ISA, K))
+]
+"""Deviation from the [ISA temperature at sea level][isq.aerospace.CONST_TEMPERATURE_ISA]."""
+
+TOTAL_PRESSURE = PRESSURE["total"]
+IMPACT_PRESSURE = DYNAMIC_PRESSURE["impact"]
 
 # linear velocity
-IAS = QtyKind(M_PERS, ("airspeed", "indicated"))
+AIRSPEED = QtyKind(M_PERS, ("airspeed",))
+IAS = AIRSPEED["indicated"]
 """Indicated airspeed, as measured directly from the airspeed indicator."""
-CAS = QtyKind(M_PERS, ("airspeed", "calibrated"))
+CAS = AIRSPEED["calibrated"]
 """Calibrated airspeed, [IAS][isq.aerospace.IAS] corrected for instrument and position errors."""
-EAS = QtyKind(M_PERS, ("airspeed", "equivalent"))
+EAS = AIRSPEED["equivalent"]
 """Equivalent airspeed."""
-TAS = QtyKind(M_PERS, ("airspeed", "true"))
+TAS = AIRSPEED["true"]
 """True airspeed."""
-GS = QtyKind(M_PERS, ("airspeed", "ground"))
+GS = AIRSPEED["ground"]
 """Ground speed."""
 WIND_SPEED = QtyKind(M_PERS, ("wind",))
 """Wind speed."""
@@ -97,26 +129,38 @@ VS = QtyKind(M_PERS, ("vertical_speed",))  # ICAO 4.15
 """Vertical speed, rate of climb or descent.
 Commonly expressed in [feet per minute][isq.aerospace.FT_PER_MIN]."""
 
-MACH = Dimensionless("mach")
-"""Mach number, the ratio between the [TAS][isq.aerospace.TAS]
-and the [speed of sound][isq.aerospace.SPEED_OF_SOUND]."""
+# MACH = Dimensionless("mach")
+# """Mach number, the ratio between the [TAS][isq.aerospace.TAS]
+# and the [speed of sound][isq.aerospace.SPEED_OF_SOUND]."""
 
 #
-# engine
+# propulsion
 #
-SHAFT_POWER = QtyKind(W, (_AC, _ENGINE, "shaft"))
-TSFC = QtyKind(KG * KWH**-1, (_AC, _ENGINE))  # ICAO 5.3
-KG_PERS = KG * M_PERS**-1  # ICAO 5.4
-MASS_FLOW_RATE = QtyKind(KG_PERS, (_AC, _ENGINE))
-
+ENGINE_POWER = POWER[_ENGINE]
+SHAFT_POWER = ENGINE_POWER["shaft"]
+ENGINE_MASS_FLOW_RATE = MASS_FLOW_RATE[_ENGINE]
+KG_PERS = KG * S**-1
+TSFC = QtyKind(KG_PERS * N**-1, (_ENGINE,))  # ICAO 5.3
+BPR = Dimensionless("bypass_ratio")
 #
 # aeroacoustics
 #
 # TODO: dBA, EPNdB etc.
 
 #
-# pilot specific
+# navigation
 #
+
+
+@dataclass(frozen=True, **slots)
+class Aerodrome:
+    """An airport, airstrip, airport, altiport, heliport, STOLport, or water
+    aerodrome."""
+
+    ident: str
+    ident_kind: Literal["icao", "iata"] | str
+
+
 PRESSURE_ALTIMETER = QtyKind(PA, ("altimeter",))
 """Altimeter setting."""
 RUNWAY_LENGTH = QtyKind(M, ("runway", "length"))  # ICAO 1.12

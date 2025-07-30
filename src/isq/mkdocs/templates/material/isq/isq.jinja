@@ -1,0 +1,83 @@
+{%- macro render_fragment(fragment) -%}
+{%- if fragment.href -%}
+<autoref identifier="{{ fragment.href }}">{{ fragment.text }}</autoref>
+{%- else -%}
+{{- fragment -}}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_fragments(fragments) -%}
+{%- if fragments is iterable and not fragments is string and fragments.href is not defined -%}
+{%- for fragment in fragments -%}
+{{- render_fragment(fragment) -}}
+{%- endfor -%}
+{%- else -%}
+{{- render_fragment(fragments) -}}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro show_wikidata(obj) -%}
+{%- if obj.extra.mkdocstrings.isq and obj.extra.mkdocstrings.isq.wikidata -%}
+<div class="isq-wikidata">
+    <b>Wikidata: </b>
+    {%- for wd in obj.extra.mkdocstrings.isq.wikidata -%}
+    <a href="https://www.wikidata.org/wiki/{{ wd.qcode }}" target="_blank" rel="noopener">{{ wd.qcode }}</a>
+    {%- if not loop.last %}, {% endif -%}
+    {%- endfor -%}
+</div>
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro show_symbols(obj) -%}
+{%- if obj.extra.mkdocstrings.isq and obj.extra.mkdocstrings.isq.symbols -%}
+<div class="isq-symbols">
+    <b>Symbol{% if obj.extra.mkdocstrings.isq.symbols|length > 1 %}s{% endif %}: </b>
+    {%- for symbol in obj.extra.mkdocstrings.isq.symbols -%}
+    <span class="isq-symbol">${{ symbol.katex }}$</span>
+    {%- if symbol.where -%}
+    <span class="isq-symbol-where">
+        ({%- for w in symbol.where -%}
+        $ {{w.symbol}} $ = {{ render_fragments(w.description) }}
+        {%- if w.unit %} ({{ render_fragments(w.unit) }}){% endif -%}
+        {%- if not loop.last %}, {%- endif -%}
+        {%- endfor -%})
+    </span>
+    {%- endif -%}
+    {%- if symbol.remarks -%}
+    <span class="isq-symbol-remarks"> ({{ symbol.remarks }})</span>
+    {%- endif -%}
+    {%- if not loop.last %}, {% endif -%}
+    {%- endfor -%}
+</div>
+{%- endif -%}
+{%- endmacro -%}
+
+
+
+{%- macro show_details(obj) -%}
+{%- if obj.extra.mkdocstrings.isq and obj.extra.mkdocstrings.isq.details -%}
+{%- for definition in obj.extra.mkdocstrings.isq.details -%}
+<div class="isq-detail">
+    {%- if definition.assumptions -%}<b>Assumptions: </b>
+    {%- for assumption in definition.assumptions -%}
+    {{ render_fragments(assumption) }}
+    {%- if not loop.last %}, {% endif %}
+    {%- endfor -%}
+    {%- endif -%}
+    $${{ definition.katex }}$$
+    <div class="isq-where">
+        {%- for w in definition.where -%}
+        <div class="isq-where-row">
+            <div class="isq-symbol">$ {{w.symbol}} $</div>
+            <div class="isq-equals">=</div>
+            <div class="isq-description">
+                {{ render_fragments(w.description) }}
+                {%- if w.unit %} ({{ render_fragments(w.unit) }}){% endif -%}
+            </div>
+        </div>
+        {%- endfor -%}
+    </div>
+</div>
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}

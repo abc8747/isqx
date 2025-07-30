@@ -16,12 +16,15 @@ from typing import (
 
 from typing_extensions import TypeAlias, assert_never
 
-from .core import (
+from ._core import (
+    DELTA,
+    DIFFERENTIAL,
+    INEXACT_DIFFERENTIAL,
     Aliased,
+    Anchor,
     BaseDimension,
     BaseUnit,
     Dimensionless,
-    E,
     Exp,
     Exponent,
     Expr,
@@ -31,28 +34,37 @@ from .core import (
     Name,
     NamedExpr,
     Number,
+    OriginAt,
     Prefix,
-    Relative,
+    Quantity,
     Scaled,
+    StrFragment,
     Tagged,
     Translated,
+    _RatioBetween,
+)
+from ._core import (
+    E as _E,
 )
 
 _FormatSpec: TypeAlias = Literal["basic"]
 _DefinableExpr: TypeAlias = Union[Aliased, Translated, Log, Tagged]
 
 
-def fmt(expr: Expr, fmt: _FormatSpec | str | Formatter = "basic") -> str:
-    if isinstance(fmt, Formatter):
-        return "".join(fmt.fmt(expr))
-    if fmt == "" or fmt == "basic":
-        return "".join(BasicFormatter(verbose=True).fmt(expr))
-    raise NotImplementedError(f"unknown format {fmt=}")
+def fmt(expr: Expr, formatter: Formatter | _FormatSpec | str = "basic") -> str:
+    if isinstance(formatter, Formatter):
+        return "".join(
+            item.text if isinstance(item, Anchor) else item
+            for item in formatter.fmt(expr)
+        )
+    if formatter == "" or formatter == "basic":
+        return fmt(expr, DEFAULT_FORMATTER)
+    raise NotImplementedError(f"unknown format {formatter=}")
 
 
 @runtime_checkable
 class Formatter(Protocol):
-    def fmt(self, expr: Expr) -> Generator[str, None, None]: ...
+    def fmt(self, expr: Expr) -> Generator[StrFragment, None, None]: ...
 
 
 class Precedence(IntEnum):
@@ -69,30 +81,18 @@ class Precedence(IntEnum):
     ATOM = auto()
 
 
-def precedence(expr: Expr) -> Precedence:
-    if isinstance(expr, Mul):
-        return Precedence.MUL
-    elif isinstance(expr, Scaled):
-        return Precedence.SCALED
-    elif isinstance(expr, Log):
-        return Precedence.LOG
-    elif isinstance(expr, Tagged):
-        return Precedence.TAGGED
-    elif isinstance(expr, Exp):
-        return Precedence.EXP
-    elif isinstance(
-        expr,
-        (
-            BaseUnit,
-            BaseDimension,
-            Dimensionless,
-            Aliased,
-            Translated,
-        ),
-    ):
-        return Precedence.ATOM
-    else:
-        raise assert_never(expr)
+PRECEDENCE: dict[type[Expr], Precedence] = {
+    Mul: Precedence.MUL,
+    Scaled: Precedence.SCALED,
+    Log: Precedence.LOG,
+    Tagged: Precedence.TAGGED,
+    Exp: Precedence.EXP,
+    BaseUnit: Precedence.ATOM,
+    BaseDimension: Precedence.ATOM,
+    Dimensionless: Precedence.ATOM,
+    Aliased: Precedence.ATOM,
+    Translated: Precedence.ATOM,
+}
 
 
 _VisitorState = TypeVar("_VisitorState", contravariant=True)
@@ -167,15 +167,16 @@ class _BasicFormatterState:
             self.parent_precedence = old_precedence
 
 
-@dataclass
+@dataclass(frozen=True)
 class BasicFormatter(
-    Visitor[_BasicFormatterState, Generator[str, None, None]], Formatter
+    Visitor[_BasicFormatterState, Generator[StrFragment, None, None]],
+    Formatter,
 ):
     overrides: dict[Name, str] = field(default_factory=dict)
     verbose: bool = False
-    mul: str = " · "
+    infix_mul: str = " · "
 
-    def fmt(self, expr: Expr) -> Generator[str, None, None]:
+    def fmt(self, expr: Expr) -> Generator[StrFragment, None, None]:
         state = _BasicFormatterState()
         yield from self.visit(expr, state)
 
@@ -196,7 +197,7 @@ class BasicFormatter(
         *,
         seen_definitions: set[str],
         depth: int,
-    ) -> Generator[str, None, None]:
+    ) -> Generator[StrFragment, None, None]:
         if name in seen_definitions:
             return
         seen_definitions.add(name)
@@ -221,8 +222,8 @@ class BasicFormatter(
 
     def visit(
         self, expr: Expr, state: _BasicFormatterState
-    ) -> Generator[str, None, None]:
-        precedence_expr = precedence(expr)
+    ) -> Generator[StrFragment, None, None]:
+        precedence_expr = PRECEDENCE[type(expr)]
         needs_parentheses = state.parent_precedence >= precedence_expr
         if needs_parentheses:
             yield "("
@@ -234,7 +235,7 @@ class BasicFormatter(
     # but add them to the state, so they can be formatted later.
     def visit_named(
         self, expr: NamedExpr, state: _BasicFormatterState
-    ) -> Generator[str, None, None]:
+    ) -> Generator[StrFragment, None, None]:
         name = expr.name
         name_formatted = self.overrides.get(name, name)
         yield name_formatted
@@ -246,21 +247,49 @@ class BasicFormatter(
 
     def visit_tagged(
         self, expr: Tagged, state: _BasicFormatterState
-    ) -> Generator[str, None, None]:
-        precedence_expr = precedence(expr)
+    ) -> Generator[StrFragment, None, None]:
+        precedence_expr = PRECEDENCE[Tagged]
         with state._set_parent_precedence(precedence_expr):
             yield from self.visit(expr.reference, state)
         yield "["
         num_tags = len(expr.tags)
         for i, tag in enumerate(expr.tags):
-            if isinstance(tag, Relative):
+            if isinstance(tag, _RatioBetween):
                 yield "`"
-                with state._set_parent_precedence(precedence_expr):
-                    yield from self.visit(tag.measured, state)
-                yield "` relative to `"
-                with state._set_parent_precedence(precedence_expr):
-                    yield from self.visit(tag.reference, state)
+                with state._set_parent_precedence(Precedence.NONE):
+                    yield from self.visit(tag.numerator, state)
+                yield "` to `"
+                if isinstance(q := tag.denominator, Quantity):
+                    yield from _format_factor(
+                        q.value,
+                        infix_mul=self.infix_mul,
+                        format_product=self._fmt_product,
+                    )
+                    with state._set_parent_precedence(Precedence.NONE):
+                        yield from self.visit(q.unit, state)
+                else:
+                    with state._set_parent_precedence(Precedence.NONE):
+                        yield from self.visit(q, state)
                 yield "`"
+            elif isinstance(tag, OriginAt):
+                yield "relative to `"
+                if isinstance(loc := tag.location, Quantity):
+                    yield from _format_factor(
+                        loc.value,
+                        infix_mul=self.infix_mul,
+                        format_product=self._fmt_product,
+                    )
+                    with state._set_parent_precedence(precedence_expr):
+                        yield from self.visit(loc.unit, state)
+                else:  # hashable
+                    yield repr(tag.location)
+                yield "`"
+            elif tag is DELTA:
+                yield "Δ"
+            elif tag is DIFFERENTIAL:
+                yield "differential"
+            elif tag is INEXACT_DIFFERENTIAL:
+                yield "inexact differential"
             else:
                 yield repr(tag)
             if i < num_tags - 1:
@@ -269,47 +298,47 @@ class BasicFormatter(
 
     def visit_exp(
         self, expr: Exp, state: _BasicFormatterState
-    ) -> Generator[str, None, None]:
-        with state._set_parent_precedence(precedence(expr)):
+    ) -> Generator[StrFragment, None, None]:
+        with state._set_parent_precedence(PRECEDENCE[Exp]):
             yield from self.visit(expr.base, state)
         yield str(expr.exponent).translate(_BASIC_EXPONENT_MAP)
 
     def visit_mul(
         self, expr: Mul, state: _BasicFormatterState
-    ) -> Generator[str, None, None]:
-        precedence_expr = precedence(expr)
+    ) -> Generator[StrFragment, None, None]:
+        precedence_expr = PRECEDENCE[Mul]
         for i, term in enumerate(expr.terms):
             with state._set_parent_precedence(precedence_expr):
                 yield from self.visit(term, state)
             if i < len(expr.terms) - 1:
-                yield self.mul
+                yield self.infix_mul
 
     def visit_scaled(
         self, expr: Scaled, state: _BasicFormatterState
-    ) -> Generator[str, None, None]:
+    ) -> Generator[StrFragment, None, None]:
         yield from _format_factor(
             expr.factor,
-            mul=self.mul,
+            infix_mul=self.infix_mul,
             format_product=self._fmt_product,
         )
-        with state._set_parent_precedence(precedence(expr)):
+        with state._set_parent_precedence(PRECEDENCE[Scaled]):
             yield from self.visit(expr.reference, state)
 
     def visit_translated(
         self, expr: Translated, state: _BasicFormatterState
-    ) -> Generator[Name, None, None]:
+    ) -> Generator[StrFragment, None, None]:
         yield from self.visit_named(expr, state)
 
     def visit_log(
         self, expr: Log, state: _BasicFormatterState
-    ) -> Generator[Name, None, None]:
-        if expr.base is E:
+    ) -> Generator[StrFragment, None, None]:
+        if expr.base is _E:
             yield "ln"
         else:
             yield "log"
             yield str(expr.base).translate(_BASIC_SUBSCRIPT_MAP)
         yield "("
-        with state._set_parent_precedence(precedence(expr)):
+        with state._set_parent_precedence(PRECEDENCE[Log]):
             yield from self.visit(expr.reference, state)
         yield ")"
 
@@ -329,7 +358,7 @@ class BasicFormatter(
 def _format_factor(
     factor: Number | LazyProduct | Prefix,
     *,
-    mul: str,
+    infix_mul: str,
     format_product: Callable[[Number | tuple[Number, Exponent]], str],
 ) -> Generator[str, None, None]:
     if isinstance(factor, Prefix):
@@ -341,7 +370,10 @@ def _format_factor(
         for i, p in enumerate(factor.products):
             yield format_product(p)
             if i < n_products - 1:
-                yield mul
+                yield infix_mul
     else:
         yield str(factor)
-    yield mul
+    yield infix_mul
+
+
+DEFAULT_FORMATTER = BasicFormatter(verbose=True)

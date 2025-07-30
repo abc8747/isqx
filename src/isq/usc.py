@@ -1,33 +1,25 @@
-"""
-United States customary and British Imperial units.
+"""United States customary and British Imperial units.
 
-References:
-
-- [SP811] "NIST Special Publication 811 - 2008 Edition - Guide for the Use of the
-    International System of Units (SI)," NIST, Available: https://www.nist.gov/pml/special-publication-811
-- [H44] "NIST Handbook 44 - 2024 - Appendix C. General Tables of Units of
-    Measurement," NIST, Available: https://www.nist.gov/document/nist-handbook-44-2024-appendix-c-pdf
-- [WMA1985] "Weights and Measures Act 1985", legislation.gov.uk.
-    Available: https://www.legislation.gov.uk/ukpga/1985/72/contents
+See: [isq._citations.SP811][], [isq._citations.H44][],
+[isq._citations.WMA1985][].
 """
 
 from decimal import Decimal
 from fractions import Fraction
 
-from .core import PI, LazyProduct, Translated
-from .si import (
+from ._core import PI, LazyProduct, Translated
+from ._iso80000 import (
     CONST_DENSITY_H2O,
     CONST_DENSITY_HG,
     CONST_STANDARD_GRAVITY,
-    G0,
-    GRAM,
     HOUR,
     KG,
     KGF,
+    M_PERS2,
     MILLI,
     MIN,
     PA,
-    TONNE,
+    G,
     J,
     K,
     L,
@@ -209,8 +201,6 @@ CWT = (100 * LB).alias("hundredweight")
 """Short hundredweight (also known as cental)"""
 TON = (2000 * LB).alias("ton")
 """Short or net ton."""
-TON_METRIC = TONNE  # SP811 Table 6
-"""Metric ton, also known in tonne other countries."""
 
 # british imperial [WMA1985 1VI]
 STONE = (14 * LB).alias("stone")
@@ -240,11 +230,11 @@ DRAM_AP = (Fraction(1, 8) * OZ_AP).alias("dram_apothecaries")
 SCRUPLE = (Fraction(1, 3) * DRAM_AP).alias("scruple")
 """Apothecaries' scruple."""
 # assaying and gemstones
-CARAT = (200 * (MILLI * GRAM)).alias("carat")
+CARAT = (200 * (MILLI * G)).alias("carat")
 """Metric carat, for gemstones."""  # H44 C-29
 POINT_MASS = (Fraction(1, 100) * CARAT).alias("point_mass")
 """Point, for gemstones."""  # H44 C-30
-ASSAY_TON = (Decimal("29.167") * GRAM).alias("assay_ton")
+ASSAY_TON = (Decimal("29.167") * G).alias("assay_ton")
 """Assay ton. The mass in milligrams of precious metal from one assay ton of ore
 gives the troy ounces per short ton."""  # H44 C-29
 QUINTAL = (100 * KG).alias("quintal")
@@ -264,7 +254,7 @@ MPH = (MI * HOUR**-1).alias("mph")
 FT_PERS2 = FT * S**-2
 """Feet per second squared."""
 # force
-LBF = (LB * G0).alias("lbf")
+LBF = (CONST_STANDARD_GRAVITY * LB * M_PERS2).alias("lbf")
 """Pound-force."""
 POUNDAL = (LB * FT * S**-2).alias("poundal")
 """Poundal, the force required to accelerate 1 lb by 1 ft/s²."""
@@ -311,7 +301,7 @@ CAL_20C = (Decimal("4.18190") * J).alias("calorie_20c")  # approx
 """Calorie (at 20 °C). The heat required to raise 1 g of water from 19.5 °C to
 20.5 °C."""
 # [SP811 B.8 (footnote 9), H44 C-57]
-BTU = BTU_IT = (Decimal("1055.05585262") * J).alias("btu_it")
+BTU_IT = (Decimal("1055.05585262") * J).alias("btu_it")
 """British thermal unit (International Table). The most widely used definition."""
 BTU_TH = (Decimal("1054.350") * J).alias("btu_th")  # approx
 """British thermal unit (thermochemical)."""
@@ -328,9 +318,11 @@ QUAD = (10**15 * BTU_IT).alias("quad")
 
 # power [SP811 B.8]
 HP = (33000 * (FT * LBF * MIN**-1)).alias("horsepower")
-"""Mechanical horsepower (imperial)."""  # https://en.wikipedia.org/wiki/Horsepower#Imperial_horsepower
+"""Mechanical horsepower (imperial).
+See: https://en.wikipedia.org/wiki/Horsepower#Imperial_horsepower"""
 HP_METRIC = (75 * (KGF * M * S**-1)).alias("horsepower_metric")
-"""Metric horsepower."""  # https://en.wikipedia.org/wiki/Horsepower#Metric_horsepower_(PS,_KM,_cv,_hk,_pk,_k,_ks,_ch)
+"""Metric horsepower.
+See: <https://en.wikipedia.org/wiki/Horsepower#Metric_horsepower_(PS,_KM,_cv,_hk,_pk,_k,_ks,_ch)>"""
 HP_BOILER = (Decimal("9809.50") * W).alias("horsepower_boiler")  # approx
 """Boiler horsepower."""
 HP_ELECTRIC = (746 * W).alias("horsepower_electric")

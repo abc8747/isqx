@@ -1,101 +1,195 @@
 # isq
 
-A dependency-free Python library to represent both **units** and [**quantity kinds**](#tags) under the International System of Quantities (ISO/IEC 80000). 
+A dependency-free Python library providing metadata objects defined by the
+International System of Quantities (ISO/IEC 80000) and other subfields, including:
 
-**Goals**:
+- units (`kg`, `ft`, `dB`...), and perhaps more importantly,
+- extensible [quantity kinds](#quantity-kinds) (geopotential/geometric altitude,
+  internal energy/work/heat...),
+- optional utilities: unit [conversion](#unit-conversion),
+  [simplification](#simplification) and [formatting](#formatting).
 
-- provide objects for use in `typing.Annotated[T, x]`
-- enable writing machine-readable, structured documentation
-- no encapsulating numerical values in a new object
-- optional, incremental adoption with immediate compatibility with external libraries
-- lightweight, zero additional runtime performance overhead
-- first-class support for [disambiguating units](#tags) (e.g. length vs. thickness vs. altitude)
+`isq` prioritises:
 
-**Limitation**: does not [(yet)](#dimension-checking) perform dimensional homogenity checks.
+- zero performance overhead
+- incremental, optional adoption of [annotations](#tutorial-documenting-code-with-type-annotations)
+- immediate interoperability with external libraries
+- extensibility
+- support for exact/"jittable" unit conversion
+- good LSP support
 
+`isq` does not "wrap" a numerical type with the unit, and does **not** enforce
+correctness at runtime.
 
-### Getting started
+It enables you to write documentation in an alternative way, using centralised
+metadata objects that are machine-readable. *Enforcement* of correctness may
+(or may not) come later as a separate, opt-in static analyzer.
 
-Install the library:
+## Installation
 
 ```sh
 # with pip.
-pip install https://github.com/cathaypacific8747/isq
+pip install https://github.com/abc8747/isq
 # with uv.
-uv add https://github.com/cathaypacific8747/isq
+uv add https://github.com/abc8747/isq
 ```
 
-Since `isq` is designed to be documentation-first, you do not need to add `isq` as a required dependency if you don't need to use runtime features like [unit conversion](#unit-conversion), [simplification](#ast-and-simplification), [defining new units](#defining-new-units), [formatting](#formatting) or introspection. In that case, it is recommended to add `isq` to an [optional dependency group](https://docs.astral.sh/uv/concepts/projects/dependencies/#optional-dependencies) instead.
+`isq` is designed to be documentation-first and can be used
+[without introducing a hard dependency on your project](#quick-note-on-hard-dependencies).
+You can find more examples, search the list of units/quantity kinds and find the
+API reference in the [documentation](https://abc8747.github.io/isq/).
 
-<details>
+## Tutorial: Documenting code with type annotations
 
-<summary>Documentation-only library installation and usage</summary>
+Most libraries use docstrings for simplicity. `isq` recommends incrementally adopting [PEP 593](https://typing.python.org/en/latest/spec/qualifiers.html#annotated).
+
+First, define generic types that you will use throughout the codebase:
+
+```py
+# isq_types.py
+from typing import Annotated, TypeVar
+
+import isq
+
+_T = TypeVar("_T")
+M = Annotated[_T, isq.M]
+K = Annotated[_T, isq.K]
+Pa = Annotated[_T, isq.PA]
+```
+Annotate function arguments or data containers like `dataclasses`:
+
+```py
+# in another file
+from .isq_types import M, K, Pa
+
+def pressure_isa(altitude: M, isa_dev: K) -> Pa:
+    # static checkers will show the type of `altitude` as `Unknown`
+    ...
+
+# or, if you prefer stricter typing:
+from numpy.typing import ArrayLike
+
+def pressure_isa(altitude: M[ArrayLike], isa_dev: K[ArrayLike]) -> Pa[ArrayLike]:
+    # `altitude` now expects the type `ArrayLike` (not a wrapper over it!) 
+    ...
+
+from dataclasses import dataclass
+
+@dataclass
+class GasState:
+    temperature: K
+    pressure: Pa
+```
+Since annotations are ignored by the Python interpreter at runtime, and
+`Annotated[T, x]` is equivalent to `T`, there is no interoperability cost.
+Internally, unit objects are defined by composing with each other:
+`J = (N * M).alias("joule")` and `N = (KG * M * S**-2).alias("newton")`.
+
+You can also retrieve the annotations at runtime:
+```py
+from typing import get_type_hints
+
+def print_metadata(obj):
+    for param, hint in get_type_hints(obj, include_extras=True).items():
+        print(f"`{param}`: {hint.__metadata__[0]}")
+
+print_metadata(pressure_isa)
+# `altitude`: meter
+# `isa_dev`: kelvin
+# `return`: pascal
+# - pascal = newton · meter⁻²
+#   - newton = kilogram · meter · second⁻²
+print_metadata(GasState)
+# `temperature`: kelvin
+# `pressure`: pascal
+# - pascal = newton · meter⁻²
+#   - newton = kilogram · meter · second⁻²
+```
+___
+
+But there is a flaw in using units alone:
+![](docs/assets/img/readme_meters.drawio.svg)
+
+`isq` encourages you to use a more abstract **quantity kind**, which can contain
+arbitrary *tags* that store important metadata.
+
+```py
+from typing import Annotated, TypeVar
+
+import isq
+
+# note that `isq` provides *runtime objects*, not types.
+# define generic types that can be used throughout your codebase
+_T = TypeVar("_T")
+GeopAltM = Annotated[_T, isq.aerospace.GEOPOTENTIAL_ALTITUDE(isq.M)]
+TempDevIsaK = Annotated[_T, isq.aerospace.TEMPERATURE_DEVIATION_ISA(isq.K)]
+StaticPressurePa = Annotated[_T, isq.STATIC_PRESSURE(isq.PA)]
+
+def pressure_isa(altitude: GeopAltM, isa_dev: TempDevIsaK) -> StaticPressurePa:
+    ...
+
+# altitude: meter['altitude', relative to `'mean_sea_level'`, 'geopotential']
+# isa_dev: kelvin['static', Δ, relative to `288.15 · kelvin`]
+# return: pascal['static']
+# - pascal = newton · meter⁻²
+#   - newton = kilogram · meter · second⁻²
+```
+
+To create your own quantity kinds, see [below](#tutorial-creating-your-own-units-and-quantity-kinds).
+
+### Quick note on hard dependencies
+
+If you intend to use `isq` for documenting code only (without runtime features
+like [conversions](#unit-conversion) or [simplification](#simplification)
+, which we will explore below), it is recommended to make `isq` an
+[optional dependency](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#dependencies-optional-dependencies)
+of your project instead:
 
 ```sh
-uv add https://github.com/cathaypacific8747/isq --optional typing
+uv add https://github.com/abc8747/isq --optional typing
 ```
-
-Since `isq` is no longer a required depedency, put `isq` imports in the `typing.TYPE_CHECKING` block. Example:
+Put `isq` imports within the `typing.TYPE_CHECKING` block:
 
 ```py
-from __future__ import annotations
+from __future__ import annotations  # see PEP 563, PEP 649
 
-from typing import Any, Annotated, TYPE_CHECKING
+from typing import Annotated, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from isq import N, KG, M, S
+    import isq
 
-def acceleration(
-    force: Annotated[Any, N],
-    mass: Annotated[Any, KG]
-) -> Annotated[Any, M * S**-2]:
-    ...
+    FloatM = Annotated[float, isq.M]  # or put them in a separate module
+
+def foo(x: FloatM): ...
+
+# to inspect annotations at runtime in another module:
+from typing import get_type_hints
+import isq
+
+for param, hint in get_type_hints(
+    foo,
+    include_extras=True,
+    localns={"isq": isq}  # add the location of your custom definitions (if any)
+).items():
+    print(f"`{param}`: {hint.__metadata__[0]}")
+# `x`: meter
 ```
+This makes sure that your code doesn't fail with `ImportError` if downstream
+users decide not to install `your_project[typing]`.
 
-</details>
+## Tutorial: Utilities
 
-See the [documentation](https://cathaypacific8747.github.io/isq) for more usage examples.
+So far, we have covered usecases for code documentation,.
 
+Units are **immutable expression trees** and `isq` provides some runtime
+utilities to *transform* the expression tree.
 
-## Usage
+### Simplification
 
-Inspired by libraries like [`pydantic`](https://github.com/pydantic/pydantic) and [`annotated-types`](https://github.com/annotated-types/annotated-types), the recommended way to adopt `isq` is via `typing.Annotated[T, x]` (see [PEP 593](https://typing.python.org/en/latest/spec/qualifiers.html#annotated)):
-```py
-from typing import Any, Annotated
-from isq import N, KG, M, S
-def acceleration(
-    force: Annotated[Any, N],
-    mass: Annotated[Any, KG]
-) -> Annotated[Any, M * S**-2]:
-    ...
-```
+The `isq.simplify` function canonicalises it into a flat form:
 
-- unlike other libraries like [`pint`](https://github.com/hgrecco/pint), this library does not wrap your types in a new `Quantity` object
-- type is kept intact as `T`
-- delegates dimensionality checking to an [optional dimension-checking tool](#dimension-checking)
-- powerful introspection:
-    <details>
-    <summary>Example</summary>
-
-    ```pycon
-    >>> from typing import get_type_hints
-    >>> for arg, arg_type in get_type_hints(acceleration, include_extras=True).items():
-    ...     print(f"{arg:>7} | {arg_type.__metadata__[0]}")
-    ...
-     force | newton
-      mass | kilogram
-    return | meter · second⁻²
-    ```
-    </details>
-
-- centralised source of truth: reduces need for duplicate docstrings while supporting documentation generators like `mkdocstrings-python` (intersphinx [here](https://cathaypacific8747.github.io/isq/objects.inv))
-- use in fields of a container: `dataclass`, `TypedDict`, `pydantic.BaseModel`...
-
-### AST and simplification
-
-Units are represented as immutable expression trees. The `isq.simplify` function canonicalises it into a flat form:
 ```pycon
->>> from isq.us_customary import PSI
+>>> from isq.usc import PSI
 >>> print(PSI)
 psi
 - psi = lbf · inch⁻²
@@ -103,92 +197,54 @@ psi
     - pound = 0.45359237 · kilogram
   - inch = 1/12 · foot
     - foot = 0.3048 · meter
->>> from isq import simplify
+>>> from isq import simplify, dimension
 >>> print(simplify(PSI))
 0.45359237 · 9.80665 · (1/12)⁻² · 0.3048⁻² · (kilogram · meter⁻¹ · second⁻²)
->>> print(simplify(PSI).dimension)
+>>> print(dimension(simplify(PSI)))
 L⁻¹ · M · T⁻²
 ```
-Note that the final scaling factor is not eagerly evaluated. This enables users to choose between approximate and exact arithmetic (useful for financial applications).
+Note that the final scaling factor is not eagerly evaluated. This enables you to
+choose between approximate and exact arithmetic (useful for financial
+applications).
 
 ### Unit conversion
 
-The `convert` function returns a callable that allow you to convert between compatible units.
+The `convert` function creates a callable that allow you to convert between
+compatible units. Under the hood, it uses `simplify` to check dimensions and
+computes the conversion factors *once*:
+
 ```pycon
 >>> from isq import M, S, MIN, convert
->>> from isq.us_customary import FT
->>> fpm2mps = convert(FT * MIN**-1, M * S**-1)
->>> fpm2mps
-Converter(scale=0.00508, offset=0.0)
->>> fpm2mps(7200.0)
+>>> from isq.usc import FT
+>>> fpm_to_mps = convert(FT * MIN**-1, M * S**-1)
+>>> fpm_to_mps
+Converter(scale=0.00508)
+>>> fpm_to_mps(7200.0)
 36.576
 >>> convert(M, FT, exact=True)(11000)
 Fraction(13750000, 381)
 >>> convert(FT * MIN**-1, M * S**-2)  # velocity -> acceleration fails
-isq.core.DimensionMismatchError: cannot convert from `foot · minute⁻¹
+isq._core.DimensionMismatchError: cannot convert from `foot · minute⁻¹
 - foot = 0.3048 · meter
 - minute = 60 · second` to `meter · second⁻²`.
-help: expected compatible dimensions, but found:
+= help: expected compatible dimensions, but found:
 dimension of origin: `L · T⁻¹`
 dimension of target: `L · T⁻²`
 ```
-The callable is compatible with many libraries, including `numpy.array` inputs and functional transformations like `jax.grad`/`jax.jit`.
+It is compatible many libraries, including using it for functional
+transformations like `jax.jit`:
 
-### Defining new units
-
-Code-as-data: all units are defined with Python without DSL/parsing an external file. Create your own units easily:
 ```pycon
->>> from fractions import Fraction
->>> from isq import M, convert, simplify
->>> from isq.us_customary import FT
->>> SMOOT = ((5 + Fraction(7, 12)) * FT).alias("smoot")
->>> print(SMOOT)
-smoot
-- smoot = 67/12 · foot
-  - foot = 0.3048 · meter
->>> convert(SMOOT, M, exact=True)(Fraction("364.4"))
-Fraction(7751699, 12500)
->>> print(simplify(SMOOT**2))
-(67/12)² · 0.3048² · meter²
+>>> import numpy as np
+>>> fpm_to_mps(np.linspace(-1300, 1300, 10))
+array([-6.604     , -5.13644444, -3.66888889, -2.20133333, -0.73377778,
+        0.73377778,  2.20133333,  3.66888889,  5.13644444,  6.604     ])
+>>> import jax
+>>> jax.grad(fpm_to_mps)(0.0)
+Array(0.00508, dtype=float32, weak_type=True)
 ```
+Converting between logarithmic units is also supported:
 
-### Tags
-
-Units alone are often insufficient to describe a quantity. Consider we might want to represent:
-
-| Dimension                                      | Possible Quantity Kinds                                                                                              |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| $\text{L}$                                     | *geopotential altitude* / *geometric altitude* / *wingspan* / *chord length* / *radius* / *thickness* / *wavelength* |
-| $\text{L}\text{T}^{-1}$                        | *indicated* / *true* / *ground* speed                                                                                |
-| $\text{L}^2\text{M}\text{T}^{-3}\text{I}^{-1}$ | *RMS* / *peak-to-peak* voltage                                                                                       |
-| $\text{L}^2\text{M}\text{T}^{-2}$              | *internal* / *kinetic* / *potential* / *enthalpy* / *Gibbs free* energy / *work done* / *heat* / *moment of force*   |
-| $\text{\$}$                                    | *nominal* / *real* USD / *capex* / *opex*                                                                            |
-| $\text{N}$                                     | moles of *hydrogen* / *oxygen* / *(arbitrary compound)*                                                              |
-| $\text{T}^{-1}$                                | Hertz (unit of frequency) / Becqurel (unit of radionuclide activity)                                                 |
-
-And that particular quantity kind may also refer to a specific:
-
-- *inertial* / *body* / *stability* reference frame
-- *x* / *y* / *z* direction
-- location *A* / *B* / *C*...
-
-Many quantities often share the same unit and we need a way to disambiguate between them. `isq.Tagged` allows you to constrain an existing unit with arbitary metadata:
-```pycon
->>> from isq import MOL, Tagged, simplify, convert
->>> MOL_H2_L = Tagged(MOL, ("H_2", "liquid"))
->>> MOL_O2_G = Tagged(MOL, ("O_2", "gas"))
->>> print(simplify(MOL_H2_L * MOL_O2_G**-1).dimension) # NOT dimensionless!
-N['H_2', 'liquid'] · (N['O_2', 'gas'])⁻¹
->>> convert(MOL_H2_L, MOL_O2_G)  # mismatched tags
-isq.core.DimensionMismatchError: cannot convert from `mole['H_2', 'liquid']` to `mole['O_2', 'gas']`.
-help: expected compatible dimensions, but found:
-dimension of origin: `N['H_2', 'liquid']`
-dimension of target: `N['O_2', 'gas']`
-```
-
-`Tagged` is effectively a newtype wrapper which contain hashable objects, such as strings or frozen dataclasses.
-
-Internally, the library also makes use of `Tagged` to represent different logarithmic quantities. A decibel is the logarithm of some generic ratio, and a decibel-milliwatt refers to the *power* relative to 1 milliwatt: `Tagged` essentially constrains what the decibel is referring to.
 ```pycon
 >>> from isq import DBM, DBW, convert
 >>> print(DBM)
@@ -197,44 +253,29 @@ dBm
   - watt = joule · second⁻¹
     - joule = newton · meter
       - newton = kilogram · meter · second⁻²
+>>> convert(DBW, DBM)
+NonAffineConverter(scale=1.0, offset=29.999999999999996)
 >>> convert(DBW, DBM)(10)
 40.0
 ```
 
-<!-- Similarly, for a generic *Reynolds number*, you may want to specify the *characteristic length* to be the *chord length* or *pipe diameter*. -->
-
-### Quantity Kinds
-
-The `Tagged` class is useful, but it forces downstream users to use a specific unit system. A more generic `isq.QtyKind` allows you to define an "abstract concept", which can be narrowed down to an compatible unit (U.S. customary, SI...):
-
-```pycon
->>> from isq.aerospace import TAS, IAS
->>> TAS
-QtyKind(unit_si=..., context=('airspeed', 'true'))
->>> from isq.us_customary import KNOT
->>> print(TAS[KNOT])
-knot['airspeed', 'true']
-- knot = nautical_mile · hour⁻¹
-  - nautical_mile = 1852 · meter
-  - hour = 60 · minute
-    - minute = 60 · second
->>> from isq import simplify, convert, M, S
->>> convert(TAS[KNOT], TAS[M * S**-1])  # succeeds because context matches
-Converter(scale=0.5144444444444445, offset=0.0)
-```
+Note that converting between linear and logarithmic quantities are not supported.
+Representing quantities like attenuation ($\text{dB}\text{ m}^{-1}$)
+is permitted, but conversion of them is not yet implemented.
 
 ### Formatting
 
-All expressions implement `__format__`, which interally calls the `isq.fmt` function with a default `isq.BasicFormatter`.
+The `isq.fmt` function (called by `__format__` of expressions) by default
+uses a `isq.BasicFormatter(verbose=True)`, but also supports customisation.
+To use shorter symbols for example:
 
-It can also take in any formatter, supporting fine-grained control over display names, output formats and locales. To use shorter symbols or $\LaTeX$:
 ```pycon
 >>> from isq import N, fmt, BasicFormatter
 >>> f"{N}" == fmt(N, BasicFormatter(verbose=True))
 True
 >>> print(fmt(N, BasicFormatter(
 ...     verbose=True,
-...     overrides={
+...     overrides={  # alias names
 ...         "newton": "N",
 ...         "kilogram": "kg",
 ...         "meter": "m",
@@ -243,30 +284,121 @@ True
 ... )))
 N
 - N = kg · m · s⁻²
->>> # TODO: latex once implemented
 ```
 
-Internally, the basic formatter uses `isq.Visitor` to traverse each node in post-order. You can pass in your own formatter as long as it adheres to the `isq.Formatter` protocol.
+Internally, the basic formatter uses `isq.Visitor` to traverse each node in
+post-order. You can pass in your own formatter as long as it adheres to the
+`isq.Formatter` protocol.
 
-## TODOs
+A $\LaTeX$ formatter is WIP.
 
-- support more string representations (e.g. LaTeX)
-  - compile LaTeX to SVG and manipulate symbols
-- mindmap
+## Tutorial: Creating your own units and quantity kinds
 
-### Dimension checking
+We follow the code-as-data principle: creating units and quantity kinds can be
+done effortlessly with pure Python:
 
-Right now, using `Annotated[T, x]` without actually checking `x` is just glorified comments. For this library to be truly useful, it should perform static analysis to avoid unit mismatches. Such a tool is not yet implemented.
+```pycon
+>>> from fractions import Fraction
+>>> import isq
+>>> SMOOT = ((5 + Fraction(7, 12)) * isq.usc.FT).alias("smoot")
+>>> print(SMOOT)
+smoot
+- smoot = 67/12 · foot
+  - foot = 0.3048 · meter
+>>> print((SMOOT**-1 * isq.M * SMOOT * isq.M**-1)**2)
+(smoot⁻¹ · meter · smoot · meter⁻¹)²
+- smoot = 67/12 · foot
+  - foot = 0.3048 · meter
+```
 
-One possible path is to use tracer objects that record operations just-in-time, and error out when dimensions do not match. But this is extremely difficult for several reasons:
+Note that expressions are represented exactly in the order you define it:
+no attempt is made to distribute exponents or combine terms unless you
+[instruct it to](#simplification).
 
-- it is common for a `numpy.NDArray` or `polars.DataFrame` to represent different units for each row/column.
-  - determining the units for the matmul between two arrays is very difficult.
-- interfacing with complex function transformations like `jax.grad(f)(x)` and `numpy.fft.fft` require significant maintenance burden.
+___
 
-Moving forward, the first MVP should start with simple function boundary checks, *only* at points where data crosses a declared "unit boundary" (argument passing, return statements). This alone would already cover most usecases.
+As explored earlier, units alone are insufficient to describe a quantity kind.
+Consider we might want to represent:
 
-Intra-expression errors (e.g. `distance_m + time_s`) are significantly more difficult to deal with and come much later.
+| Common Units                             | Possible Quantity Kinds                                                                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| $\text{m}$, $\text{ft}$, $\text{in}$...  | *geopotential altitude* / *geometric altitude* / *wingspan* / *chord length* / *radius* / *thickness* / *wavelength*         |
+| $\text{m}\text{ s}^{-1}$, $\text{kt}$... | *indicated* / *true* / *ground* speed                                                                                        |
+| $\text{J}$, $\text{Btu}$                 | *internal* / *kinetic* / *potential* / *enthalpy* / *Gibbs free* energy / *work done* / *heat* / *moment of force*           |
+| $\text{W}$, $\text{kWh}$                 | *instantaneous* / *RMS* / *peak-to-peak* / *time-averaged* power                                                             |
+| $\text{mol}$                             | amount of *hydrogen* / *oxygen* / *(some arbitrary compound)*                                                                |
+| $\text{USD}$, $\text{EUR}$...            | *nominal* / *real*, *capex* / *opex*                                                                                         |
+| -                                        | radians / aspect ratio / Reynolds number <of some *characteristic length*\> / coefficient of drag (zero-lift / lift-induced) |
 
-Such a tool will be released as an optional feature, separate from the core library.
+And that particular quantity kind may also refer to a specific:
 
+- *inertial* / *body* / *stability* reference frame
+- *x* / *y* / *z* direction
+- temperature / pressure at location *A* / *B* / *C*...
+
+#### Tags
+
+`isq` allows you to *constrain* an existing unit with arbitrary *tags* using the
+`[]` operator:
+
+```pycon
+>>> import isq
+>>> MOL_H2_L = isq.MOL["H_2", "liquid"]
+>>> MOL_O2_G = isq.MOL["O_2", "gas"]
+>>> print(MOL_H2_L * MOL_O2_G**-1)  # does not reduce to dimensionless!
+mole['H_2', 'liquid'] · (mole['O_2', 'gas'])⁻¹
+```
+
+You can use any [hashable object](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
+including strings, frozen dataclasses, or even `isq` units itself!
+This is helpful when you want to represent something awkward like
+*Reynolds number* with *characteristic length* = *chord length*.
+
+`isq` provides two important tags, `Delta` and `OriginAt`:
+
+```pycon
+>>> import isq
+>>> print(isq.K[isq.DELTA])  # finite interval/difference in temperature
+kelvin[Δ]
+>>> print(isq.J[isq.INEXACT_DIFFERENTIAL, "heat"])  # "small change"
+joule['inexact differential', 'heat']
+- joule = newton · meter
+  - newton = kilogram · meter · second⁻²
+>>> print(isq.M[isq.OriginAt("ground level")])  # elevation varies
+meter[relative to `'ground level'`]
+>>> print(isq.K[isq.DELTA, isq.OriginAt(isq.Quantity(130, K))])
+kelvin[Δ, relative to `130 · kelvin`]
+>>> print(isq.DBU)
+dBu
+- dBu = 20 · log₁₀(ratio[`volt` relative to `0.6¹⸍² · volt`])
+  - volt = watt · ampere⁻¹
+    - watt = joule · second⁻¹
+      - joule = newton · meter
+        - newton = kilogram · meter · second⁻²
+```
+
+#### Quantity Kinds
+
+The `Tagged` class is useful, but it forces downstream users to use a specific
+unit system.
+
+Instead, use the more generic `isq.QtyKind`, a factory that produces `isq.Tagged`:
+
+```pycon
+>>> import isq
+>>> DIAMETER_PIPE = isq.QtyKind(unit_si_coherent=isq.M, tags=("diameter", "pipe"))
+>>> print(DIAMETER_PIPE(isq.M))
+meter['diameter', 'pipe']
+>>> print(DIAMETER_PIPE(isq.usc.IN))
+inch['diameter', 'pipe']
+- inch = 1/12 · foot
+  - foot = 0.3048 · meter
+>>> print(DIAMETER_PIPE(isq.usc.LB))
+isq._core.UnitKindMismatchError: cannot create tagged unit for kind `('diameter', 'pipe')` with unit `pound
+- pound = 0.45359237 · kilogram`.
+expected dimension of kind: `L` (`meter`)
+   found dimension of unit: `M` (`pound
+- pound = 0.45359237 · kilogram`)
+```
+
+Users can now select the unit system they prefer, while ensuring the dimensions are correct.

@@ -1,12 +1,12 @@
 from fractions import Fraction
 
-from isq import CENTI, GRAM, HOUR, M, S, simplify
-from isq.fmt import BasicFormatter, fmt
-from isq.us_customary import BTU, FAHRENHEIT, FT, IN, R
+from isq import CENTI, HOUR, G, M, S, simplify
+from isq._fmt import BasicFormatter, fmt
+from isq.usc import BTU_IT, FAHRENHEIT, FT, IN, R
 
-K_VALUE = BTU * IN / (HOUR * FT**2 * R)
+K_VALUE = BTU_IT * IN / (HOUR * FT**2 * R)
 CM = CENTI * M
-DYN = (GRAM * CM * S**-2).alias("dyn")
+DYN = (G * CM * S**-2).alias("dyn")
 STATC = (DYN ** Fraction(1, 2) * M).alias("statc")
 
 
@@ -14,16 +14,16 @@ def test_fmt_basic_tagged() -> None:
     from isq import M_PERS
     from isq.aerospace import TAS
 
-    M_PERS_TAS = TAS[M_PERS]
+    M_PERS_TAS = TAS(M_PERS)
     assert (
-        fmt(M_PERS_TAS, fmt=BasicFormatter())
+        fmt(M_PERS_TAS, formatter=BasicFormatter())
         == "(meter · second⁻¹)['airspeed', 'true']"
     )
 
 
 def test_fmt_basic_translated() -> None:
     assert (
-        fmt(FAHRENHEIT, fmt=BasicFormatter(verbose=True))
+        fmt(FAHRENHEIT, formatter=BasicFormatter(verbose=True))
         == """fahrenheit
 - fahrenheit = rankine - 459.67
   - rankine = 5/9 · kelvin"""
@@ -34,7 +34,7 @@ def test_fmt_basic_log() -> None:
     from isq import DB
 
     assert (
-        fmt(DB, fmt=BasicFormatter(verbose=True))
+        fmt(DB, formatter=BasicFormatter(verbose=True))
         == """decibel
 - bel = log₁₀(ratio)"""
     )
@@ -44,9 +44,9 @@ def test_fmt_basic_log_level() -> None:
     from isq import DBU
 
     assert (
-        fmt(DBU, fmt=BasicFormatter(verbose=True))
+        fmt(DBU, formatter=BasicFormatter(verbose=True))
         == """dBu
-- dBu = 20 · log₁₀(ratio[`volt` relative to `(0.6¹⸍² · volt)`])
+- dBu = 20 · log₁₀(ratio[`volt` to `0.6¹⸍² · volt`])
   - volt = watt · ampere⁻¹
     - watt = joule · second⁻¹
       - joule = newton · meter
@@ -56,7 +56,7 @@ def test_fmt_basic_log_level() -> None:
 
 def test_fmt_basic_k_value() -> None:
     assert (
-        fmt(K_VALUE, fmt=BasicFormatter(verbose=True))
+        fmt(K_VALUE, formatter=BasicFormatter(verbose=True))
         == """btu_it · inch · (hour · foot² · rankine)⁻¹
 - btu_it = 1055.05585262 · joule
   - joule = newton · meter
@@ -68,20 +68,20 @@ def test_fmt_basic_k_value() -> None:
 - rankine = 5/9 · kelvin"""
     )
     assert (
-        fmt(simplify(K_VALUE), fmt=BasicFormatter(verbose=True))
+        fmt(simplify(K_VALUE), formatter=BasicFormatter(verbose=True))
         == "1055.05585262 · 1/12 · 0.3048 · 60⁻¹ · 60⁻¹ · 0.3048⁻² · (5/9)⁻¹ · (meter · kilogram · second⁻³ · kelvin⁻¹)"
     )
 
 
 def test_fmt_basic_statc() -> None:
     assert (
-        fmt(STATC, fmt=BasicFormatter(verbose=True))
+        fmt(STATC, formatter=BasicFormatter(verbose=True))
         == """statc
 - statc = dyn¹⸍² · meter
   - dyn = gram · centimeter · second⁻²
     - gram = 1/1000 · kilogram"""
     )
     assert (
-        fmt(simplify(STATC), fmt=BasicFormatter(verbose=True))
+        fmt(simplify(STATC), formatter=BasicFormatter(verbose=True))
         == "(1/1000)¹⸍² · (1/100)¹⸍² · (meter³⸍² · kilogram¹⸍² · second⁻¹)"
     )

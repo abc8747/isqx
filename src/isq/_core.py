@@ -2,35 +2,58 @@ from __future__ import annotations
 
 import decimal
 import math
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from decimal import Decimal
-from fractions import Fraction
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Final,
+import sys
+from collections.abc import (
     Generator,
     Hashable,
-    Literal,
     Mapping,
     MutableMapping,
     MutableSequence,
+    Sequence,
+)
+from dataclasses import dataclass, fields, replace
+from decimal import Decimal
+from fractions import Fraction
+from functools import cache
+from types import ModuleType
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Final,
+    Literal,
     NamedTuple,
     Protocol,
-    Sequence,
     SupportsAbs,
     SupportsFloat,
     Union,
     final,
+    get_args,
+    get_origin,
+    get_type_hints,
     overload,
     runtime_checkable,
 )
 
-from typing_extensions import TypeAlias, assert_never
+if sys.version_info < (3, 10):
+    from typing_extensions import TypeAlias
+
+    slots: dict[str, bool] = {}
+else:
+    from typing import TypeAlias
+
+    slots: dict[str, bool] = {"slots": True}
+
+if sys.version_info < (3, 11):
+    from typing import NoReturn
+
+    def assert_never(arg: NoReturn) -> NoReturn:
+        raise AssertionError("expected code to be unreachable")
+else:
+    from typing import assert_never
 
 if TYPE_CHECKING:
-    from .fmt import Formatter, _FormatSpec
+    from ._fmt import Formatter, _FormatSpec
 
 
 @runtime_checkable
@@ -40,6 +63,7 @@ class SupportsDecimal(SupportsFloat, SupportsAbs[object], Protocol):
 
 ExprKind: TypeAlias = Literal["dimensionless", "unit", "dimension"]
 Number: TypeAlias = Union[SupportsDecimal, Decimal, Fraction, float, int]
+_ARGS_NUMBER = get_args(Number)
 Name: TypeAlias = str
 """A unique slug to identify the expression. This is used by the default basic
 formatter to display the expression and hence should not contain any spaces
@@ -70,15 +94,15 @@ class AliasMixin:
 
 class FormatMixin:
     def __format__(self, fmt: _FormatSpec | str | Formatter) -> str:
-        from .fmt import fmt as format_
+        from ._fmt import fmt as format_
 
-        return format_(self, fmt=fmt)  # type: ignore
+        return format_(self, formatter=fmt)  # type: ignore
 
     def __str__(self) -> str:
         return self.__format__("basic")
 
 
-class ExprBase(ABC, FormatMixin):
+class ExprBase(FormatMixin):
     """A base class for a "unit-like" expression.
 
     It may be of the following forms:
@@ -104,7 +128,7 @@ class ExprBase(ABC, FormatMixin):
       complex expression. However, it can be further [tagged][isq.Tagged]
       (e.g. surface temperature vs ISA temperature).
     ⁴ can be created by multiplying a [prefix][isq.Prefix] (e.g. `milli`)
-    ⁵ can be created by indexing a [quantity kind][isq.QtyKind] with a unit
+    ⁵ can be created by calling a [quantity kind][isq.QtyKind] with a unit
 
     Operator overloading is provided for ergonomic expression construction.
 
@@ -114,25 +138,6 @@ class ExprBase(ABC, FormatMixin):
         interprets `J / KG / K` as `(J / KG) / K`, it is often clearer to
         represent it as `J * KG**-1 * K**-1`.
     """
-
-    @property
-    @abstractmethod
-    def dimension(self) -> Expr:
-        """Return the dimension of this "unit-like" expression.
-        Note that it does not perform simplification.
-
-        Examples:
-
-        - `Exp(M, 2)` -> `Exp(DIM_LENGTH, 2)`
-        - `Mul(M, Exp(S, -1))` -> `Mul(DIM_LENGTH, Exp(DIM_TIME, -1))`
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def kind(self) -> ExprKind:
-        """Whether this expression is a unit, dimension, or dimensionless."""
-        ...
 
     def __pow__(self, exponent: Exponent) -> Exp:
         return Exp(self, exponent)  # type: ignore
@@ -169,56 +174,41 @@ class ExprBase(ABC, FormatMixin):
         if not isinstance(
             rhs, (LazyProduct, SupportsDecimal, Decimal, Fraction, float, int)
         ):
-            return self * rhs**-1  # type: ignore
+            return self * rhs**-1
 
         return Scaled(
             self,  # type: ignore
-            LazyProduct(tuple(f for f in _products_inverse(rhs))),  # type: ignore
+            LazyProduct(tuple(f for f in _products_inverse(rhs))),
         )  # M / 2 => Scaled(M, Fraction(1, 2))
 
+    def __getitem__(self, tags: tuple[Tag, ...] | Tag) -> Tagged:
+        """Attach tags to this expresson."""
+        t = tags if isinstance(tags, tuple) else (tags,)
+        if isinstance(self, Tagged):
+            return Tagged(self.reference, self.tags + t)
+        return Tagged(self, t)  # type: ignore
 
-@dataclass(frozen=True)
+
+# all expressions should be immutable. helper functions like `kind`, `dimension`
+# simplify etc. rely on this fact to cache results.
+@dataclass(frozen=True, **slots)
 class Dimensionless(Named, ExprBase):
     name: Name
     """Name for the dimensionless number, e.g. `reynolds`, `prandtl`"""
 
-    @property
-    def dimension(self) -> Dimensionless:
-        return self
 
-    @property
-    def kind(self) -> ExprKind:
-        return "dimensionless"
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class BaseDimension(Named, ExprBase):
     name: Name
     """Name for the base dimension, e.g. `L`, `M`, `T`"""
 
-    @property
-    def dimension(self) -> BaseDimension:
-        return self
 
-    @property
-    def kind(self) -> ExprKind:
-        return "dimension"
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class BaseUnit(Named, ExprBase):
     _dimension: BaseDimension
     """Reference to the base dimension"""
     name: Name
     """Name for the unit, e.g. `m`, `kg`, `s`"""
-
-    @property
-    def dimension(self) -> BaseDimension:
-        return self._dimension
-
-    @property
-    def kind(self) -> ExprKind:
-        return "unit"
 
 
 Exponent: TypeAlias = Union[int, Fraction]
@@ -226,7 +216,7 @@ Exponent: TypeAlias = Union[int, Fraction]
 or a fraction, but not zero"""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class Exp(AliasMixin, ExprBase):
     """An expression raised to an exponent.
     For example, `BaseUnit("meter", Dimension("L")), 2)` is m².
@@ -236,7 +226,7 @@ class Exp(AliasMixin, ExprBase):
     base: _ComposableExpr
     exponent: Exponent
     """Exponent. Avoid using zero to represent dimensionless numbers: 
-    use [isq.Dimensionless][] with a name instead."""
+    use [`isq.Dimensionless`][] with a name instead."""
 
     def __post_init__(self) -> None:
         if not isinstance(self.exponent, (int, Fraction)):
@@ -267,16 +257,8 @@ class Exp(AliasMixin, ExprBase):
                 ),
             )  # prevent ℃². J ℃⁻¹ should be written as J K⁻¹
 
-    @property
-    def dimension(self) -> Exp:
-        return Exp(self.base.dimension, self.exponent)  # type: ignore
 
-    @property
-    def kind(self) -> ExprKind:
-        return self.base.kind
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class Mul(AliasMixin, ExprBase):
     """Products of powers of an expression."""
 
@@ -291,7 +273,7 @@ class Mul(AliasMixin, ExprBase):
                 msg="`Mul` terms must not be empty.",
                 help="use `Dimensionless` to represent a dimensionless quantity.",
             )
-        kinds = []
+        current_kind: ExprKind | None = None
         for term in self.terms:
             ref = _unwrap_tagged_or_aliased(term)
             if isinstance(ref, Translated):
@@ -301,27 +283,14 @@ class Mul(AliasMixin, ExprBase):
                     msg="`Translated` units (like ℃) are terminal and cannot be part of a product.",
                     help=f"use its absolute reference `{ref.reference}` instead.",
                 )  # prevent ℃ * ℃
-            kinds.append(term.kind)
-        unique_kinds = set(kinds) - {"dimensionless"}
-        if len(unique_kinds) != 1:
-            raise MixedKindError(terms=self.terms)
-
-    @property
-    def dimension(self) -> Mul:
-        return Mul(tuple(term.dimension for term in self.terms))  # type: ignore
-
-    @property
-    def kind(self) -> ExprKind:
-        # all terms have a consistent underlying kind (unit/dimension)
-        for term in self.terms:
-            term_kind = term.kind
-            if term_kind != "dimensionless":
-                return term_kind
-        # everything left are dimensionless to the power of something
-        return "dimensionless"
+            k = kind(term)
+            if current_kind is None and k != "dimensionless":
+                current_kind = k
+            elif current_kind != k and k != "dimensionless":
+                raise MixedKindError(terms=self.terms)  # prevent time * seconds
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class Scaled(AliasMixin, ExprBase):
     reference: BaseUnit | Exp | Mul | Scaled | Aliased | Tagged | Log
     """The unit or dimension that this unit or dimension is based on."""
@@ -357,18 +326,10 @@ class Scaled(AliasMixin, ExprBase):
             )  # prevent 13 * ℃
         # TODO: prevent BaseDimension from being scaled
 
-    @property
-    def dimension(self) -> Expr:
-        return self.reference.dimension
 
-    @property
-    def kind(self) -> ExprKind:
-        return self.reference.kind
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class Log(AliasMixin, ExprBase):
-    """The logarithm of a dimensionless expression."""
+    """The logarithm of a dimensionless expression [ISO 80000-2:2019 2-13.4]."""
 
     reference: Dimensionless | Tagged
     """A dimensionless expression"""
@@ -378,26 +339,20 @@ class Log(AliasMixin, ExprBase):
     """The base of the logarithm, e.g. 10 for bel, e for neper."""
 
     def __post_init__(self) -> None:
-        if not isinstance(inner := self.reference, (Dimensionless, Tagged)) or (
-            isinstance(inner, Tagged)
-            and not isinstance(inner.reference, Dimensionless)
-        ):
+        ref = self.reference
+        is_valid_ref = isinstance(ref, Dimensionless) or (
+            isinstance(ref, Tagged) and isinstance(ref.reference, Dimensionless)
+        )
+        if not is_valid_ref:
             raise CompositionError(
                 outer=Log,
-                inner=inner,
-                msg="`Log` can only wrap a dimensionless number",
+                inner=ref,
+                msg="`Log` can only wrap a `Dimensionless` expression",
+                help="use the `isq.ratio()` helper for logarithmic units like dB.",
             )
 
-    @property
-    def dimension(self) -> Dimensionless:
-        return Dimensionless(f"log_{repr(self.reference)}")
 
-    @property
-    def kind(self) -> Literal["dimensionless"]:
-        return "dimensionless"
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class Aliased(Named, ExprBase):
     """An alias for an expression, used to give a more readable name.
 
@@ -423,16 +378,8 @@ class Aliased(Named, ExprBase):
                 msg="`Aliased` can only wrap an `Exp`, `Mul`, `Scaled`, `Tagged`, or `Log` expression.",
             )
 
-    @property
-    def dimension(self) -> Expr:
-        return self.reference.dimension
 
-    @property
-    def kind(self) -> ExprKind:
-        return self.reference.kind
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class Translated(Named, ExprBase):
     """An expression offsetted from some reference unit."""
 
@@ -458,22 +405,15 @@ class Translated(Named, ExprBase):
                 msg="`Translated` must have a `BaseUnit` or `Scaled` expression as its reference.",
             )
 
-    @property
-    def kind(self) -> ExprKind:
-        return self.reference.kind
 
-    @property
-    def dimension(self) -> Expr:
-        return self.reference.dimension
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class Tagged(AliasMixin, ExprBase):
     """An expression decorated with one of more semantic context tag.
 
     Similar to how:
+
     - `Annotated[T, M1, M2, ...]` attaches metadata to some type `T`,
-    - `Tagged(E, (C1, C2, ...))` attaches context to an [expression][isq.Expr].
+    - `expr[C1, C2, ...]` attaches context to an [expression][isq.Expr].
 
     This allows one to "disambiguate" between quantities that share the same
     physical dimension, but have different meanings, e.g.
@@ -488,44 +428,24 @@ class Tagged(AliasMixin, ExprBase):
             raise CompositionError(
                 outer=Tagged,
                 inner=self.reference,
-                msg="nesting `Tagged` expressions is not allowed. to add tags, use `Tagged.add()`.",
+                msg="nesting `Tagged` expressions is not allowed. use the `unit[tags]` syntax.",
             )
         for tag in self.tags:
-            if isinstance(tag, SupportsTagCheck):
-                tag.__tag_check__(self.reference, self.tags)
-
-    @property
-    def dimension(self) -> Tagged | Expr:
-        ref_dim = self.reference.dimension
-        # note: log level's dimension is always dimensionless
-        # so we need to strip away tags that dont make any more sense
-        tags = []
-        for tag in self.tags:
-            if isinstance(tag, SupportsTagCheck):
-                try:
-                    tag.__tag_check__(ref_dim, self.tags)
-                except CompositionError:
-                    continue
-            tags.append(tag)
-        if not tags:
-            return ref_dim
-        return Tagged(ref_dim, tuple(tags))  # type: ignore
-
-    @property
-    def kind(self) -> ExprKind:
-        return self.reference.kind
+            if isinstance(tag, HasTagValidation):
+                tag.__validate_tag__(self.reference, self.tags)
 
 
 @runtime_checkable
-class SupportsTagCheck(Hashable, Protocol):
-    def __tag_check__(
+class HasTagValidation(Hashable, Protocol):
+    def __validate_tag__(
         self,
         reference: Expr,
         tags: tuple[Tag, ...],
     ) -> None:
-        """Validate that this tag can be applied to the given expression.
+        """Check that this tag can be applied to the given expression.
 
         For example, this can be used to ensure:
+
         - `decibel` (log level) with log reference unit `voltage` but not
         - `reynolds number` with log reference unit `voltage`.
 
@@ -536,9 +456,6 @@ class SupportsTagCheck(Hashable, Protocol):
         """
         ...
 
-
-Tag: TypeAlias = Union[SupportsTagCheck, Hashable]
-"""Any hashable object, for example, frozen dataclasses or strings."""
 
 # using sealed unions instead of ExprBase to facilitate static type checking
 Expr: TypeAlias = Union[
@@ -553,6 +470,7 @@ Expr: TypeAlias = Union[
     Log,
     Tagged,
 ]
+_ARGS_EXPR = get_args(Expr)
 NamedExpr: TypeAlias = Union[
     Dimensionless, BaseDimension, BaseUnit, Aliased, Translated
 ]
@@ -587,12 +505,12 @@ PhysicalUnit: TypeAlias = Union[
 #
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class Prefix:
     """A prefix, which when multiplied by a [base unit][isq.BaseUnit] or
     [aliased unit][isq.Aliased], returns a [scaled unit][isq.Scaled].
 
-    Note that this is not an [isq.Expr][].
+    Note that this is not an [`isq.Expr`][].
     """
 
     value: Number
@@ -643,79 +561,458 @@ class Prefix:
         return Scaled(rhs, self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class QtyKind:
-    """An abstract *kind of quantity* (ISO 80000-1) represents a "concept" (e.g.
+    r"""An abstract *kind of quantity* (ISO 80000-1) represents a "concept" (e.g.
     speed) *without* a specific unit tied to it.
 
-    When indexed with a unit, it becomes a
-    [concrete unit with tagged context][isq.Tagged].
+    When called with a unit, it becomes a [concrete unit with tagged
+    context][isq.Tagged].
     """
 
-    unit_si: _TaggedAllowedExpr
-    """The SI unit, e.g. `M_PERS` for speed"""
-    tags: tuple[Tag, ...]
+    unit_si_coherent: _TaggedAllowedExpr
+    """The coherent SI unit (i.e. no conversion factors involved, e.g.
+    `M_PERS` for speed, not `KM_PERHOUR`)"""
+    tags: tuple[Tag, ...] | None = None
 
-    def __getitem__(self, unit: _TaggedAllowedExpr) -> Tagged:
-        """Attach a specific unit to this kind of quantity."""
-        if unit is self.unit_si:
-            return Tagged(self.unit_si, tags=self.tags)
+    def si_coherent(self) -> Expr:
+        """Return the SI coherent unit with tags."""
+        if self.tags is None:
+            return self.unit_si_coherent
+        return self.unit_si_coherent[self.tags]
 
-        dim_unit = simplify(unit).dimension
-        dim_unit_self = simplify(self.unit_si).dimension
+    def __getitem__(self, tags: tuple[Tag, ...] | Tag) -> QtyKind:
+        """Attach additional tags to this quantity kind."""
+        t = tags if isinstance(tags, tuple) else (tags,)
+        if self.tags is not None:
+            t = self.tags + t
+        return replace(self, tags=t)
+
+    def __call__(self, unit: _TaggedAllowedExpr) -> Expr:
+        """Create a tagged unit from this quantity kind."""
+        if unit is self.unit_si_coherent:
+            return self.si_coherent()
+
+        dim_unit = dimension(simplify(unit))
+        dim_unit_self = dimension(simplify(self.unit_si_coherent))
         if dim_unit != dim_unit_self:
             raise UnitKindMismatchError(self, unit, dim_unit_self, dim_unit)
-        return Tagged(unit, tags=self.tags)
+        if self.tags is None:
+            return unit
+        return unit[self.tags]
 
 
+#
 # special tags
+# mathematical concepts [ISO 80000-2]
+#
 
 
-@dataclass(frozen=True)
-class Relative(SupportsTagCheck):
-    measured: PhysicalUnit
-    reference: PhysicalUnit
+@dataclass(frozen=True, **slots)
+class _Delta(HasTagValidation):
+    """A tag to indicate the quantity as an interval or a difference, (a vector
+    in affine space), rather than a particular point on the scale.
 
-    def __tag_check__(
-        self,
-        reference: Expr,
-        tags: tuple[Tag, ...],
-    ) -> None:
-        if not isinstance(reference, Dimensionless):
+    It is independent of a specific origin alone, but when combined with
+    [`isq.OriginAt`][] it can represent a "deviation relative to a specific
+    point on the scale".
+    """
+
+    kind: Literal["finite", "differential", "inexact_differential"] = "finite"
+
+    def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
+        _check_duplicate_tags(self, tags)
+
+    # while frozen=True adds the hash, we define our own __hash__ because:
+    # - py310's abc.Hashable checks before the dataclass decorator is applied
+    # - mypy doesn't understand that frozen=True creates __hash__ dynamically
+    def __hash__(self) -> int:
+        return hash((self.__class__.__name__, self.kind))
+
+
+DELTA = _Delta("finite")
+r"""A tag to indicate a finite change in a quantity $\Delta Q$.
+
+Example: [duration in time][isq.DURATION]"""
+DIFFERENTIAL = _Delta("differential")
+r"""A tag to indicate an exact differential $dQ$ (whose integral is
+path-independent).
+
+Example: [volume element][isq.VOLUME_ELEMENT]"""
+INEXACT_DIFFERENTIAL = _Delta("inexact_differential")
+r"""A tag to indicate an inexact differential $\delta Q$ (whose integral is
+path-dependent).
+
+Example: [inexact differential in heat][isq.INEXACT_DIFFERENTIAL_HEAT]"""
+
+
+# TODO: Substance (water), Solute, Solution
+# TODO: StateOfMatter (solid, liquid, gas, plasma, different allotropes...)
+# TODO: vacuum?
+
+
+@dataclass(frozen=True, **slots)
+class Quantity:
+    """A simple data container for a value and its unit, for use in
+    specifying the [origin of a point on the scale][isq.OriginAt].
+
+    !!! warning
+        This is not an [`isq.Expr`][] should not be further composed.
+    """
+
+    value: Number | LazyProduct
+    unit: PhysicalUnit
+
+
+@dataclass(frozen=True, **slots)
+class OriginAt(HasTagValidation):
+    """A tag to specify the origin for a point on the scale. Commonly combined
+    with [`isq.DELTA`][] to also represent a change in the quantity.
+
+    Examples:
+
+    - Unix epoch: `S[OriginAt("unix epoch")]`
+    - difference in actual temperature and ISA temperature:
+      `K[DELTA, OriginAt((15, CELSIUS))]`
+    - difference in pressure: `Pa[DELTA, OriginAt((100, PSI))]`
+    """
+
+    location: Quantity | Hashable
+    """The location of the "zero point" of the measurement.
+
+    Can be a quantity (value + unit, e.g. `(100, PSI)`) or simply a hashable
+    object (e.g. the string "unix epoch"). Hashable objects are useful for
+    scenarios where the origin itself is contextual, for example:
+
+    - the height above the ground is dependent on the geographic location
+    - the stock price relative to yesterday's close
+    - time elapsed relative to the engine ignition
+    """
+
+    def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
+        if (
+            isinstance(q := self.location, Quantity)
+            and not isinstance(reference, Dimensionless)
+            and q.unit != reference
+        ):
             raise CompositionError(
-                outer=Relative,
+                outer=OriginAt,
                 inner=reference,
-                msg="tag `Relative` can only be applied to a `Dimensionless` expression.",
+                msg=(
+                    f"expression {reference} is not compatible with "
+                    f"`OriginAt.location` of unit {q.unit}"
+                ),
+                help=f"`OriginAt.location` must be of unit {reference}",
             )
-        # TODO: check that measured/reference are actually units
         _check_duplicate_tags(self, tags)
 
     def __hash__(self) -> int:
-        return hash((self.__class__.__name__, self.measured, self.reference))
+        return hash((self.__class__.__name__, self.location))
+
+
+# TODO: add tag `AtCondition` (Delta pressure = 0, temperature = 293.15 K)
+# TODO: add tag `Rotation`? clockwise/counterclockwise
+# TODO: add tag `Direction`? into/out of system
+
+_RATIO = Dimensionless("ratio")
+
+
+def ratio(numerator: Expr, denominator: Expr | Quantity) -> Tagged:
+    """Returns a dimensionless between two expressions of the same dimension.
+
+    The denominator can be a [quantity (value + unit)][isq.Quantity] to
+    represent logarithmic units like [`isq.DBW`][].
+
+    See: https://en.wikipedia.org/wiki/Dimensionless_quantity#Ratios,_proportions,_and_angles"""
+    return _RATIO[_RatioBetween(numerator, denominator)]
+
+
+@dataclass(frozen=True, **slots)
+class _RatioBetween(HasTagValidation):
+    numerator: Expr
+    denominator: Expr | Quantity
+
+    def __post_init__(self) -> None:
+        # TODO: enforce dimensionless:
+        # we abuse numerator * (denominator.value * denominator.unit)**-1
+        # and check we indeed get dimensionless or scaled dimensionless.
+        pass
+
+    def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
+        if reference is not _RATIO:
+            raise CompositionError(
+                outer=_RatioBetween,
+                inner=reference,
+                msg="`RatioBetween` tag can only be applied to a ratio.",
+                help="use the `isq.ratio()` helper function.",
+            )
+        _check_duplicate_tags(self, tags)
+
+    def __hash__(self) -> int:
+        return hash((self.__class__.__name__, self.numerator, self.denominator))
+
+
+@dataclass(frozen=True, **slots)
+class _Tensor(HasTagValidation):
+    rank: int
+
+    def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
+        _check_duplicate_tags(self, tags)
+
+    def __hash__(self) -> int:
+        return hash((self.__class__.__name__, self.rank))
+
+
+# NOTE: `var: Annotated[T, x]` can be interpreted as "the numerical value of
+# `var` is a measurement on the scale `x`". If `T` is a float, then it is a
+# scalar; if `T` is numpy array, it can be a tensor.
+# Use `_Tensor` to indicate that the quantity *can*, but does not have to,
+# be a tensor.
+VECTOR = _Tensor(rank=1)
+"""A tag to indicate that the quantity can be a vector.
+[ISO 80000-2:2019 2-18.1]. It is not restricted to three dimensions.
+
+Examples:
+
+- velocity vector: `M_PERS[VECTOR]`
+- force vector: `F[VECTOR]`"""
+TENSOR_SECOND_ORDER = _Tensor(rank=2)
+"""A tag to indicate that the quantity can be a second-order tensor.
+
+Examples:
+
+- stress tensor: `(N * M**-2)["stress", TENSOR_SECOND_ORDER]`"""
+
+
+@dataclass(frozen=True, **slots)
+class _CoordinateSystem(HasTagValidation, Named):
+    name: Literal["cartesian", "spherical", "cylindrical"] | str
+    # NOTE: allowing arbitrary names for now because different game engines
+    # don't agree to one (also ENU, NED...)
+
+    def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
+        _check_duplicate_tags(self, tags)
+
+    def __hash__(self) -> int:
+        return hash((self.__class__.__name__, self.name))
+
+
+# coordinate systems, TODO: left handed systems.
+CARTESIAN = _CoordinateSystem(name="cartesian")
+r"""A tag to indicate that the quantity is expressed in Cartesian coordinates
+($x$, $y$, $z$) [ISO 80000-2:2019 2-17.1].
+
+The position vector is $\mathbf{r} = x \mathbf{e}_x + y \mathbf{e}_y +
+z \mathbf{e}_z$, and its differential is $d\mathbf{r} = dx \mathbf{e}_x +
+dy \mathbf{e}_y + dz \mathbf{e}_z$.
+"""
+CYLINDRICAL = _CoordinateSystem(name="cylindrical")
+r"""A tag to indicate that the quantity is expressed in cylindrical coordinates
+(radial distance $\rho$, azimuth $\varphi$, axial coordinate or height $z$)
+[ISO 80000-2:2019 2-17.2].
+
+The position vector is $\mathbf{r} = \rho \mathbf{e}_\rho(\varphi) +
+z \mathbf{e}_z$, and its differential is $d\mathbf{r} =
+d\rho \mathbf{e}_\rho(\varphi) + \rho d\varphi \mathbf{e}_\varphi(\varphi) +
+dz \mathbf{e}_z$.
+
+If $z = 0$, it is equivalent to polar coordinates.
+"""
+SPHERICAL = _CoordinateSystem(name="spherical")
+r"""A tag to indicate that the quantity is expressed in spherical coordinates
+(radial distance $r$, polar angle $\theta$, azimuthal angle $\varphi$)
+[ISO 80000-2:2019 2-17.3].
+
+The position vector is $\mathbf{r} = r \mathbf{e}_r(\theta, \varphi)$,
+and its differential is $d\mathbf{r} = dr \mathbf{e}_r(\theta, \varphi) +
+r d\theta \mathbf{e}_\theta(\theta, \varphi) + r \sin(\theta) d\varphi
+\mathbf{e}_\varphi(\theta, \varphi)$.
+"""
+
+# TODO: while it is tempting to add a tag that "constrains" the quantity to be
+# greater than zero, much like `annotated_types.Gt`, we need to be very careful
+# because some quantities can be negative, e.g.
+# negative thermodynamic temperatures or altitudes below sea level.
+# https://github.com/mpusz/mp-units/issues/468
+
+
+@dataclass(frozen=True, **slots)
+class _Complex(HasTagValidation):
+    def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
+        _check_duplicate_tags(self, tags)
+
+    def __hash__(self) -> int:
+        return hash(self.__class__.__name__)
+
+
+COMPLEX = _Complex()
+"""A tag to indicate that the quantity is complex-valued."""
+
+
+# iso/iec 80000-specific
+@dataclass(frozen=True, **slots)
+class PhotometricCondition(HasTagValidation):
+    """Photometric condition [ISO 80000-7]. Can be:
+
+    - [Photopic vision (cones in human vision, in daylight)](https://en.wikipedia.org/wiki/Photopic_vision)
+    - [Scotopic vision (rods in human vision, at night)](https://en.wikipedia.org/wiki/Scotopic_vision)
+    - [Mesopic/twilight vision (rods and cones in human vision)](https://en.wikipedia.org/wiki/Mesopic_vision)
+    - CIE 1964 standard colorimetric observer (10° photopic photometric observer)
+    - CIE 1988 modified 2° spectral luminous efficiency function for photopic vision
+    - Any other custom condition.
+    """
+
+    kind: (
+        Literal[
+            "photopic",
+            "scotopic",
+            "mesopic",
+            "photopic_cie_1964_10degree",
+            "photopic_cie_1988_mod_2degree",
+        ]
+        | str
+    )
+
+    def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
+        _check_duplicate_tags(self, tags)
+
+    def __hash__(self) -> int:
+        return hash((self.__class__.__name__, self.kind))
 
 
 def _check_duplicate_tags(
     tag: Tag,
     tags: tuple[Tag, ...],
 ) -> None:
-    if (n_tags := tags.count(tag)) > 1:
+    tag_type = type(tag)
+    if sum(1 for t in tags if isinstance(t, tag_type)) > 1:
         raise CompositionError(
             outer=Tagged,
             inner=tag,
-            msg=(
-                f"tag {type(tag).__name__} cannot be applied multiple times, "
-                f"found {n_tags} occurrences."
-            ),
+            msg=f"tag `{tag_type.__name__}` cannot be applied multiple times.",
         )
+
+
+Tag: TypeAlias = Union[
+    OriginAt,
+    _RatioBetween,
+    _Delta,
+    _Tensor,
+    _CoordinateSystem,
+    _Complex,
+    PhotometricCondition,
+    HasTagValidation,
+    Hashable,
+]
+"""A tag can be any hashable object (e.g. frozen dataclasses or strings)."""
+
+#
+# this ends the basic expression system used for documentation purposes.
+# the rest of the code are *runtime* helpers that transform and manipulate
+# the expressions.
+#
+# the `dimension` and `kind` helper is sometimes used in `__post_init__` to make
+# invalid states unrepresentable. this comes with a minor performance
+# penalty but is worth it.
+#
+
+
+@overload
+def dimension(expr: Dimensionless) -> Dimensionless: ...
+@overload
+def dimension(expr: BaseDimension) -> BaseDimension: ...
+@overload
+def dimension(expr: BaseUnit) -> BaseDimension: ...
+@overload
+def dimension(expr: Exp) -> Exp: ...
+@overload
+def dimension(expr: Mul) -> Mul: ...
+@overload
+def dimension(expr: Log) -> Dimensionless: ...
+@overload
+def dimension(expr: Tagged) -> Tagged | Expr: ...
+@overload
+def dimension(expr: Aliased | Scaled | Translated) -> Expr: ...
+@cache
+def dimension(expr: Expr) -> Expr:
+    """Return the dimension of this "unit-like" expression.
+    Note that it does not perform simplification.
+
+    Examples:
+
+    - `Exp(M, 2)` -> `Exp(DIM_LENGTH, 2)`
+    - `Mul(M, Exp(S, -1))` -> `Mul(DIM_LENGTH, Exp(DIM_TIME, -1))`
+    """
+    if isinstance(expr, (Dimensionless, BaseDimension)):
+        return expr
+    if isinstance(expr, BaseUnit):
+        return expr._dimension
+    if isinstance(expr, (Aliased, Scaled, Translated)):
+        return dimension(expr.reference)
+    if isinstance(expr, Exp):
+        return Exp(dimension(expr.base), expr.exponent)  # type: ignore
+    if isinstance(expr, Mul):
+        return Mul(tuple(dimension(term) for term in expr.terms))  # type: ignore
+    if isinstance(expr, Tagged):
+        ref_dim = dimension(expr.reference)
+        # note: log level's dimension is always dimensionless
+        # so we need to strip away tags that dont make any more sense
+        tags = []
+        for tag in expr.tags:
+            if isinstance(tag, HasTagValidation):
+                try:
+                    tag.__validate_tag__(ref_dim, expr.tags)
+                except CompositionError:
+                    continue
+            tags.append(tag)
+        if not tags:
+            return ref_dim
+        return ref_dim[tuple(tags)]
+    if isinstance(expr, Log):
+        return Dimensionless(f"log_{repr(expr.reference)}")
+    assert_never(expr)
+
+
+@overload
+def kind(expr: Dimensionless | Log) -> Literal["dimensionless"]: ...
+@overload
+def kind(expr: BaseDimension) -> Literal["dimension"]: ...
+@overload
+def kind(expr: BaseUnit) -> Literal["unit"]: ...
+@overload
+def kind(
+    expr: Exp | Mul | Scaled | Aliased | Translated | Tagged,
+) -> ExprKind: ...
+@cache
+def kind(expr: Expr) -> ExprKind:
+    """Whether this expression is a unit, dimension, or dimensionless."""
+    if isinstance(expr, Dimensionless):
+        return "dimensionless"
+    if isinstance(expr, BaseDimension):
+        return "dimension"
+    if isinstance(expr, BaseUnit):
+        return "unit"
+    if isinstance(expr, Exp):
+        return kind(expr.base)
+    if isinstance(expr, (Scaled, Aliased, Translated, Tagged)):
+        return kind(expr.reference)
+    if isinstance(expr, Mul):
+        # all terms have a consistent underlying kind (unit/dimension)
+        for term in expr.terms:
+            term_kind = kind(term)
+            if term_kind != "dimensionless":
+                return term_kind
+        return "dimensionless"
+        # everything left are dimensionless to the power of something
+    if isinstance(expr, Log):
+        return "dimensionless"
+    assert_never(expr)
 
 
 #
 # simplify
 #
-# TODO: in the future, we want a as_basis() function that accepts set[Expr]
-# why: we sometimes want to re-express some unit not in MKS, but CGS.
-# that will require linear algebra to solve the dimensional exponents but
-# we're leaving that as optional and far in the future.
+
 
 SimplifiedExpr: TypeAlias = Union[
     Dimensionless,
@@ -756,8 +1053,7 @@ def simplify(
     Scaled,
     Translated,
 ]: ...
-
-
+@cache
 def simplify(expr: Expr) -> SimplifiedExpr:
     if isinstance(expr, (Dimensionless, BaseDimension, BaseUnit)):
         return expr
@@ -841,11 +1137,13 @@ def _decompose_expr(
             base_exponent_pairs_mut,
             scaled_conversions_mut,
         )
-    else:  # pragma: no cover
+    else:
         assert_never(expr)
 
 
-__DIMENSIONLESS_SIMPLIFIED: Final = Dimensionless(name="from_simplified")
+__DIMENSIONLESS_SIMPLIFIED: Final[Dimensionless] = Dimensionless(
+    name="from_simplified"
+)
 
 
 def _build_canonical_expr(
@@ -891,33 +1189,64 @@ def _build_canonical_expr(
     )
 
 
+# TODO: in the future, we want a as_basis() function that accepts set[Expr]
+# why: we sometimes want to re-express some unit not in MKS, but CGS.
+# that will require linear algebra to solve the dimensional exponents but
+# we're leaving that as optional and far in the future.
+
 #
 # converter
 #
 
 
-@dataclass(frozen=True)
-class Converter:
+def _converter_new(
+    scale: Number, offset: Number
+) -> Converter | NonAffineConverter:
+    # unless conversions involve celsius/fahrenheit/log units, non-affine
+    # conversions are rare
+    if not offset:
+        return Converter(scale=scale)
+    return NonAffineConverter(scale=scale, offset=offset)
+
+
+@runtime_checkable
+class SupportsConversion(Protocol):
+    def __call__(self, value):  # type: ignore
+        """Convert a value in the origin unit to the target unit.
+
+        :param value: An `int`, `float`, [fractions.Fraction][],
+            or any other numeric type^.
+
+            ^ If the converter was created with `exact=True`, the `scale`
+            will be fractions and thus may not be compatible with many numeric
+            libraries (e.g. `fractions.Fraction * numpy.array` fails).
+            [decimal.Decimal][] inputs should be converted into
+            [fractions.Fraction][].
+        """
+
+
+@dataclass(frozen=True, **slots)
+class Converter(SupportsConversion):
+    scale: Number
+
+    def __call__(self, value):  # type: ignore
+        return self.scale * value
+
+
+@dataclass(frozen=True, **slots)
+class NonAffineConverter(SupportsConversion):
     scale: Number
     offset: Number
 
-    def __call__(self, value: Any) -> Any:
-        """Convert a value in the origin unit to the target unit.
-
-        :param value: An integer, float or [fractions.Fraction][].
-            If the converter was created with exact=False, it can also take an
-            array-like object.
-            If exact=True, [decimal.Decimal][] inputs should be converted into a
-            [fractions.Fraction][].
-        """
+    def __call__(self, value):  # type: ignore
         return value * self.scale + self.offset
 
 
 class _LogInfo(NamedTuple):
     k: Number | LazyProduct
     b: Number
-    q_measured: PhysicalUnit
-    q_ref: PhysicalUnit
+    q_measured_unit: PhysicalUnit
+    q_ref: Quantity
     other_tags: tuple[Tag, ...]
 
 
@@ -927,20 +1256,25 @@ def _get_log_info(info: _ConversionInfo) -> _LogInfo | None:
     log_expr = info.expr
     if not isinstance(log_expr.reference, Tagged):
         return None
-    relative_tag = None
+    ratio_between_tag = None
     other_tags: list[Tag] = []
     for tag in log_expr.reference.tags:
-        if isinstance(tag, Relative):
-            relative_tag = tag
+        if isinstance(tag, _RatioBetween):
+            ratio_between_tag = tag
         else:
             other_tags.append(tag)
-    if relative_tag is None:
+    if ratio_between_tag is None or (
+        not isinstance(ratio_between_tag.denominator, Quantity)
+    ):
+        # pH, pKa isn't log(ratio), and
+        # generic dB does not refer to a specific reference value
         return None
+    # TODO: handle Log(Exp(ratio, 2))
     return _LogInfo(
         k=info.factor,
         b=log_expr.base,
-        q_measured=relative_tag.measured,
-        q_ref=relative_tag.reference,
+        q_measured_unit=log_expr.reference,
+        q_ref=ratio_between_tag.denominator,
         other_tags=tuple(other_tags),
     )
 
@@ -951,7 +1285,7 @@ def convert(
     *,
     exact: bool = False,
     ctx: decimal.Context | None = None,
-) -> Converter:
+) -> Converter | NonAffineConverter:
     """Create a new unit converter from one unit to another.
 
     Checks that the underlying dimension are compatible
@@ -970,8 +1304,9 @@ def convert(
     if log_info_origin and log_info_target:
         if not (
             log_info_origin.b == log_info_target.b
-            and log_info_origin.q_measured == log_info_target.q_measured
-            and log_info_origin.q_ref == log_info_target.q_ref
+            and log_info_origin.q_measured_unit
+            == log_info_target.q_measured_unit
+            and log_info_origin.q_ref.unit == log_info_target.q_ref.unit
             and log_info_origin.other_tags == log_info_target.other_tags
         ):
             return _convert_logarithmic(
@@ -985,13 +1320,15 @@ def convert(
             target=target,
         )  # e.g. V = V_ref * b**(L_dBV / k), L_dbV = k * log_b(V / V_ref)
 
-    if origin_simpl.kind != target_simpl.kind:
+    if (origin_kind := kind(origin_simpl)) != (
+        target_kind := kind(target_simpl)
+    ):
         raise KindMismatchError(
-            origin_kind=origin_simpl.kind, target_kind=target_simpl.kind
+            origin_kind=origin_kind, target_kind=target_kind
         )
 
-    origin_dim = info_origin.expr.dimension
-    target_dim = info_target.expr.dimension
+    origin_dim = dimension(info_origin.expr)
+    target_dim = dimension(info_target.expr)
     origin_dim_terms = (
         origin_dim.terms if isinstance(origin_dim, Mul) else (origin_dim,)
     )
@@ -1016,7 +1353,7 @@ def convert(
     ) - _factor_to_fraction(info_target.offset, ctx=ctx)
     offset = LazyProduct(tuple([offset_numerator, *inv_scale_target]))
 
-    return Converter(
+    return _converter_new(
         scale=scale.to_exact(ctx=ctx) if exact else scale.to_approx(),
         offset=offset.to_exact(ctx=ctx) if exact else offset.to_approx(),
     )
@@ -1028,7 +1365,7 @@ def _convert_logarithmic(
     *,
     exact: bool,
     ctx: decimal.Context,
-) -> Converter:
+) -> Converter | NonAffineConverter:
     r"""
     With $L_1 = k_1 \log_{b_1}\left(\frac{Q}{Q_{\text{ref}_1}}\right)$,
     $L_2 = k_2 \log_{b_2}\left(\frac{Q}{Q_{\text{ref}_2}}\right)
@@ -1038,20 +1375,22 @@ def _convert_logarithmic(
     """
     if origin_info.other_tags != target_info.other_tags:
         raise DimensionMismatchError(
-            origin_info.q_measured,
-            target_info.q_measured,
-            simplify(origin_info.q_measured).dimension,
-            simplify(target_info.q_measured).dimension,
+            origin_info.q_measured_unit,
+            target_info.q_measured_unit,
+            dimension(simplify(origin_info.q_measured_unit)),
+            dimension(simplify(target_info.q_measured_unit)),
         )
 
     ref_converter = convert(
-        origin=origin_info.q_ref,
-        target=target_info.q_ref,
+        origin=origin_info.q_ref.unit,
+        target=target_info.q_ref.unit,
         exact=True,
         ctx=ctx,
     )
-    if ref_converter.offset != 0:
-        raise NonLinearConversionError(origin_info.q_ref, target_info.q_ref)
+    if isinstance(ref_converter, NonAffineConverter):
+        raise NonLinearConversionError(
+            origin_info.q_ref.unit, target_info.q_ref.unit
+        )
 
     k1 = _factor_to_fraction(origin_info.k, ctx=ctx)
     k2 = _factor_to_fraction(target_info.k, ctx=ctx)
@@ -1071,12 +1410,12 @@ def _convert_logarithmic(
 
         scale = k_ratio * Fraction(ln_b1_d) / Fraction(ln_b2_d)
         offset = k2 * Fraction(ln_ref_ratio_d) / Fraction(ln_b2_d)
-        return Converter(scale=scale, offset=offset)
+        return _converter_new(scale, offset)
     else:
         ln_b2_fl = math.log(float(b2))
         scale_fl = float(k_ratio) * math.log(float(b1)) / ln_b2_fl
         offset_fl = float(k2) * math.log(float(ref_ratio_f)) / ln_b2_fl
-        return Converter(scale=scale_fl, offset=offset_fl)
+        return _converter_new(scale_fl, offset_fl)
 
 
 class _ConversionInfo(NamedTuple):
@@ -1086,6 +1425,8 @@ class _ConversionInfo(NamedTuple):
     """Total scaling factor to convert from this unit to the absolute reference"""
     offset: Number | LazyProduct
     """Total offset to convert from this unit to the absolute reference"""
+    tag_origin_at: OriginAt | None = None
+    tag_delta: _Delta | None = None
 
 
 def _flatten(
@@ -1107,10 +1448,19 @@ def _flatten(
         return _ConversionInfo(expr_simpl.reference, factor, 0)
     elif isinstance(expr_simpl, Tagged):
         info_ref = _flatten(expr_simpl.reference)  # type: ignore
+        tag_origin_at = None
+        tag_delta = None
+        for tag in expr_simpl.tags:
+            if isinstance(tag, OriginAt):
+                tag_origin_at = tag
+            elif isinstance(tag, _Delta):
+                tag_delta = tag
         return _ConversionInfo(
-            Tagged(info_ref.expr, expr_simpl.tags),  # type: ignore
+            info_ref.expr[expr_simpl.tags],
             info_ref.factor,
             info_ref.offset,
+            tag_origin_at=tag_origin_at,
+            tag_delta=tag_delta,
         )
     elif isinstance(expr_simpl, Translated):
         info_ref = _flatten(expr_simpl.reference)  # type: ignore
@@ -1124,7 +1474,7 @@ def _flatten(
             (-1, expr_simpl.offset, *_products(info_ref.factor))
         )
         return _ConversionInfo(info_ref.expr, info_ref.factor, new_offset)
-    else:  # pragma: no cover
+    else:
         assert_never(expr_simpl)
 
 
@@ -1185,7 +1535,7 @@ def _fraction_to_decimal(fraction: Fraction) -> Decimal:
     return fraction.numerator / Decimal(fraction.denominator)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, **slots)
 class LazyProduct(SupportsFloat):
     r"""Represents a lazy product of a sequence of numbers raised to an optional
     exponent, i.e. $\prod_i x_i$, or $\prod_i x_i^{e_i}$.
@@ -1193,7 +1543,7 @@ class LazyProduct(SupportsFloat):
     Lazy evaluation allows the choice between evaluating it to an exact value
     (taking longer to compute, useful for financial calculations) or an
     approximate float.
-    """
+    """  # TODO: support LazyProduct itself as the base
 
     products: tuple[tuple[Number, Exponent] | Number, ...]
 
@@ -1232,13 +1582,11 @@ class LazyProduct(SupportsFloat):
     def __float__(self) -> float:
         return self.to_approx()
 
-    def to_exact(
-        self, *, ctx: decimal.Context | None = None
-    ) -> Fraction | Decimal:
+    def to_exact(self, ctx: decimal.Context) -> Fraction | Decimal:
         """Reduce it to an *exact* fraction or decimal.
 
         :param ctx: The decimal context (precision, rounding, etc.) to use.
-            If none, the global `decimal.getcontext()` is used.
+            `decimal.getcontext()` can be used to get the current context.
 
         The return type depends on the items of each product:
 
@@ -1266,7 +1614,6 @@ class LazyProduct(SupportsFloat):
         For simplicity, only cases that can definitively be represented as a
         `Fraction` are returned as such. A `Decimal` is returned otherwise.
         """
-        ctx = ctx or decimal.getcontext()
         # accumulate products in two streams: if the "tripwire" for decimal
         # is hit, we must return Decimal.
         product_fraction = Fraction(1)
@@ -1304,15 +1651,44 @@ class LazyProduct(SupportsFloat):
                     base_decimal = ctx.create_decimal_from_float(base)
                 elif isinstance(base, int):  # ^
                     base_decimal = Decimal(base, context=ctx)
-                else:  # pragma: no cover
+                else:
                     assert_never(base)
                 exponent_decimal = _fraction_to_decimal(exponent)
                 product_decimal *= ctx.power(base_decimal, exponent_decimal)
-            else:  # pragma: no cover
+            else:
                 assert_never(exponent)
         if product_decimal == Decimal(1):
             return product_fraction
         return _fraction_to_decimal(product_fraction) * product_decimal
+
+
+@dataclass(frozen=True, **slots)
+class StdUncertainty:
+    """Concise notation for the one-standard-deviation uncertainty of a
+    numerical value.
+
+    For example, the parentheses in `12.3456(89) kg` means:
+    ```
+         numerical value = 12.3456
+    standard uncertainty =  0.0089
+    ```
+    Use `typing.Annotated` to attach the uncertainty information to the value:
+    ```py
+    from decimal import Decimal
+    from typing import Annotated
+    from isq import KG, StdUncertainty
+
+    CONST_FOO: Annotated[Decimal, KG, StdUncertainty(89)] = Decimal("12.3456")
+    ```
+    """
+
+    # not really used anywhere - its for clarity only.
+    # we could try to propagate errors for derived physical constants,
+    # but that is overkill.
+
+    value: int
+    """The one-standard-deviation uncertainty expressed in the least
+    significant digit(s) of the numerical value. Must be greater than zero."""
 
 
 @final
@@ -1361,9 +1737,119 @@ class _PI(SupportsDecimal):
         return "π"
 
 
-E: Final = _E()
-PI: Final = _PI()
+E: Final[_E] = _E()
+"""The Euler number [ISO 80000-2:2019 2-13.1][isq._citations.ISO_80000_2]."""
+PI: Final[_PI] = _PI()
+"""The ratio of the circumference of a circle to its diameter
+[ISO 80000-2:2019 2-14.1][isq._citations.ISO_80000_2]."""
 
+
+#
+# tools for introspecting `Annotated` (especially module attributes)
+# where __doc__ is not available
+#
+
+
+@dataclass(frozen=True, **slots)
+class AnnotatedMetadata:
+    unit: Expr | None
+    std_uncertainty: StdUncertainty | None
+
+    @classmethod
+    def from_args(cls, args: Sequence[Any]) -> AnnotatedMetadata:
+        """Extract metadata from the args of an `Annotated` type.
+
+        Example:
+        ```pycon
+        >>> from typing import Annotated
+        >>> from isq import KG, StdUncertainty
+        >>> from dataclasses import dataclass
+        >>> @dataclass
+        ... class Foo:
+        ...     class_member: Annotated[float, KG, StdUncertainty(13)]
+        ...
+        >>> def bar(function_arg: Annotated[float, KG]) -> None:
+        ...     ...
+        ...
+        >>> from isq import AnnotatedMetadata
+        >>> def print_metadata(obj) -> None:
+        ...     for name, ann in get_type_hints(obj, include_extras=True).items():
+        ...         print(f"{name}: {AnnotatedMetadata.from_args(get_args(ann))}")
+        ...
+        >>> print_metadata(Foo)
+        class_member: AnnotatedMetadata(unit=kilogram, std_uncertainty=StdUncertainty(value=13))
+        >>> print_metadata(bar)
+        function_arg: AnnotatedMetadata(unit=kilogram)
+        return: AnnotatedMetadata(unit=None)
+        ```
+        """
+        unit: _TaggedAllowedExpr | None = None
+        std_uncertainty: StdUncertainty | None = None
+        for arg in args:
+            if isinstance(arg, _ARGS_EXPR):
+                if unit is not None:
+                    raise DuplicateAnnotationError(args, arg)
+                unit = arg
+            elif isinstance(arg, StdUncertainty):
+                if std_uncertainty is not None:
+                    raise DuplicateAnnotationError(args, arg)
+                std_uncertainty = arg
+        return cls(unit=unit, std_uncertainty=std_uncertainty)
+
+    def __str__(self) -> str:
+        kv = []
+        for field in fields(self):
+            if (value := getattr(self, field.name)) is None:
+                continue
+            kv.append(f"{field.name}={value}")
+        return f"{type(self).__name__}({', '.join(kv)})"
+
+
+def module_attribute_metadata(
+    module_rt: ModuleType,
+) -> Generator[tuple[str, AnnotatedMetadata], None, None]:
+    """Yields all (name, metadata) pairs for module attributes that are
+    annotated with valid [unit expressions][isq.Expr] and/or
+    [standard uncertainties][isq.StdUncertainty] in the given module.
+
+    Effectively returns the units and uncertainties of all constants. Example:
+    ```pycon
+    >>> from isq import module_attribute_metadata, iso80000
+    >>> for name, metadata in module_attribute_metadata(iso80000):
+    ...     print(f"{name}: {metadata}")
+    ...
+    CONST_SPEED_OF_LIGHT_VACUUM: AnnotatedMetadata(unit=meter · second⁻¹)
+    CONST_PLANCK: AnnotatedMetadata(unit=joule · second
+    - joule = newton · meter
+    - newton = kilogram · meter · second⁻²)
+    CONST_REDUCED_PLANCK: AnnotatedMetadata(unit=joule · second
+    - joule = newton · meter
+    - newton = kilogram · meter · second⁻²)
+    ...
+    ```
+    """
+    for name, anno in get_type_hints(module_rt, include_extras=True).items():
+        if get_origin(anno) is not Annotated:
+            continue
+        metadata = AnnotatedMetadata.from_args(get_args(anno))
+        yield name, metadata
+
+
+class Anchor(NamedTuple):
+    """A simple wrapper over a text with an external link.
+
+    It is used to:
+
+    - yield a bare string or a "link" in [`isq.BasicFormatter`][].
+    - create a hyperlink in the [where clause of a definition][isq.details.WhereFragment]
+    - render a link in the [HTML documentation][isq.mkdocs.extension.MkdocsFormatter].
+    """
+
+    text: str
+    href: str
+
+
+StrFragment: TypeAlias = Union[str, Anchor]
 
 #
 # errors
@@ -1374,7 +1860,7 @@ class IsqError(Exception):
     """Base exception for all errors raised by the isq library."""
 
 
-@dataclass
+@dataclass(frozen=True, **slots)
 class CompositionError(IsqError):
     outer: type
     inner: Any
@@ -1394,26 +1880,26 @@ class CompositionError(IsqError):
             f"\nreason: {self.msg}"
         )
         if self.help:
-            message += f"\nhelp: {self.help}"
+            message += f"\n= help: {self.help}"
         return message
 
 
-@dataclass
+@dataclass(frozen=True, **slots)
 class MixedKindError(IsqError):
     terms: tuple[Expr, ...]
 
     def __str__(self) -> str:  # pragma: no cover
         return (
             "cannot mix expressions of different kinds in a product."
-            f"\n  found kinds: {', '.join(f'`{t.kind}`' for t in self.terms)}"
-            "\nhelp: all terms in a `Mul` expression must be of the same kind "
+            f"\n  found kinds: {', '.join(f'`{kind(t)}`' for t in self.terms)}"
+            "\n= help: all terms in a `Mul` expression must be of the same kind "
             "(e.g., all units like `M` and `S`, or all dimensions like "
             "`DIM_LENGTH` and `DIM_TIME`)."
         )
 
 
 # conversion
-@dataclass
+@dataclass(frozen=True, **slots)
 class KindMismatchError(IsqError):
     origin_kind: ExprKind
     target_kind: ExprKind
@@ -1426,7 +1912,7 @@ class KindMismatchError(IsqError):
         )
 
 
-@dataclass
+@dataclass(frozen=True, **slots)
 class DimensionMismatchError(IsqError):
     origin: Expr
     target: Expr
@@ -1436,31 +1922,31 @@ class DimensionMismatchError(IsqError):
     def __str__(self) -> str:  # pragma: no cover
         return (
             f"cannot convert from `{self.origin}` to `{self.target}`."
-            "\nhelp: expected compatible dimensions, but found:"
+            "\n= help: expected compatible dimensions, but found:"
             f"\ndimension of origin: `{self.dim_origin}`"
             f"\ndimension of target: `{self.dim_target}`"
         )
 
 
-@dataclass
+@dataclass(frozen=True, **slots)
 class UnitKindMismatchError(IsqError):
-    kind: QtyKind
+    qtykind: QtyKind
     unit: Expr
     dim_kind: Expr
     dim_unit: Expr
 
     def __str__(self) -> str:  # pragma: no cover
         return (
-            f"cannot create tagged unit for kind `{self.kind.tags}` with "
+            f"cannot create tagged unit for kind `{self.qtykind.tags}` with "
             f"unit `{self.unit}`."
             f"\nexpected dimension of kind: `{self.dim_kind}`"
-            f" (`{self.kind.unit_si}`)"
+            f" (`{self.qtykind.unit_si_coherent}`)"
             f"\n   found dimension of unit: `{self.dim_unit}`"
             f" (`{self.unit}`)"
         )
 
 
-@dataclass
+@dataclass(frozen=True, **slots)
 class NonLinearConversionError(IsqError):
     origin: Expr
     target: Expr
@@ -1470,14 +1956,21 @@ class NonLinearConversionError(IsqError):
             f"cannot create a value-agnostic converter from `{self.origin}` "
             f"to `{self.target}`."
             "conversion between a logarithmic and a linear unit is non-linear."
-            "\nhelp: this requires a reference value (e.g., 1V for dBV), "
-            "but this library only performs value-agnostic conversions. "
-            "please perform the calculation manually."
+            "\n= help: this requires a reference value (e.g., 1V for dBV), "
+            "but the `isq` library only performs value-agnostic conversions. "
+            "perform the calculation manually instead."
         )
 
 
-# NOTE: for a registry, one option is to adopt https://peps.python.org/pep-0487/#subclass-registration:
-# - have a `Registrable` mixin with `__init_subclass__` so the act of defining a class `S` automatically adds it to a global dict
-# - this guarantees completeness with zero boilerplate
-# - BUT... importing a module containing units would have side effects. explicit registration is prob a better idea
-# - we need to be careful of circular imports (avoid importing ft before m)
+@dataclass(frozen=True, **slots)
+class DuplicateAnnotationError(IsqError):
+    annotation_args: Sequence[Any]
+    conflicting_arg: _TaggedAllowedExpr | StdUncertainty
+
+    def __str__(self) -> str:  # pragma: no cover
+        return (
+            f"duplicate annotation `{self.conflicting_arg}` found in "
+            f"{', '.join(repr(arg) for arg in self.annotation_args)}."
+            "\n= help: only one unit and one standard uncertainty can be "
+            "applied."
+        )

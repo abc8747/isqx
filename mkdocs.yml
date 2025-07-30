@@ -1,15 +1,20 @@
 site_name: isq
 site_description: A system for representing physical units
-repo_name: cathaypacific8747/isq
-repo_url: https://github.com/cathaypacific8747/isq
-site_url: https://cathaypacific8747.github.io/isq/
+repo_name: abc8747/isq
+repo_url: https://github.com/abc8747/isq
+site_url: https://abc8747.github.io/isq/
 nav:
-  - Home: "README.md"
+  - Home: "index.md"
+  - Examples: "examples.md"
   - API Reference:
-    - Core: "api/core.md"
-    - SI units: "api/si.md"
-    - U.S. Customary units: "api/us_customary.md"
-    - Aerospace: "api/aerospace.md"
+    - isq (core, fmt): "api/core.md"
+    - isq (iso80000): "api/iso80000.md"
+    - isq.usc: "api/usc.md"
+    - isq.aerospace: "api/aerospace.md"
+    - isq.details: "api/details.md"
+    - isq.mkdocs: "api/mkdocs.md"
+  - Design: "design.md"
+  - Contributing: "contributing.md"
 
 theme:
   name: material
@@ -33,6 +38,25 @@ theme:
 plugins:
   - search
   - social
+  - isq:
+      definitions:
+        - isq._iso80000
+        - isq.aerospace
+        - isq.usc
+        - isq.chemistry
+      details:
+        - isq.details.iso80000.SPACE_AND_TIME
+        - isq.details.iso80000.MECHANICS
+        - isq.details.iso80000.THERMODYNAMICS
+        - isq.details.iso80000.ELECTROMAGNETISM
+        - isq.details.iso80000.LIGHT_AND_RADIATION
+        - isq.details.iso80000.ACOUSTICS
+        - isq.details.iso80000.PHYSICAL_CHEMISTRY_AND_MOLECULAR_PHYSICS
+        - isq.details.iso80000.ATOMIC_AND_NUCLEAR_PHYSICS
+        - isq.details.iso80000.CHARACTERISTIC_NUMBERS
+        - isq.details.iso80000.CONDENSED_MATTER_PHYSICS
+        - isq.details.iso80000.INFORMATION_SCIENCE_AND_TECHNOLOGY
+        - isq.details.chemistry.PHYSICAL_CHEMISTRY
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -40,6 +64,7 @@ plugins:
           inventories:
             - https://docs.python.org/3/objects.inv
             - https://numpy.org/doc/stable/objects.inv
+            - https://mkdocstrings.github.io/griffe/objects.inv
           options:
             # NOTE: bug in upstream, with `annotations_path: brief` top level SI unit definitions like `(KG * M * S**-2).alias("newton")` gets incorrectly rendered as `.alias("newton")`
             # https://github.com/mkdocstrings/python/blob/bac553d8bd87c2ca9a1cd67fc473e2686a4eedc2/src/mkdocstrings_handlers/python/templates/material/_base/expression.html.jinja#L92
@@ -59,6 +84,7 @@ plugins:
             show_symbol_type_toc: true
             show_root_heading: true
             show_root_full_path: false
+            show_labels: false
             docstring_style: sphinx
             group_by_category: false
       enable_inventory: true
@@ -83,8 +109,13 @@ markdown_extensions:
   - pymdownx.inlinehilite:
       style_plain_text: py3
   - pymdownx.magiclink
-  - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: [!relative $config_dir]
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify
@@ -96,11 +127,7 @@ markdown_extensions:
       permalink: "¤"
   - pymdownx.arithmatex:
       generic: true
-
-extra_javascript:
-  - assets/js/katex.js
-  - https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js
-  - https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js
-
-extra_css:
-  - https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css
+hooks:
+  - scripts/docs.py
+watch:
+  - src
