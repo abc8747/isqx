@@ -393,19 +393,3 @@ def foo(bar: M[int], baz: M[float]):
 See also:
 https://stackoverflow.com/questions/78536551/variable-not-allowed-in-type-expression-how-can-i-create-parameterized-typin
 https://stackoverflow.com/questions/78845949/how-to-define-a-typing-special-form-for-use-with-static-type-checking
-
-### Future plans?
-
-This project was written to fulfill a long-standing urge to organise all units
-and quantities in a central location, and make it useful as Python annotations.
-
-`isq` also has a secondary, long-term goal: a "concept map generator". My high
-school physics teacher would often encourage our class to draw all quantity
-kinds as nodes in a graph, and create edges between them with equations as its
-labels. Back then, I used a single PowerPoint slide to do this but soon ran into
-immense lag. I always wanted to do this in a far more scalable and flexible way,
-and `isq` is built from the ground-up to support that.
-
-Units and quantity kinds are already pretty complete in code-form, and the next
-step is to take these to generate interactive SVG diagrams with D3. It will live
-under the `mkdocs` directory and be completely optional.

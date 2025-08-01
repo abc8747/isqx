@@ -599,7 +599,10 @@ MECHANICS: Details = {
             assumptions={"incompressible flow"},
         ),
     ),
-    _iso80000.STRESS: (Wikidata("Q13409892"), Symbol(r"\boldsymbol{\sigma}")),
+    _iso80000.STRESS_TENSOR: (
+        Wikidata("Q13409892"),
+        Symbol(r"\boldsymbol{\sigma}"),
+    ),
     _iso80000.NORMAL_STRESS: (
         Wikidata("Q11425837"),
         Equation(
@@ -666,7 +669,7 @@ MECHANICS: Details = {
             r"E = \frac{\sigma}{\varepsilon}",
             {
                 "E": SELF,
-                r"\sigma": _iso80000.STRESS,
+                r"\sigma": _iso80000.STRESS_TENSOR,
                 r"\varepsilon": _iso80000.LINEAR_STRAIN,
             },
         ),
@@ -1479,13 +1482,13 @@ ELECTROMAGNETISM: Details = {
         Wikidata("Q29996"),
         Equation(
             r"I = \frac{dq}{dt}",
-            {"I": SELF, "q": _iso80000.CHARGE_ELECTRIC, "t": _iso80000.TIME},
+            {"I": SELF, "q": _iso80000.ELECTRIC_CHARGE, "t": _iso80000.TIME},
         ),
         Symbol("i"),
     ),
     _iso80000.INSTANTANEOUS_CURRENT: Symbol("i(t)"),
     _iso80000.RMS_CURRENT: Symbol(r"I_\mathrm{rms}"),
-    _iso80000.CHARGE_ELECTRIC: (Wikidata("Q1111"), Symbol("Q"), Symbol("q")),
+    _iso80000.ELECTRIC_CHARGE: (Wikidata("Q1111"), Symbol("Q"), Symbol("q")),
     _iso80000.CHARGE_DENSITY: (
         Wikidata("Q69425629"),
         Equation(
@@ -1493,7 +1496,7 @@ ELECTROMAGNETISM: Details = {
             {
                 r"\rho": SELF,
                 r"\boldsymbol{r}": _iso80000.POSITION,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
                 "V": _iso80000.VOLUME,
             },
         ),
@@ -1505,7 +1508,7 @@ ELECTROMAGNETISM: Details = {
             {
                 r"\sigma": SELF,
                 r"\boldsymbol{r}": _iso80000.POSITION,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
                 "A": _iso80000.AREA,
             },
         ),
@@ -1517,7 +1520,7 @@ ELECTROMAGNETISM: Details = {
             {
                 r"\lambda": SELF,
                 r"\boldsymbol{r}": _iso80000.POSITION,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
                 "l": _iso80000.LENGTH,
             },
         ),
@@ -1529,7 +1532,7 @@ ELECTROMAGNETISM: Details = {
             r"\boldsymbol{p} = q(r_+ - r_-)",
             {
                 r"\boldsymbol{p}": SELF,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
                 "r": _iso80000.POSITION,
             },
         ),
@@ -1587,7 +1590,7 @@ ELECTROMAGNETISM: Details = {
                 r"\boldsymbol{E}": SELF,
                 r"\boldsymbol{r}": _iso80000.POSITION,
                 r"\boldsymbol{F}": _iso80000.FORCE,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
             },
         ),
     ),
@@ -1677,7 +1680,7 @@ ELECTROMAGNETISM: Details = {
         Wikidata("Q164399"),
         Equation(
             r"C = \frac{q}{U}",
-            {"C": SELF, "q": _iso80000.CHARGE_ELECTRIC, "U": _iso80000.VOLTAGE},
+            {"C": SELF, "q": _iso80000.ELECTRIC_CHARGE, "U": _iso80000.VOLTAGE},
         ),
     ),
     _iso80000.PERMITTIVITY: (
@@ -1782,7 +1785,7 @@ ELECTROMAGNETISM: Details = {
             r"\boldsymbol{F} = q \boldsymbol{v} \times \boldsymbol{B}",
             {
                 r"\boldsymbol{F}": _iso80000.FORCE,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
                 r"\boldsymbol{v}": _iso80000.VELOCITY,
                 r"\boldsymbol{B}": SELF,
             },
@@ -4271,7 +4274,7 @@ ATOMIC_AND_NUCLEAR_PHYSICS: Details = {
             r"\omega_c = \frac{|q|}{m}B",
             {
                 r"\omega_c": SELF,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
                 "m": _iso80000.MASS,
                 "B": _iso80000.MAGNETIC_FLUX_DENSITY,
             },
@@ -4286,7 +4289,7 @@ ATOMIC_AND_NUCLEAR_PHYSICS: Details = {
                 "m": _iso80000.MASS,
                 r"\boldsymbol{v}": _iso80000.VELOCITY,
                 r"\boldsymbol{B}": _iso80000.MAGNETIC_FLUX_DENSITY,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
             },
         ),
         Symbol("r_L"),
@@ -4709,7 +4712,7 @@ ATOMIC_AND_NUCLEAR_PHYSICS: Details = {
             {
                 r"N_\mathrm{il}": SELF,
                 "e": _iso80000.CONST_ELEMENTARY_CHARGE,
-                "q": _iso80000.CHARGE_ELECTRIC,
+                "q": _iso80000.ELECTRIC_CHARGE,
                 "l": _iso80000.LENGTH,
             },
         ),
@@ -4973,7 +4976,7 @@ ATOMIC_AND_NUCLEAR_PHYSICS: Details = {
         Wikidata("Q336938"),
         Equation(
             r"X = \frac{dq}{dm}",
-            {"X": SELF, "q": _iso80000.CHARGE_ELECTRIC, "m": _iso80000.MASS},
+            {"X": SELF, "q": _iso80000.ELECTRIC_CHARGE, "m": _iso80000.MASS},
         ),
     ),
     _iso80000.EXPOSURE_RATE: (
@@ -5044,14 +5047,14 @@ CHARACTERISTIC_NUMBERS: Details = {
     _iso80000.GRASHOF_NUMBER: (
         Wikidata("Q868719"),
         Equation(
-            r"Gr = \frac{g \alpha_V (T_s - T_\inf) L^3}{\nu^2}",
+            r"Gr = \frac{g \alpha_V (T_s - T_\infty) L^3}{\nu^2}",
             {
                 "Gr": SELF,
                 "L": ("characteristic ", _iso80000.LENGTH),
                 "g": _iso80000.ACCELERATION_OF_FREE_FALL,
                 r"\alpha_V": _iso80000.VOLUMETRIC_EXPANSION_COEFFICIENT,
                 r"T_s": _iso80000.SURFACE_TEMPERATURE,  # NOTE: wikidata uses $\Delta T$
-                r"T_\inf": _iso80000.REFERENCE_TEMPERATURE,
+                r"T_\infty": _iso80000.REFERENCE_TEMPERATURE,
                 r"\nu": _iso80000.KINEMATIC_VISCOSITY,
             },
         ),
@@ -6465,7 +6468,7 @@ CHARACTERISTIC_NUMBERS: Details = {
     _iso80000.GRASHOF_MAGNETIC_NUMBER: (
         Wikidata("Q105356815"),
         Equation(
-            r"Gr_m = \frac{4\pi \sigma_e \mu_e g \alpha_V (T_s - T_\inf) L^3}{\nu}",
+            r"Gr_m = \frac{4\pi \sigma_e \mu_e g \alpha_V (T_s - T_\infty) L^3}{\nu}",
             {
                 r"Gr_m": SELF,
                 r"\sigma_e": _iso80000.CONDUCTIVITY,
@@ -6473,7 +6476,7 @@ CHARACTERISTIC_NUMBERS: Details = {
                 "g": _iso80000.ACCELERATION_OF_FREE_FALL,
                 r"\alpha_V": _iso80000.VOLUMETRIC_EXPANSION_COEFFICIENT,
                 r"T_s": _iso80000.SURFACE_TEMPERATURE,
-                r"T_\inf": _iso80000.REFERENCE_TEMPERATURE,
+                r"T_\infty": _iso80000.REFERENCE_TEMPERATURE,
                 "L": _iso80000.LENGTH,
                 r"\nu": _iso80000.KINEMATIC_VISCOSITY,
             },

@@ -24,6 +24,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          package_json_file: src/isq_vis/package.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: src/isq_vis/pnpm-lock.yaml
+
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
@@ -39,5 +52,9 @@ jobs:
 
       - name: Install the project
         run: uv sync --all-extras --all-groups
+
+      - name: Install pnpm dependencies
+        run: pnpm install
+        working-directory: ./src/isq_vis
 
       - run: uv run mkdocs gh-deploy --force

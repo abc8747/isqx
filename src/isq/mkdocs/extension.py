@@ -16,7 +16,7 @@ import inspect
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple
+from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Union
 
 from _griffe.expressions import (
     Expr,
@@ -25,6 +25,7 @@ from _griffe.expressions import (
     ExprDict,
     ExprKeyword,
     ExprName,
+    ExprSubscript,
     ExprTuple,
 )
 from _griffe.models import Attribute
@@ -90,13 +91,19 @@ _ARGS_DEFINITION = (LazyProduct, *_ARGS_NUMBER, *_ARGS_EXPR, QtyKind)
 # NOTE: equilibrium constants are factory functions that return a QtyKind.
 # right now we skip over them!
 
+Unit: TypeAlias = Union[tuple[StrFragment, ...], None]
+"""The unit of measurement *rendered* as string fragments."""
+# Mul(M, S) is represented as (Anchor("M", "isq.M"), "\cdot", Anchor("S", "isq.S"))
+# in the future, we want to return a tagged union (the direct representation
+# of the unit). for now, this is good enough.
+
 
 # see: https://mkdocstrings.github.io/griffe/guide/users/how-to/selectively-inspect/
 @dataclass(frozen=True)
 class Where:
     symbol: str
     description: StrFragment | tuple[StrFragment, ...]
-    unit: tuple[StrFragment, ...] | None
+    unit: Unit  # for now
 
 
 @dataclass(frozen=True)
@@ -120,8 +127,26 @@ class WikidataDetail:
     qcode: str
 
 
+CanonicalPath: TypeAlias = str
+
+
 @dataclass
-class Objects:
+class QtyKindDetail:
+    """Several quantities can share the same unit. Two cases:
+
+    - Explicit inheritance: when a quantity is defined by subscripting
+        another, like `POTENTIAL_ENERGY = ENERGY["potential"]`: this is a
+        strong signal of a parent-child relationship.
+        we can detect this during the griffe AST walking
+    - Implicit grouping: some quantities are related by their physical
+        dimension but not defined via subscripting (e.g., SPEED and VELOCITY).
+        we can group them by their underlying SI dimension.
+        the hierarchy can be inferred from the tags.
+    """
+
+    parent: str | None = None
+    unit_si_coherent: Unit = None  # str for now
+    tags: tuple[str, ...] = field(default_factory=tuple)  # str for now
     wikidata: list[WikidataDetail] = field(default_factory=list)
     symbols: list[SymbolDetail] = field(default_factory=list)
     equations: list[EquationDetail] = field(default_factory=list)
@@ -133,8 +158,11 @@ class IsqExtension(Extension):
     ):
         self.config = config
         self.definitions: Definitions = {}
-        self.objects: dict[str, Objects] = {}  # by path
+        self.objects: dict[str, QtyKindDetail] = {}  # by path
         self.objects_out_path = objects_out_path
+        self.possible_parent_maps: dict[str, str] = {}  # child -> parent
+        """Note that items in this map are not guaranteed to be isq objects
+        because griffe works with static analysis."""
 
     def on_instance(
         self,
@@ -145,6 +173,20 @@ class IsqExtension(Extension):
         **kwargs: Any,
     ) -> None:
         inject_citation_into_docstring(obj, agent)
+
+        # collect strict parent-child relationships
+        if (
+            isinstance(obj, Attribute)
+            and isinstance(obj.value, ExprSubscript)
+            and isinstance(
+                parent_expr := obj.value.left, (ExprName, ExprAttribute)
+            )
+        ):
+            parent_path = parent_expr.canonical_path
+            if parent_path.split(".", 1)[0] in ("typing", "typing_extensions"):
+                # heuristic: we captured something invalid like Union[str, int]
+                return
+            self.possible_parent_maps[obj.canonical_path] = parent_path
 
     def on_module_instance(
         self,
@@ -201,7 +243,7 @@ class IsqExtension(Extension):
             for path, item in _process_details_module(
                 defs_path, loader, formatter, reverse_definitions
             ):
-                objects = self.objects.setdefault(path, Objects())
+                objects = self.objects.setdefault(path, QtyKindDetail())
                 attr_target: Attribute = loader.modules_collection[path]
                 isq_extras = _get_or_init_isq_extras(attr_target)
 
@@ -215,19 +257,39 @@ class IsqExtension(Extension):
                     objects.equations.append(item)
                     isq_extras["details"].append(item)
 
+        # set the parent (if found). would be nice for jinja to also show this
+        # but we focus on the frontend vis for now.
+        for child_path, parent_path in self.possible_parent_maps.items():
+            if child_path in self.objects and parent_path in self.objects:
+                child_object_detail = self.objects[child_path]
+                child_object_detail.parent = parent_path
+
+        for path, details in self.objects.items():
+            if path not in self.definitions:
+                continue
+            definition = self.definitions[path]
+            if not isinstance(v := definition.value, QtyKind):
+                continue
+            details.unit_si_coherent = tuple(
+                formatter.fmt(v.unit_si_coherent)
+            )  # str for now
+            if v.tags is not None:
+                details.tags = tuple(str(t) for t in v.tags)  # str for now
+
         if self.objects_out_path:
             json_path = Path(self.objects_out_path) / "objects.json"
+            # do not serialize members that have `None` or empty tuple values to
+            # save space
             serialized_objects = {
                 path: asdict(
                     details,
-                    dict_factory=lambda x: {
-                        k: v for (k, v) in x if v is not None
-                    },
+                    dict_factory=lambda x: {k: v for (k, v) in x if v},
                 )
                 for path, details in self.objects.items()
             }
+            json_path.parent.mkdir(parents=True, exist_ok=True)
             with open(json_path, "w") as f:
-                json.dump(serialized_objects, f, indent=2)
+                json.dump(serialized_objects, f)
             logger.info(f"wrote objects to {json_path}")
 
 
@@ -236,17 +298,16 @@ class Definition(NamedTuple):
     annotated_metadata: AnnotatedMetadata | None
 
 
-Definitions: TypeAlias = dict[str, Definition]
-"""A mapping of the `griffe` canonical path to the definition."""
+Definitions: TypeAlias = dict[CanonicalPath, Definition]
 
 
 class _ReverseDefinition(NamedTuple):
-    path: str
+    path: CanonicalPath
     annotated_metadata: AnnotatedMetadata | None
 
 
 _ReverseDefinitions: TypeAlias = dict[int, _ReverseDefinition]
-"""A mapping of the [`id`][] of the value to the reverse definition."""
+"""A mapping of the `builtins.id(value)` to the reverse definition."""
 #
 # unit formatting
 #
@@ -348,7 +409,7 @@ def parse_where(
             if unit_expr is not None:
                 break  # only infer unit from the first fragment
 
-        unit: tuple[StrFragment, ...] | None
+        unit: Unit
         if unit_expr is None:
             unit = None
         elif kind(unit_expr) == "dimensionless":

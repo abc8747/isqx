@@ -20,8 +20,8 @@ export function stripTight(s) {
 /**
  * Extracts the main formula and symbol definitions from a definition block.
  *
- * @param {HTMLElement} definition `div.isq-detail`
- * @returns {{formula: HTMLElement, targets: Array<object>}|null} formula and
+ * @param {Element} definition `div.isq-detail`
+ * @returns {{formula: Element, targets: Array<object>}|null} formula and
  * sorted list of targets
  */
 function findHighlightTargets(definition) {
@@ -60,9 +60,9 @@ function findHighlightTargets(definition) {
  * - trying to find $a_b$ in $a_b^c$ fails because KaTeX coalesces
  *   `b` and `c` in the same "column"
  * - trying to find $T$ in $TS$ fails because KaTeX coalesces $T$ and $S$ in the
- *   same `HTMLElement`
+ *   same `Element`
  *
- * @param {HTMLElement} formula The root element of the KaTeX formula.
+ * @param {Element} formula The root element of the KaTeX formula.
  * @param {Array<object>} mutTargets The symbol definitions to search for.
  */
 function findMatches(formula, mutTargets) {

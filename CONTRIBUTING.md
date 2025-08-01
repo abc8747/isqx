@@ -89,14 +89,15 @@ G0 = isq.Quantity(9.8065, M * S**-2)
 from isq import QtyKind
 
 # must be defined with coherent SI units (i.e. not scaled)
-LENGTH = QtyKind(M)
-# add a tag: diameter can be thought of a "subclass" of length.
-DIAMETER = LENGTH["diameter"]
-# alternatively:
-ALTITUDE = QtyKind(M, ("altitude",))
+# it can have optional tags.
+ENERGY = QtyKind(J)
+# add a tag: kinetic energy can be thought of a "subclass" of length.
+KINETIC_ENERGY = LENGTH["kinetic"]
+# alternatively, if it doesn't make sense to "subclass".
+WORK_DONE = QtyKind(J, ("work_done",))
 
-from isq.usc import IN
-LENGTH_IN = QtyKind(IN)  # BAD!
+from isq.usc import BTU
+ENERGY_BTU = QtyKind(BTU)  # BAD!
 ```
 
 # Defining details

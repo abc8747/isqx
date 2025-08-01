@@ -1835,7 +1835,8 @@ def module_attribute_metadata(
         yield name, metadata
 
 
-class Anchor(NamedTuple):
+@dataclass(frozen=True, **slots)
+class Anchor:  # NOTE: not using namedtuple so json serialization works nicely
     """A simple wrapper over a text with an external link.
 
     It is used to:

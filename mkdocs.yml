@@ -14,6 +14,7 @@ nav:
     - isq.details: "api/details.md"
     - isq.mkdocs: "api/mkdocs.md"
   - Design: "design.md"
+  - Visualiser: "vis.md"
   - Contributing: "contributing.md"
 
 theme:
@@ -129,5 +130,3 @@ markdown_extensions:
       generic: true
 hooks:
   - scripts/docs.py
-watch:
-  - src

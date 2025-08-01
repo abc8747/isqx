@@ -103,7 +103,7 @@ J = (N * M).alias("joule", allow_prefix=True)
 W = (J * S**-1).alias("watt", allow_prefix=True)
 """Watt, a unit of [power][isq.POWER] and [radiant flux][isq.RADIANT_FLUX]."""
 C = (A * S).alias("coulomb", allow_prefix=True)
-"""Coulomb, a unit of electric [charge][isq.CHARGE_ELECTRIC]."""
+"""Coulomb, a unit of electric [charge][isq.ELECTRIC_CHARGE]."""
 V = (W * A**-1).alias("volt", allow_prefix=True)
 """Volt, a unit of electric [potential difference][isq.ELECTRIC_POTENTIAL_DIFFERENCE]
 and [voltage][isq.VOLTAGE], also known as `electric tension` or `tension`."""
@@ -421,13 +421,13 @@ datum.". Specify the particular datum using the [`isq.OriginAt`][] tag.
 DEPTH = LENGTH["depth"]
 """A measure of [distance][isq.DISTANCE] downwards from a surface."""
 RELATIVE_TO_MSL = OriginAt("mean_sea_level")
-ALTITUDE = QtyKind(M, ("altitude", RELATIVE_TO_MSL))
+ALTITUDE = LENGTH["altitude", RELATIVE_TO_MSL]
 """The vertical [distance][isq.DISTANCE] of a level, a point or an object
 considered as a point, measured from the
 [mean sea level][isq.RELATIVE_TO_MSL] (as defined by ICAO).
 
 For the different kinds of altitude, see the [`isq.aerospace`][] module."""
-ELEVATION = QtyKind(M, ("elevation", RELATIVE_TO_MSL))
+ELEVATION = LENGTH["elevation", RELATIVE_TO_MSL]
 """The vertical [distance][isq.DISTANCE] of a point or a level, on or affixed
 to the surface of the Earth, measured from
 [mean sea level][isq.RELATIVE_TO_MSL] (as defined by ICAO)."""
@@ -499,7 +499,7 @@ TIME_CONSTANT = QtyKind(S, ("time_constant",))
 """Measure for the response of a dynamic system to a change of the system
 input."""
 VELOCITY = QtyKind(M_PERS, (VECTOR,))
-SPEED = QtyKind(M_PERS)
+SPEED = VELOCITY["magnitude"]
 ACCELERATION = QtyKind(M_PERS2, (VECTOR,))
 
 RAD_PERS = RAD * S**-1
@@ -518,7 +518,7 @@ NUMBER_OF_REVOLUTIONS = Dimensionless("n_revolutions")
 """Physical quantity; number of revolutions of a rotating body or turns in a coil."""
 ROTATIONAL_FREQUENCY = QtyKind(NUMBER_OF_REVOLUTIONS * S**-1)
 ANGULAR_FREQUENCY = QtyKind(RAD_PERS)
-WAVELENGTH = QtyKind(M, ("wave",))
+WAVELENGTH = PERIOD["wave"]
 """Spatial [period][isq.PERIOD] of a wave; the [distance][isq.DISTANCE] over
 which the wave's shape repeats; the inverse of the spatial frequency."""
 WAVENUMBER = QtyKind(M**-1, ("wave",))
@@ -528,8 +528,8 @@ the [wavenumber][isq.WAVENUMBER]."""
 ANGULAR_WAVENUMBER = QtyKind(RAD * M**-1, ("wave",))
 ANGULAR_WAVEVECTOR = QtyKind(RAD * M**-1, ("wave", VECTOR))
 """See: https://en.wikipedia.org/wiki/Wave_vector"""
-PHASE_SPEED = QtyKind(M_PERS, ("phase",))
-GROUP_SPEED = QtyKind(M_PERS, ("group",))
+PHASE_SPEED = SPEED["phase"]
+GROUP_SPEED = SPEED["group"]
 """Speed at which a wave's envelope propagates in space."""
 DAMPING_COEFFICIENT = QtyKind(S**-1, ("damping_coefficient",))
 LOGARITHMIC_DECREMENT = QtyKind(Dimensionless("logarithmic_decrement"))
@@ -602,17 +602,19 @@ PRESSURE = QtyKind(PA)
 unit [area][isq.AREA]. Also known as total pressure."""
 STATIC_PRESSURE = PRESSURE["static"]
 """[Pressure][isq.PRESSURE] in the absence of sound waves."""
-GAUGE_PRESSURE = QtyKind(PA, ("gauge",))
+GAUGE_PRESSURE = PRESSURE["gauge"]
 DYNAMIC_PRESSURE = PRESSURE["dynamic"]
 """See: https://en.wikipedia.org/wiki/Dynamic_pressure"""
-STRESS = QtyKind(PA, ("stress", TENSOR_SECOND_ORDER))
+STRESS = QtyKind(PA, ("stress",))
+STRESS_TENSOR = STRESS[TENSOR_SECOND_ORDER]
 """Tensor that describes the state of stress at a point inside a material."""
 NORMAL_STRESS = QtyKind(
     PA, ("stress", "normal")
 )  # NOTE: not inheriting from stress because they are not tensors.
 SHEAR_STRESS = QtyKind(PA, ("stress", "shear"))
 """Component of [stress][isq.STRESS] coplanar with a material cross section."""
-STRAIN_TENSOR = Dimensionless("strain")[TENSOR_SECOND_ORDER, CARTESIAN]
+STRAIN = Dimensionless("strain")
+STRAIN_TENSOR = STRAIN[TENSOR_SECOND_ORDER, CARTESIAN]
 """Symmetric tensor quantity of the strain caused by [stress][isq.STRESS] in
 matter."""
 LINEAR_STRAIN = Dimensionless(
@@ -704,12 +706,12 @@ result of a difference in [temperature][isq.TEMPERATURE]."""
 HEAT_TO_SYSTEM = HEAT["to_system"]
 """Heat transferred to the system."""
 INEXACT_DIFFERENTIAL_HEAT = HEAT[INEXACT_DIFFERENTIAL]
-LATENT_HEAT = QtyKind(J, ("latent_heat",))
+LATENT_HEAT = HEAT["latent"]
 """Released or absorbed [energy][isq.ENERGY] during a constant-temperature
 process."""
 SPECIFIC_LATENT_HEAT = QtyKind(J * KG**-1, ("specific_latent_heat",))
 MOLAR_LATENT_HEAT = QtyKind(J * MOL**-1, ("molar_latent_heat",))
-HEAT_FLOW_RATE = QtyKind(W, ("heat",))
+HEAT_FLOW_RATE = QtyKind(W, ("heat_flow",))
 HEAT_FLUX = QtyKind(W * M**-2, ("heat_flux", VECTOR))
 THERMAL_CONDUCTIVITY = QtyKind(W * M**-1 * K**-1)
 """Capacity of a material to conduct [heat][isq.HEAT]."""
@@ -837,7 +839,7 @@ CURRENT = QtyKind(A)
 INSTANTANEOUS_CURRENT = CURRENT["instantaneous"]
 RMS_CURRENT = CURRENT["rms"]
 """Root mean square current."""
-CHARGE_ELECTRIC = QtyKind(C)
+ELECTRIC_CHARGE = QtyKind(C)
 """Physical property that quantifies an object's interaction with electric
 fields."""
 CHARGE_DENSITY = QtyKind(C * M**-3)
@@ -866,7 +868,7 @@ RMS_VOLTAGE = VOLTAGE["rms"]
 ELECTRIC_FLUX_DENSITY = QtyKind(C * M**-2, ("flux_density", VECTOR))
 """Vector field related to displacement current and flux density."""
 CAPACITANCE = QtyKind(F)
-"""Ability of a body to store electrical [charge][isq.CHARGE_ELECTRIC]."""
+"""Ability of a body to store electrical [charge][isq.ELECTRIC_CHARGE]."""
 PERMITTIVITY = QtyKind(F * M**-1)
 """Physical quantity, measure of the resistance to the electric field."""
 RELATIVE_PERMITTIVITY = Dimensionless("relative_permittivity")
@@ -922,7 +924,7 @@ SPEED_OF_LIGHT = PHASE_SPEED["light"]  # defined in ISO80000-7
 """Phase [speed][isq.SPEED] of an electromagnetic wave in a medium."""
 SOURCE_VOLTAGE = VOLTAGE["ideal_source"]
 """Scalar physical quantity homogeneous to a [voltage][isq.VOLTAGE], expressing
-the modulus of the [force][isq.FORCE] exerted on a [charge][isq.CHARGE_ELECTRIC]
+the modulus of the [force][isq.FORCE] exerted on a [charge][isq.ELECTRIC_CHARGE]
 in an electric field."""
 MAGNETIC_POTENTIAL = QtyKind(A, ("magnetic_potential",))
 """Scalar potential whose negative gradient is the
@@ -1587,7 +1589,7 @@ MASS_ENERGY_TRANSFER_COEFFICIENT = QtyKind(
 """For ionizing uncharged particles, measure for the [energy][isq.ENERGY]
 transferred to charged particles in the form of kinetic energy."""
 IONIZING_EXPOSURE = QtyKind(C * KG**-1, ("exposure_ionizing",))
-"""Electric [charge][isq.CHARGE_ELECTRIC] of ions produced in air by X- or gamma
+"""Electric [charge][isq.ELECTRIC_CHARGE] of ions produced in air by X- or gamma
 radiation per [mass][isq.MASS] of air, when all liberated electrons are
 completely stopped."""
 EXPOSURE_RATE = QtyKind(C * KG**-1 * S**-1, ("exposure_rate",))
@@ -1947,8 +1949,8 @@ GRUNEISEN_PARAMETER = Dimensionless("gruneisen_parameter")
 lattice has on its vibrational properties, and, as a consequence, the effect
 that changing [temperature][isq.TEMPERATURE] has on the size or dynamics of the
 lattice."""
-MEAN_FREE_PATH_OF_PHONONS = QtyKind(M, ("mean_free_path", "phonon"))
-MEAN_FREE_PATH_OF_ELECTRONS = QtyKind(M, ("mean_free_path", "electron"))
+MEAN_FREE_PATH_OF_PHONONS = MEAN_FREE_PATH["phonon"]
+MEAN_FREE_PATH_OF_ELECTRONS = MEAN_FREE_PATH["electron"]
 ENERGY_DENSITY_OF_STATES = QtyKind(J**-1 * M**-3, ("energy_density_of_states",))
 """Quantity in condensed matter physics."""
 RESIDUAL_RESISTIVITY = RESISTIVITY["residual"]
@@ -2005,14 +2007,14 @@ DIFFUSION_LENGTH = LENGTH["diffusion"]
 [diffusion coefficient][isq.DIFFUSION_COEFFICIENT] and
 [lifetime][isq.LIFETIME]."""
 EXCHANGE_INTEGRAL = ENERGY["exchange_integral"]
-CURIE_TEMPERATURE = QtyKind(K, ("curie",))
+CURIE_TEMPERATURE = TEMPERATURE["curie"]
 """[Temperature][isq.TEMPERATURE] above which certain materials lose their
 permanent magnetic properties."""
-NEEL_TEMPERATURE = QtyKind(K, ("neel",))
+NEEL_TEMPERATURE = TEMPERATURE["neel"]
 """Critical [temperature][isq.TEMPERATURE] of an antiferromagnet."""
-SUPERCONDUCTION_TRANSITION_TEMPERATURE = QtyKind(
-    K, ("superconduction_transition",)
-)
+SUPERCONDUCTION_TRANSITION_TEMPERATURE = TEMPERATURE[
+    "superconduction_transition"
+]
 """Critical [temperature][isq.TEMPERATURE] of a superconductor."""
 THERMODYNAMIC_CRITICAL_MAGNETIC_FLUX_DENSITY = MAGNETIC_FLUX_DENSITY[
     "critical", "thermodynamic"
@@ -2060,10 +2062,10 @@ EQUIVALENT_BINARY_STORAGE_CAPACITY = QtyKind(
     BIT, ("equivalent_binary_storage_capacity",)
 )
 TRANSFER_RATE = QtyKind(S**-1, ("transfer_rate",))
-PERIOD_OF_DATA_ELEMENTS = QtyKind(S, ("period_of_data_elements",))
+PERIOD_OF_DATA_ELEMENTS = PERIOD["data_elements"]
 BIT_RATE = QtyKind(BIT * S**-1, ("bit_rate",))
 """Information transmission rate expressed in bits per second."""
-BIT_PERIOD = QtyKind(S, ("bit_period",))
+BIT_PERIOD = PERIOD["bit"]
 EQUIVALENT_BIT_RATE = QtyKind(BIT * S**-1, ("equivalent_bit_rate",))
 BAUD = (S**-1)["modulation_rate"].alias("baud", allow_prefix=True)
 """Baud, a unit of modulation rate (symbol rate)."""

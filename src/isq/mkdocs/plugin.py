@@ -69,7 +69,7 @@ class IsqPlugin(BasePlugin[IsqPluginConfig]):  # type: ignore
             {
                 "isq.mkdocs.extension:IsqExtension": {
                     "config": self.config,
-                    "objects_out_path": config.site_dir,
+                    "objects_out_path": f"{config.site_dir}/assets",
                 }
             }
         )

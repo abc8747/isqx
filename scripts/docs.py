@@ -1,11 +1,16 @@
 #!/usr/bin/env -S uv run --script
+import logging
+import os
+import shutil
+import subprocess
 from functools import partial
 from pathlib import Path
 
-path_root = Path(__file__).parent.parent
+PATH_ROOT = Path(__file__).parent.parent
 
 FILENAME_INDEX = "index"
 FILENAME_CONTRIBUTING = "contributing"
+logger = logging.getLogger(__name__)
 
 
 def copy_docs_file(path_in: Path, path_out: Path) -> None:
@@ -24,7 +29,7 @@ def copy_docs_file(path_in: Path, path_out: Path) -> None:
         readme_content = f.read()
     output = (
         "<!-- DO NOT EDIT! CHANGES WILL BE LOST. edit `README.md` and"
-        + f" run `{Path(__file__).relative_to(path_root)}` instead. -->\n"
+        + f" run `{Path(__file__).relative_to(PATH_ROOT)}` instead. -->\n"
         + readme_content.replace("](docs/assets/", "](assets/")
     )
     with open(path_out, "w+") as f:
@@ -35,15 +40,37 @@ def copy_docs_file(path_in: Path, path_out: Path) -> None:
 
 copy_readme = partial(
     copy_docs_file,
-    path_in=path_root / "README.md",
-    path_out=path_root / "docs" / f"{FILENAME_INDEX}.md",
+    path_in=PATH_ROOT / "README.md",
+    path_out=PATH_ROOT / "docs" / f"{FILENAME_INDEX}.md",
 )
 
 copy_contributing = partial(
     copy_docs_file,
-    path_in=path_root / "CONTRIBUTING.md",
-    path_out=path_root / "docs" / f"{FILENAME_CONTRIBUTING}.md",
+    path_in=PATH_ROOT / "CONTRIBUTING.md",
+    path_out=PATH_ROOT / "docs" / f"{FILENAME_CONTRIBUTING}.md",
 )
+
+
+def write_visualiser(site_url: str) -> None:
+    # just so we don't need allow-same-origin
+    url = f"{site_url.removesuffix('/')}/vis.html?autoLoad"
+    output = f"""
+Here is an interactive visualisation of (most) quantity kinds. The standalone
+page can be found at [`/vis.html`]({url}).
+
+<iframe
+  src="{url}"
+  sandbox="allow-scripts"
+  loading="lazy"
+  title="ISQ Visualization"
+  style="width: 100%; height: 768px; border: 1px solid var(--md-typeset-table-color);">
+</iframe>
+<!-- note that this does not render with `mkdocs serve`, see
+https://github.com/mkdocs/mkdocs/issues/3852 -->
+"""
+    with open(PATH_ROOT / "docs" / "vis.md", "w+") as f:
+        f.write(output)
+
 
 # mkdocs events
 
@@ -51,6 +78,35 @@ copy_contributing = partial(
 def on_pre_build(config) -> None:  # type: ignore
     copy_readme()
     copy_contributing()
+    write_visualiser(config["site_url"])
+
+
+PATH_VIS_SOURCE = Path(__file__).parent.parent / "src" / "isq_vis"
+
+
+def on_post_build(config) -> None:  # type: ignore
+    path_out = Path(config["site_dir"])
+    path_vis_html = path_out / "vis.html"
+
+    if not (PATH_VIS_SOURCE / "node_modules").exists():
+        logger.error(
+            "`module_modules` not found.\n"
+            f"= help: run `pnpm install` in {PATH_VIS_SOURCE}"
+        )
+        return
+    subprocess.run(["pnpm", "build"], cwd=PATH_VIS_SOURCE, check=True)
+    # not removing dir because assets/objects.json exists
+    shutil.copytree(
+        PATH_VIS_SOURCE / "dist",
+        path_out,
+        ignore=lambda d, files: ["index.html"] if "index.html" in files else [],
+        dirs_exist_ok=True,
+    )
+    shutil.copy(
+        PATH_VIS_SOURCE / "dist" / "index.html",
+        path_vis_html,
+    )
+    logger.info(f"built isq-vis to {path_vis_html}")
 
 
 if __name__ == "__main__":
