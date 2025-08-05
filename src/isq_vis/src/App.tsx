@@ -9,7 +9,7 @@ import {
   createResource
 } from "solid-js";
 import { createStore } from "solid-js/store";
-import type { QtyKindData, AppState, CanonicalPath } from "./types";
+import type { IsqData, AppState, CanonicalPath } from "./types";
 import { processGraphData } from "./graph";
 import { phaseRainbow } from "./cmap";
 import Graph from "./Graph";
@@ -36,8 +36,10 @@ const App: Component = () => {
   const [panelSize, setSidePanelSize] = createSignal(350);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
 
-  const [dataSource, setDataSource] = createSignal<string | File>();
-  const fetchData = async (source: string | File): Promise<QtyKindData> => {
+  const [dataSource, setDataSource] = createSignal<string | File | IsqData>();
+  const fetchData = async (
+    source: string | File | IsqData
+  ): Promise<IsqData> => {
     if (typeof source !== "string" && !(source instanceof File)) {
       return source;
     }
@@ -71,7 +73,7 @@ const App: Component = () => {
       handleUrlLoad("assets/objects.json");
     } else if (storedData) {
       try {
-        setDataSource(JSON.parse(storedData));
+        setDataSource(JSON.parse(storedData) as IsqData);
       } catch (e) {
         console.error("failed to parse data from localStorage", e);
         localStorage.removeItem(LOCALSTORAGE_KEY);
@@ -122,9 +124,9 @@ const App: Component = () => {
       setStore("data", null);
       return;
     }
-    setStore("data", data);
+    setStore("data", data.qtyKinds);
     if (!data) return;
-    const { nodes, links, linkMap } = processGraphData(data);
+    const { nodes, links, linkMap } = processGraphData(data.qtyKinds);
     const numNodes = nodes.length || 1;
     const colorMap = nodes.map((_, i) => {
       const t = (i / numNodes) * 0.7;
@@ -315,6 +317,5 @@ const SplashContainer: Component<{
     </div>
   );
 };
-
 
 export default App;

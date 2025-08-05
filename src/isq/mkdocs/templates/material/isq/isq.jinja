@@ -1,13 +1,13 @@
 {%- macro render_fragment(fragment) -%}
-{%- if fragment.href -%}
-<autoref identifier="{{ fragment.href }}">{{ fragment.text }}</autoref>
+{%- if fragment.path -%}
+<autoref identifier="{{ fragment.path }}">{{ fragment.text }}</autoref>
 {%- else -%}
 {{- fragment -}}
 {%- endif -%}
 {%- endmacro -%}
 
 {%- macro render_fragments(fragments) -%}
-{%- if fragments is iterable and not fragments is string and fragments.href is not defined -%}
+{%- if fragments is iterable and not fragments is string and fragments.path is not defined -%}
 {%- for fragment in fragments -%}
 {{- render_fragment(fragment) -}}
 {%- endfor -%}

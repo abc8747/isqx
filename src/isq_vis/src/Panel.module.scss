@@ -105,9 +105,24 @@
   border-radius: 5px;
   border-left: 4px solid var(--bg-border);
   padding-left: 0.5rem;
-  margin-top: 0.5rem;
   font-size: 0.9em;
+  display: grid;
+  grid-template-columns: max-content max-content 1fr;
+  align-items: baseline;
+  gap: 0.25rem 0.25rem;
+  padding-top: .25rem;
+  padding-bottom: .25rem;
+
+  .whereRow {
+    display: contents;
+  }
+
+  .whereSymbol {
+    text-align: right;
+  }
 }
+
+
 
 .symbolRemarks {
   color: var(--text-muted);

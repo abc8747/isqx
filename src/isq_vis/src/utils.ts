@@ -19,9 +19,9 @@ export const findCanonicalPathInDescription = (
     if (
       typeof item === "object" &&
       item !== null &&
-      typeof item.href === "string"
+      typeof item.path === "string"
     ) {
-      return item.href;
+      return item.path;
     }
   }
   return null;

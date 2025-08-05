@@ -35,20 +35,30 @@ const CrossRef: ParentComponent<{
 
 function isAnchor(
   fragment: StrFragment
-): fragment is { text: string; href: string } {
+): fragment is { text: string; path: string } {
   return (
-    typeof fragment === "object" && fragment !== null && "href" in fragment
+    typeof fragment === "object" && fragment !== null && "path" in fragment
   );
 }
 
 const RenderFragment: Component<{
   fragment: StrFragment;
+  noLinks?: boolean;
 }> = props => {
   const fragment = () => props.fragment;
 
   return (
-    <Show when={isAnchor(fragment())} fallback={<>{fragment()}</>}>
-      <CrossRef targetPath={(fragment() as { href: string }).href}>
+    <Show
+      when={isAnchor(fragment()) && !props.noLinks}
+      fallback={
+        <>
+          {isAnchor(fragment())
+            ? (fragment() as { text: string }).text
+            : fragment()}
+        </>
+      }
+    >
+      <CrossRef targetPath={(fragment() as { path: string }).path}>
         {(fragment() as { text: string }).text}
       </CrossRef>
     </Show>
@@ -57,12 +67,15 @@ const RenderFragment: Component<{
 
 const RenderFragments: Component<{
   fragments: StrFragment | StrFragment[];
+  noLinks?: boolean;
 }> = props => {
   const fragments = () =>
     Array.isArray(props.fragments) ? props.fragments : [props.fragments];
   return (
     <For each={fragments()}>
-      {fragment => <RenderFragment fragment={fragment} />}
+      {fragment => (
+        <RenderFragment fragment={fragment} noLinks={props.noLinks} />
+      )}
     </For>
   );
 };
@@ -74,28 +87,6 @@ const Symbol: Component<{ symbol: SymbolDetail }> = props => (
       <span class={styles.symbolRemarks}> ({props.symbol.remarks})</span>
     </Show>
   </>
-);
-
-const SymbolsSection: Component<{
-  symbols: SymbolDetail[] | undefined;
-  color: string;
-}> = props => (
-  <Show when={props.symbols && props.symbols.length > 0}>
-    <div
-      class={styles.detailSection}
-      style={{ "border-left-color": props.color }}
-    >
-      <h4>Symbols</h4>
-      <For each={props.symbols}>
-        {(symbol, i) => (
-          <>
-            <Symbol symbol={symbol} />
-            {i() < props.symbols!.length - 1 ? ", " : ""}
-          </>
-        )}
-      </For>
-    </div>
-  </Show>
 );
 
 const EquationsSection: Component<{
@@ -112,12 +103,21 @@ const EquationsSection: Component<{
               <div class={styles.whereClause}>
                 <For each={eq.where}>
                   {w => (
-                    <div>
-                      <span>
+                    <div class={styles.whereRow}>
+                      <span class={styles.whereSymbol}>
                         <KaTeX text={w.symbol} />
                       </span>
-                      <span> = </span>
-                      <RenderFragments fragments={w.description} />
+                      <span>=</span>
+                      <span>
+                        <RenderFragments fragments={w.description} />
+                        <Show when={w.unit}>
+                          <>
+                            {" ("}
+                            <RenderFragments fragments={w.unit!} noLinks />
+                            {")"}
+                          </>
+                        </Show>
+                      </span>
                     </div>
                   )}
                 </For>
@@ -168,7 +168,7 @@ const IncomingLinksSection: Component<{
   return (
     <Show when={hydratedLinks().length > 0}>
       <div class={styles.detailSection}>
-        <h4 style={{ color: "var(--accent-blue)" }}>Defined In</h4>
+        <h4 style={{ color: "var(--accent-blue)" }}>Referenced by</h4>
         <div class={styles.definedIn}>
           <For each={hydratedLinks()}>
             {({ sourceNode, sourceIndex, equations }) => (

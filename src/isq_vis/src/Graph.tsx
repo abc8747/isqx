@@ -166,7 +166,7 @@ const Graph: Component<{
     )
   );
 
-const handleNodeClick = (nodeIndex: number, event: MouseEvent) => {
+  const handleNodeClick = (nodeIndex: number, event: MouseEvent) => {
     event.stopPropagation();
     setUi("selectedNodeIndices", currentSelection => {
       const isAlreadySelected = currentSelection.includes(nodeIndex);

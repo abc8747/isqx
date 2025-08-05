@@ -1,5 +1,9 @@
 # isq
 
+[![image](https://img.shields.io/pypi/v/isq.svg)](https://pypi.python.org/pypi/isq)
+[![image](https://img.shields.io/pypi/l/isq.svg)](https://pypi.python.org/pypi/isq)
+[![image](https://img.shields.io/pypi/pyversions/isq.svg)](https://pypi.python.org/pypi/isq)
+
 A dependency-free Python library providing metadata objects defined by the
 International System of Quantities (ISO/IEC 80000) and other subfields, including:
 

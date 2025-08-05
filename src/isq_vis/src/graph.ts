@@ -30,18 +30,18 @@ interface SimulationNode {
 /**
  * Creates the initial node and link structures from the raw data.
  */
-function createSimulationGraph(rawData: QtyKindData): {
+function createSimulationGraph(qtyKindData: QtyKindData): {
   nodes: SimulationNode[];
   simulationLinks: { source: SimulationNode; target: SimulationNode }[];
 } {
-  const canonicalPaths = Object.keys(rawData);
+  const canonicalPaths = Object.keys(qtyKindData);
   const pathToIndex = new Map<CanonicalPath, NodeIndex>(
     canonicalPaths.map((p, i) => [p, i])
   );
 
   const nodes: SimulationNode[] = canonicalPaths.map(path => ({
     canonicalPath: path,
-    details: rawData[path],
+    details: qtyKindData[path],
     x: 0,
     y: 0,
     r: 0,
@@ -195,15 +195,15 @@ function layoutGraph(
   return finalSimNodes;
 }
 
-export function processGraphData(rawData: QtyKindData | null): {
+export function processGraphData(qtyKindData: QtyKindData | null): {
   nodes: GraphNode[];
   links: GraphLink[];
   linkMap: Map<number, GraphLink[]>;
 } {
-  if (!rawData) return { nodes: [], links: [], linkMap: new Map() };
+  if (!qtyKindData) return { nodes: [], links: [], linkMap: new Map() };
 
   const { nodes: initialNodes, simulationLinks } =
-    createSimulationGraph(rawData);
+    createSimulationGraph(qtyKindData);
   const finalSimNodes = layoutGraph(initialNodes, simulationLinks);
 
   const finalPathToIndex = new Map<CanonicalPath, NodeIndex>(

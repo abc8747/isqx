@@ -8,10 +8,10 @@ export type NodeIndex = number;
 // raw data structures from objects.json
 //
 
-export type StrFragment = string | { text: string; href: CanonicalPath };
+export type StrFragment = string | { text: string; path: CanonicalPath };
 
 /** A unit of measurement. */
-export type Unit = StrFragment;
+export type Unit = StrFragment | StrFragment[]; // this will change in the future
 
 /** A variable within the context of an equation. */
 export interface WhereClause {
@@ -48,6 +48,21 @@ export interface QtyKindDetail {
 
 /** The root data structure loaded from the `objects.json` file. */
 export type QtyKindData = Record<CanonicalPath, QtyKindDetail>;
+
+export interface Quantity {
+  value: string; // for now
+  unit: Unit | null;
+}
+
+export type ConstantsData = Record<CanonicalPath, Quantity>;
+
+export type UnitsData = Record<CanonicalPath, Unit>;
+
+export interface IsqData {
+  qtyKinds: QtyKindData;
+  constants: ConstantsData;
+  units?: UnitsData; // empty for now until we figure out how to serialise things properly
+}
 
 //
 // processed graph and state structures

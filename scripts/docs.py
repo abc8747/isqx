@@ -51,34 +51,12 @@ copy_contributing = partial(
 )
 
 
-def write_visualiser(site_url: str) -> None:
-    # just so we don't need allow-same-origin
-    url = f"{site_url.removesuffix('/')}/vis.html?autoLoad"
-    output = f"""
-Here is an interactive visualisation of (most) quantity kinds. The standalone
-page can be found at [`/vis.html`]({url}).
-
-<iframe
-  src="{url}"
-  sandbox="allow-scripts"
-  loading="lazy"
-  title="ISQ Visualization"
-  style="width: 100%; height: 768px; border: 1px solid var(--md-typeset-table-color);">
-</iframe>
-<!-- note that this does not render with `mkdocs serve`, see
-https://github.com/mkdocs/mkdocs/issues/3852 -->
-"""
-    with open(PATH_ROOT / "docs" / "vis.md", "w+") as f:
-        f.write(output)
-
-
 # mkdocs events
 
 
 def on_pre_build(config) -> None:  # type: ignore
     copy_readme()
     copy_contributing()
-    write_visualiser(config["site_url"])
 
 
 PATH_VIS_SOURCE = Path(__file__).parent.parent / "src" / "isq_vis"

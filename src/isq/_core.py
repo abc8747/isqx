@@ -1847,7 +1847,7 @@ class Anchor:  # NOTE: not using namedtuple so json serialization works nicely
     """
 
     text: str
-    href: str
+    path: str
 
 
 StrFragment: TypeAlias = Union[str, Anchor]

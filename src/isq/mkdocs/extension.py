@@ -96,6 +96,7 @@ Unit: TypeAlias = Union[tuple[StrFragment, ...], None]
 # Mul(M, S) is represented as (Anchor("M", "isq.M"), "\cdot", Anchor("S", "isq.S"))
 # in the future, we want to return a tagged union (the direct representation
 # of the unit). for now, this is good enough.
+# we also want to get rid of the None.
 
 
 # see: https://mkdocstrings.github.io/griffe/guide/users/how-to/selectively-inspect/
@@ -125,6 +126,12 @@ class EquationDetail(KaTeXWhere):
 @dataclass(frozen=True)
 class WikidataDetail:
     qcode: str
+
+
+@dataclass(frozen=True)
+class Quantity:
+    value: str  # for now: in the future we should support lazy products
+    unit: Unit  # for now
 
 
 CanonicalPath: TypeAlias = str
@@ -277,20 +284,58 @@ class IsqExtension(Extension):
                 details.tags = tuple(str(t) for t in v.tags)  # str for now
 
         if self.objects_out_path:
+            constants = {}
+            for path, definition in self.definitions.items():
+                if not isinstance(
+                    definition.value, (LazyProduct, *_ARGS_NUMBER)
+                ):
+                    continue
+                value = definition.value
+                value_str = str(
+                    value.to_approx()
+                    if isinstance(value, LazyProduct)
+                    else value
+                )
+                unit_expr: IsqExpr | None = None
+                if not (
+                    (meta := definition.annotated_metadata)
+                    and (unit_expr := meta.unit)
+                ):
+                    logger.warning(
+                        f"no unit found for {path} in annotated metadata"
+                    )
+                    continue  # dimensionless quantities should be annotated anyways
+                constants[path] = Quantity(
+                    value=value_str,
+                    unit=(
+                        tuple(formatter.fmt(unit_expr))  # str for now
+                        if unit_expr is not None
+                        else None
+                    ),
+                )
+
             json_path = Path(self.objects_out_path) / "objects.json"
             # do not serialize members that have `None` or empty tuple values to
             # save space
-            serialized_objects = {
-                path: asdict(
-                    details,
-                    dict_factory=lambda x: {k: v for (k, v) in x if v},
-                )
-                for path, details in self.objects.items()
+            output_data = {
+                "qtyKinds": {
+                    path: to_dict(details)
+                    for path, details in self.objects.items()
+                },
+                "constants": {
+                    path: to_dict(details)
+                    for path, details in constants.items()
+                },
+                "units": {},  # TODO
             }
             json_path.parent.mkdir(parents=True, exist_ok=True)
             with open(json_path, "w") as f:
-                json.dump(serialized_objects, f)
+                json.dump(output_data, f)
             logger.info(f"wrote objects to {json_path}")
+
+
+def to_dict(obj: Any) -> dict[str, Any]:
+    return asdict(obj, dict_factory=lambda x: {k: v for (k, v) in x if v})
 
 
 class Definition(NamedTuple):
@@ -328,7 +373,7 @@ class MkdocsFormatter(BasicFormatter):
         if reverse_def := self.reverse_definitions.get(id(expr)):
             yield Anchor(
                 text=name_formatted,
-                href=reverse_def.path,
+                path=reverse_def.path,
             )
         else:
             yield name_formatted
@@ -415,7 +460,7 @@ def parse_where(
         elif kind(unit_expr) == "dimensionless":
             unit = ("dimensionless",)
         else:
-            unit = tuple(s for s in formatter.fmt(unit_expr))
+            unit = tuple(s for s in formatter.fmt(unit_expr))  # str  for now
 
         yield Where(
             symbol=w_rt_k,

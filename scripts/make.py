@@ -15,6 +15,7 @@ import typer
 from docs import copy_docs_file
 
 PATH_ROOT = Path(__file__).parent.parent
+PATH_VIS = PATH_ROOT / "src" / "isq_vis"
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -43,13 +44,13 @@ def check_katex() -> None:
 def fix() -> None:
     os.system("uv run --python 3.9 ruff check --fix src tests")
     os.system("uv run --python 3.9 ruff format src tests")
+    os.system(f"cd {PATH_VIS} && pnpm run fmt")
 
 
 #
 # for vis
 #
 PATH_DUMP = PATH_ROOT / "scripts" / "dump.sh"
-PATH_VIS = PATH_ROOT / "src" / "isq_vis"
 EXCLUDE_VIS = [
     "pnpm-lock.yaml",
     "vite.config.ts",
@@ -90,6 +91,13 @@ def all(exclude: list[str] = EXCLUDE_ALL, slim: bool = False) -> None:
     )
     os.system(
         xclip(f"cd {PATH_ROOT} && bash {PATH_DUMP} mkdocs.yml docs src {g}")
+    )
+
+
+@app.command()
+def preview() -> None:
+    os.system(
+        "uv run mkdocs build && http-server site -p 8080 -c-1 --brotli --gzip"
     )
 
 
