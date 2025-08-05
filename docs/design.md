@@ -1,4 +1,4 @@
-`isq` tries not to follow the patterns of existing units of measurement (UoM)
+`isqx` tries not to follow the patterns of existing units of measurement (UoM)
 libraries: it prioritises incremental adoption over runtime enforcement.
 
 It is inspired libraries like:
@@ -7,7 +7,7 @@ It is inspired libraries like:
   [`fastapi`](https://github.com/fastapi/fastapi), which popularised the use of
   metadata objects with `typing.Annotated`,
 - [`impunity`](https://achevrot.github.io/impunity/), which also use `Annotated`
-to enforce dimension correctness,
+to enforce dimension correctness.
 
 ## Why do existing UoM libraries not proliferate?
 
@@ -27,7 +27,7 @@ learning" (28%). The frustrations are best captured by the survey responses:
   performance."*
 - *"manual conversions functions covered most use cases"*
 
-`isq` is designed to be opt-in only, decoupling the unit from the runtime value.
+`isqx` is designed to be opt-in only, decoupling the unit from the runtime value.
 It builds upon the idea of what's already excellent: writing docstrings
 *orthogonal* to the code responsible for computation.
 
@@ -177,7 +177,7 @@ function boundary, leading to the frustrations described earlier.
 
 Python shines in its flexibility. Introducing a hard dependency on the
 `Quantity` newtype interferes too much with what we're trying to achieve, and
-`isq` crucially avoids using the newtype pattern in the first place.
+`isqx` crucially avoids using the newtype pattern in the first place.
 
 ## Problem 2: Quantities of the same dimension but different kinds
 
@@ -189,7 +189,7 @@ parameter with `Joules` is too ambiguous: using
 Surprisingly, most UoM libraries only offer units to work with (see
 [`pint#551`](https://github.com/hgrecco/pint/issues/551)).
 
-`isq` tackles this with two key ideas:
+`isqx` tackles this with two key ideas:
 
 - units can be "refined": `J["work"]` and `J["heat"]` both still represent
   `Joules`, but additional metadata stored within the expression makes sure
@@ -197,15 +197,15 @@ Surprisingly, most UoM libraries only offer units to work with (see
 - downstream users should be able to pick the unit they prefer
   (`MJ`, `GJ`, `Btu`...) easily.
 
-The former idea is implemented with [`isq.Tagged`][], responsible for binding
+The former idea is implemented with [`isqx.Tagged`][], responsible for binding
 arbitrary metadata to a unit. Its design is strongly inspired by
 `typing.Annotated` itself, providing a very flexible system to specify what they
 want. `Expr.__getitem__` provides an ergonomic way to "refining" an existing
 unit.
 
-The latter idea is implemented with the [`isq.QtyKind`][] factory, which also
+The latter idea is implemented with the [`isqx.QtyKind`][] factory, which also
 stores the metadata but makes the unit "generic". `QtyKind.__call__` with any
-user-defined, dimensionally-compatible unit produces a [`isq.Tagged`][]
+user-defined, dimensionally-compatible unit produces a [`isqx.Tagged`][]
 expression.
 
 ### Reusing `Tagged`
@@ -220,40 +220,41 @@ Another point of confusion is that it can also be interpreted as: "the numeric
 value of `x` represents the difference in length between two points on the meter
 scale (position-independent)".
 
-Because [`isq.Tagged`][] can store any hashable object, one can use the
-[`isq.OriginAt`][] or [`isq.DELTA`][] tags to reduce ambiguity.
+Because [`isqx.Tagged`][] can store any hashable object, one can use the
+[`isqx.OriginAt`][] or [`isqx.DELTA`][] tags to reduce ambiguity.
 
 ### Note on `QtyKind`
 
-One important caveat is that while [`isq.Expr`][] can be composed with each
-other to form a "larger tree", [`isq.QtyKind`][] **cannot be further composed**.
+One important caveat is that while [`isqx.Expr`][] can be composed with each
+other to form a "larger tree", [`isqx.QtyKind`][] **cannot be further composed**.
 This may sound surprising: wouldn't something like `force = mass * acceleration`,
 `kinetic_energy = 0.5 * mass * velocity**2` be an ergonomic way of defining new
 quantities?
 
-While it makes sense to do so, `isq` avoids this because many quantities are not
+While it makes sense to do so, `isqx` avoids this because many quantities are not
 defined by simple products of powers:
 
 | Quantity Kind                                  | Definition                                                     | Additional expression nodes needed |
 | ---------------------------------------------- | -------------------------------------------------------------- | ---------------------------------- |
-| [work][isq.WORK]                               | $W = \int_C \mathbf{F} \cdot d\mathbf{s}$                      | integral, dot product              |
-| [enthalpy][isq.ENTHALPY]                       | $H = U + pV$                                                   | addition, subtraction              |
-| [isentropic exponent][isq.ISENTROPIC_EXPONENT] | $-\frac{V}{\rho} \left(\frac{\partial p}{\partial V}\right)_S$ | partial derivatives                |
-| [poynting vector][isq.POYNTING_VECTOR]         | $\mathbf{S} = \mathbf{E} \times \mathbf{H}$                    | cross product                      |
-| [complex power][isq.COMPLEX_POWER]             | $\underline{S} = \underline{U} \underline{I}^*$                | complex conjugate                  |
+| [work][isqx.WORK]                               | $W = \int_C \mathbf{F} \cdot d\mathbf{s}$                      | integral, dot product              |
+| [enthalpy][isqx.ENTHALPY]                       | $H = U + pV$                                                   | addition, subtraction              |
+| [isentropic exponent][isqx.ISENTROPIC_EXPONENT] | $-\frac{V}{\rho} \left(\frac{\partial p}{\partial V}\right)_S$ | partial derivatives                |
+| [poynting vector][isqx.POYNTING_VECTOR]         | $\mathbf{S} = \mathbf{E} \times \mathbf{H}$                    | cross product                      |
+| [complex power][isqx.COMPLEX_POWER]             | $\underline{S} = \underline{U} \underline{I}^*$                | complex conjugate                  |
 
 We would have to build another SymPy just to define a quantity kind and resolve
 its units. `mp-units` tries to do exactly this, but it resorts to simplifying or
 ignoring operations that are too hard to model.
 
-`isq` tries to keep it simple by storing its definitions in a separate (and
-optional) [details dictionary][isq.details.Details] under the [`isq.details`][]
+`isqx` tries to keep it simple by storing its definitions in a separate (and
+optional) [details dictionary][isqx.details.Details] under the [`isqx.details`][]
 module instead. Our documentation uses a custom `mkdocstrings-python` and
-`griffe` plugin to scan for and generate cross-references.
+`griffe` plugin to scan for expressions, generate cross-references. It is also
+emits an JSON file for the [visualiser](./vis.md).
 
 ## Problem 3: Exact representation and formatting
 
-Consider the unit for fuel economy, [miles per gallon][isq.usc.MPG].
+Consider the unit for fuel economy, [miles per gallon][isqx.usc.MPG].
 Dimensionally, this is equivalent to the inverse area:
 $\frac{\mathsf{L}}{\mathsf{L}^3} = \mathsf{L}^{-2}$.
 
@@ -261,21 +262,20 @@ Many runtime libraries would eagerly simplify `MPG` to a base form like `m⁻²`
 to improve performance in dimensional checks. This however, loses the
 human-readable intent.
 
-`isq` follows the code-as-data principle, preserving the exact tree
-representation. This allows the formatted output to be exactly in the form the
-user defined it.
+`isqx` preserving the exact tree representation.
+This allows the formatted output to be exactly in the form the user defined it.
 
 ## FAQ
 
 ### What's the point if there is no runtime checks?
 
 > Since `x` in `Annotated[T, x]` are ignored by the Python interpreter and
-> you're not using `x` for checking dimension errors, isn't `isq` just
+> you're not using `x` for checking dimension errors, isn't `isqx` just
 > glorified comments?
 
-Yes, that is the design goal. `isq` provides a machine-readable, centralised
-vocabulary for documentation. It avoids the "newtype" friction by decoupling
-the documentation from the runtime value.
+Yes. `isqx` provides a machine-readable, centralised vocabulary for documentation.
+It avoids the "newtype" friction by decoupling the documentation from the
+runtime value.
 
 Expressive, unambiguous documentation can significantly reduce accidental
 errors without imposing runtime or interoperability costs.
@@ -291,7 +291,7 @@ However, painpoints boil down to:
 - no intersphinx
 - LSP: inability to "jump to definition" all the way to its base units
 
-`isq` tries to be barebones.
+`isqx` tries to be minimal.
 
 > What about parsing the Python AST and collecting all `x` in functions or
 > dataclasses, and building a static analyzer?
@@ -318,38 +318,38 @@ false positives is very difficult. Some challenges include:
   ISO 80000 permits this, but it might be physically questionable in some
   contexts (e.g. `force in the x direction` + `force in the y direction`)
 
-`isq` provides the necessary expressiveness to build a smart static analyzer.
+`isqx` provides the necessary expressiveness to build a smart static analyzer.
 If one is built, it should learn from the success of gradual typing systems
 like mypy and offer configurable strictness levels.
 
-### Why are details stored in a separate `isq.details` module?
+### Why are details stored in a separate `isqx.details` module?
 
 Some quantity kinds are defined in terms of quantity kinds that are defined
-later. For example, [action][isq.ACTION] [ISO 80000-3] is defined in terms of
-[work][isq.WORK] [ISO 80000-5]. We can either:
+later. For example, [action][isqx.ACTION] [ISO 80000-3] is defined in terms of
+[work][isqx.WORK] [ISO 80000-5]. We can either:
 
-- couple details with the [`isq.QtyKind`][] and forward-reference with strings
-- define all [`isq.QtyKind`][]s first and define definitions separately.
+- couple details with the [`isqx.QtyKind`][] and forward-reference with strings
+- define all [`isqx.QtyKind`][]s first and define definitions separately.
 
 The latter is adopted because:
 
 1. LSP support is far better: enables go-to-definition interactions.
    refactoring will be far easier.
-2. Our [mkdocs plugin][isq.mkdocs.plugin] will be able to easily build
+2. Our [mkdocs plugin][isqx.mkdocs.plugin] will be able to easily build
    cross-references
 3. Extensibility: downstream users can easily append their own domain-specific
    definitions.
-4. Performance: avoids loading non-critical information on `import isq`.
+4. Performance: avoids loading non-critical information on `import isqx`.
 5. `USD <-> HKD` is not fixed
 
-Similarly, the [formatting][isq.Expr] of expressions are decoupled from their
+Similarly, the [formatting][isqx.Expr] of expressions are decoupled from their
 definitions for the same reason. Users might want to maintain their own set of
 symbols/locales and we don't want downstream users to have to monkeypatch
 classes.
 
 ### How can I parse units from a string?
 
-`isq` does not come with a built-in parser because there are endless variety of
+`isqx` does not come with a built-in parser because there are endless variety of
 formats:
 
 - plain text
@@ -357,11 +357,11 @@ formats:
 - locale/subfield-specific symbols
 - user defined custom tags
 
-However, the expression tree of `isq` can be used as a target for a custom
+However, the expression tree of `isqx` can be used as a target for a custom
 parser. A simple recursive descent or Pratt parser can be written to transform
-a string into a [`isq.Expr`][] object.
+a string into a [`isqx.Expr`][] object.
 
-### Having to define `M = Annotated[_T, isq.M]` is annoying. Why not make `isq.M` a type instead of object?
+### Having to define `M = Annotated[_T, isqx.M]` is annoying. Why not make `isqx.M` a type instead of object?
 
 Unfortunately, there is no way to create our own `Annotated` and have
 static type checkers understand it. One possible path is:
@@ -391,5 +391,6 @@ def foo(bar: M[int], baz: M[float]):
 # Found 2 errors in 1 file (checked 1 source file)
 ```
 See also:
-https://stackoverflow.com/questions/78536551/variable-not-allowed-in-type-expression-how-can-i-create-parameterized-typin
-https://stackoverflow.com/questions/78845949/how-to-define-a-typing-special-form-for-use-with-static-type-checking
+
+- https://stackoverflow.com/questions/78536551/variable-not-allowed-in-type-expression-how-can-i-create-parameterized-typin
+- https://stackoverflow.com/questions/78845949/how-to-define-a-typing-special-form-for-use-with-static-type-checking

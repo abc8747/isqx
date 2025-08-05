@@ -1,8 +1,8 @@
 from fractions import Fraction
 
-from isq import CENTI, HOUR, G, M, S, simplify
-from isq._fmt import BasicFormatter, fmt
-from isq.usc import BTU_IT, FAHRENHEIT, FT, IN, R
+from isqx import CENTI, HOUR, G, M, S, simplify
+from isqx._fmt import BasicFormatter, fmt
+from isqx.usc import BTU_IT, FAHRENHEIT, FT, IN, R
 
 K_VALUE = BTU_IT * IN / (HOUR * FT**2 * R)
 CM = CENTI * M
@@ -11,8 +11,8 @@ STATC = (DYN ** Fraction(1, 2) * M).alias("statc")
 
 
 def test_fmt_basic_tagged() -> None:
-    from isq import M_PERS
-    from isq.aerospace import TAS
+    from isqx import M_PERS
+    from isqx.aerospace import TAS
 
     M_PERS_TAS = TAS(M_PERS)
     assert (
@@ -31,7 +31,7 @@ def test_fmt_basic_translated() -> None:
 
 
 def test_fmt_basic_log() -> None:
-    from isq import DB
+    from isqx import DB
 
     assert (
         fmt(DB, formatter=BasicFormatter(verbose=True))
@@ -41,7 +41,7 @@ def test_fmt_basic_log() -> None:
 
 
 def test_fmt_basic_log_level() -> None:
-    from isq import DBU
+    from isqx import DBU
 
     assert (
         fmt(DBU, formatter=BasicFormatter(verbose=True))

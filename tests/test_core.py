@@ -3,8 +3,7 @@ from decimal import getcontext
 from fractions import Fraction
 
 import pytest
-
-from isq import (
+from isqx import (
     CELSIUS,
     DAY,
     HOUR,
@@ -28,8 +27,8 @@ from isq import (
     dimension,
     simplify,
 )
-from isq.aerospace import GEOMETRIC_ALTITUDE, GEOPOTENTIAL_ALTITUDE
-from isq.usc import FT
+from isqx.aerospace import GEOMETRIC_ALTITUDE, GEOPOTENTIAL_ALTITUDE
+from isqx.usc import FT
 
 #
 # OpsMixin
@@ -93,7 +92,7 @@ def test_exp_simplify() -> None:
 
 
 def test_mul_invalid() -> None:
-    from isq import MixedKindError
+    from isqx import MixedKindError
 
     with pytest.raises(CompositionError, match="empty"):
         _u0 = Mul(tuple())
@@ -150,7 +149,7 @@ def test_scaled_dimension() -> None:
 
 
 def test_scaled_simplify_nested() -> None:
-    from isq import YEAR
+    from isqx import YEAR
 
     expr3s = simplify(YEAR)
     assert isinstance(expr3s, Scaled)
@@ -182,7 +181,7 @@ def test_scaled_simplify_dimensionless() -> None:
 
 
 def test_scaled_simplify_with_lazy_product() -> None:
-    from isq.usc import IN  # -> ft -> m
+    from isqx.usc import IN  # -> ft -> m
 
     result = simplify(Exp(simplify(IN), 2))  # type: ignore
 
@@ -194,8 +193,8 @@ def test_scaled_simplify_with_lazy_product() -> None:
 
 
 def test_scaled_simplify_with_lazy_product_multiple_terms() -> None:
-    from isq import PA
-    from isq.usc import PSI
+    from isqx import PA
+    from isqx.usc import PSI
 
     # defined by lbf -> lbm -> kg and in -> ft -> m
     psi_simplified = simplify(PSI)  # Scaled(simplify(PA), LazyProduct(...))
@@ -214,7 +213,7 @@ def test_scaled_simplify_with_lazy_product_multiple_terms() -> None:
     assert isinstance(result.factor, LazyProduct)
     assert isinstance(result.reference, Mul)
 
-    from isq import KG
+    from isqx import KG
 
     result_ref_simplified = simplify(result.reference)
     assert isinstance(result_ref_simplified, Mul)
@@ -233,7 +232,7 @@ def test_scaled_simplify_with_lazy_product_multiple_terms() -> None:
 
 
 def test_prefix_invalid() -> None:
-    from isq import KG, KILO, G, W
+    from isqx import KG, KILO, G, W
 
     KW = KILO * W
     assert isinstance(KW, Scaled)
@@ -301,9 +300,9 @@ def test_tagged_conversion() -> None:
 
 
 def test_qty_kind_call() -> None:
-    from isq import UnitKindMismatchError
-    from isq.aerospace import TAS
-    from isq.usc import KNOT
+    from isqx import UnitKindMismatchError
+    from isqx.aerospace import TAS
+    from isqx.usc import KNOT
 
     tas_mps = TAS(M_PERS)
     assert isinstance(tas_mps, Tagged)
@@ -335,7 +334,7 @@ def test_qty_kind_call() -> None:
 
 
 def test_alias_fail() -> None:
-    from isq import Aliased
+    from isqx import Aliased
 
     with pytest.raises(CompositionError, match="can only wrap"):
         _ = Aliased(M, "fail")  # type: ignore
@@ -347,7 +346,7 @@ def test_alias_fail() -> None:
 
 
 def test_convert_dimensionless() -> None:
-    from isq import SR
+    from isqx import SR
 
     assert convert(RAD, RAD)(1) == 1  # -> Dimensionless
 
@@ -356,7 +355,7 @@ def test_convert_dimensionless() -> None:
 
 
 def test_convert_base_dimension() -> None:
-    from isq import DIM_LENGTH, DIM_TIME
+    from isqx import DIM_LENGTH, DIM_TIME
 
     with pytest.raises(DimensionMismatchError):
         _fn = convert(DIM_LENGTH, DIM_TIME)  # incompatible dim
@@ -411,7 +410,7 @@ def test_convert_mul() -> None:
 
 
 def test_convert_scaled() -> None:
-    from isq import MIN
+    from isqx import MIN
 
     with pytest.raises(DimensionMismatchError):
         _fn = convert(DAY, M)  # incompatible dim
@@ -427,7 +426,7 @@ def test_convert_scaled() -> None:
 
 
 def test_translated_is_terminal() -> None:
-    from isq import KILO, Translated
+    from isqx import KILO, Translated
 
     with pytest.raises(CompositionError, match="exponentiated"):
         _ = CELSIUS**2
@@ -444,8 +443,8 @@ def test_translated_is_terminal() -> None:
 
 
 def test_convert_translated() -> None:
-    from isq import CELSIUS, DIM_TEMPERATURE, K, NonAffineConverter
-    from isq.usc import FAHRENHEIT, R
+    from isqx import CELSIUS, DIM_TEMPERATURE, K, NonAffineConverter
+    from isqx.usc import FAHRENHEIT, R
 
     assert dimension(CELSIUS) == DIM_TEMPERATURE
 
@@ -471,7 +470,7 @@ def test_convert_translated() -> None:
 
 
 def test_convert_tagged_translated() -> None:
-    from isq import CELSIUS, K
+    from isqx import CELSIUS, K
 
     SURFACE_TEMP_C = CELSIUS["surface"]
     SURFACE_TEMP_K = K["surface"]
@@ -488,8 +487,8 @@ def test_convert_tagged_translated() -> None:
 
 
 def test_log_level_invalid() -> None:
-    from isq import BEL, DB, DBV, HZ, KILO, Log, M, Quantity, V
-    from isq._core import _RATIO, _RatioBetween
+    from isqx import BEL, DB, DBV, HZ, KILO, Log, M, Quantity, V
+    from isqx._core import _RATIO, _RatioBetween
 
     # NOTE: we allow logarithmic units to be composed with others,
     # TODO: in the future harden `convert` so we dont mess it up
@@ -518,7 +517,16 @@ def test_log_level_invalid() -> None:
 
 
 def test_convert_logarithmic() -> None:
-    from isq import DBM, DBUV, DBV, DBW, NPV, NPW, Converter, NonAffineConverter
+    from isqx import (
+        DBM,
+        DBUV,
+        DBV,
+        DBW,
+        NPV,
+        NPW,
+        Converter,
+        NonAffineConverter,
+    )
 
     assert isinstance(dimension(DBM), Dimensionless)
 
@@ -552,7 +560,7 @@ def test_convert_logarithmic() -> None:
 
 
 def test_convert_logarithmic_with_prefix() -> None:
-    from isq import DBV, DECI, MILLI, NPV, Converter
+    from isqx import DBV, DECI, MILLI, NPV, Converter
 
     npv_to_decinpv = convert(NPV, DECI * NPV, exact=True)
     assert isinstance(npv_to_decinpv, Converter)  # no offset
@@ -565,7 +573,7 @@ def test_convert_logarithmic_with_prefix() -> None:
 
 
 def test_convert_logarithmic_fail() -> None:
-    from isq import DBM, DBV, NonLinearConversionError, V
+    from isqx import DBM, DBV, NonLinearConversionError, V
 
     with pytest.raises(NonLinearConversionError):
         convert(V, DBV)
@@ -578,7 +586,7 @@ def test_convert_logarithmic_fail() -> None:
 def test_angle_conversion() -> None:
     from decimal import Decimal, localcontext
 
-    from isq import DEG, PI, REV, E
+    from isqx import DEG, PI, REV, E
 
     with localcontext() as ctx:
         assert PI.to_decimal(ctx) == Decimal("3.141592653589793238462643383")
@@ -605,7 +613,7 @@ def test_angle_conversion() -> None:
 
 
 def test_derived_angle_conversion() -> None:
-    from isq import DEG
+    from isqx import DEG
 
     DEG_PER_S = DEG * S**-1
     RAD_PER_S = RAD * S**-1
@@ -625,7 +633,7 @@ def test_derived_angle_conversion() -> None:
 def test_xkcd_whatif_11() -> None:  # https://what-if.xkcd.com/11/
     from math import pi
 
-    from isq import CENTI, KILO, YEAR, BaseDimension, BaseUnit
+    from isqx import CENTI, KILO, YEAR, BaseDimension, BaseUnit
 
     BIRD = BaseUnit(BaseDimension("bird"), "bird")
     POOP = BaseUnit(BaseDimension("poop"), "poop")
@@ -660,8 +668,8 @@ def test_xkcd_whatif_11() -> None:  # https://what-if.xkcd.com/11/
     )
     assert period_yr == pytest.approx(195, abs=0.7)
 
-    from isq import MILLI, YEAR
-    from isq.usc import FL_OZ, MI, MPG
+    from isqx import MILLI, YEAR
+    from isqx.usc import FL_OZ, MI, MPG
 
     MM2 = (MILLI * M) ** 2
     assert convert(MPG**-1, MM2)(1 / 20) == pytest.approx(0.11760729)

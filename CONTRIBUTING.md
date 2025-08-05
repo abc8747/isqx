@@ -1,8 +1,8 @@
 # Development
 
 ```shell
-$ git clone https://github.com/abc8747/isq.git
-$ cd isq
+$ git clone https://github.com/abc8747/isqx.git
+$ cd isqx
 $ uv venv
 $ uv sync --dev
 ```
@@ -41,7 +41,7 @@ To build and serve the documentation:
 $ uv run mkdocs serve
 ```
 
-Note that this loads in some custom extensions under `src/isq/mkdocs` and
+Note that this loads in some custom extensions under `src/isqx/mkdocs` and
 **overwrites** `docs/index.md` with the one from the top level `README.md`.
 
 # Defining units and quantity kinds.
@@ -50,9 +50,9 @@ The ISO/IEC 80000 (`iso80000.py`) contains many useful core objects and is
 considered complete. If you would like to add new definitions for your own
 subfield, you should place them in two files:
 
-- Core definitions (`src/isq/{{domain}}.py`): this is where runtime objects like
+- Core definitions (`src/isqx/{{domain}}.py`): this is where runtime objects like
   `QtyKind`, `BaseUnit` etc. are defined.
-- Descriptive Details (`src/isq/details/{{domain}}.py`): this is where
+- Descriptive Details (`src/isqx/details/{{domain}}.py`): this is where
   non-essential metadata like `Wikidata`, `Symbol` and `Equation` etc. are defined.
 
 ## Units and constants
@@ -65,7 +65,7 @@ First, define the essential runtime objects.
 
 ```py
 from decimal import Decimal
-from isq import BaseDimension, BaseUnit
+from isqx import BaseDimension, BaseUnit
 
 # base units
 DIM_TIME = BaseDimension("T")
@@ -76,17 +76,17 @@ N = (KG * M * S**-2).alias("newton", allow_prefix=True)
 FT = (Decimal("0.3048") * M).alias("foot")
 
 # constants
-from isq import StdUncertainty  # optional
+from isqx import StdUncertainty  # optional
 from typing import Annotated
 G0: Annotated[Decimal, M * S**-2, StdUncertainty("12")] = Decimal("9.8065")
 # do not do this:
-G0 = isq.Quantity(9.8065, M * S**-2)
+G0 = isqx.Quantity(9.8065, M * S**-2)
 ```
 
 ## Quantity kinds
 
 ```py
-from isq import QtyKind
+from isqx import QtyKind
 
 # must be defined with coherent SI units (i.e. not scaled)
 # it can have optional tags.
@@ -96,7 +96,7 @@ KINETIC_ENERGY = LENGTH["kinetic"]
 # alternatively, if it doesn't make sense to "subclass".
 WORK_DONE = QtyKind(J, ("work_done",))
 
-from isq.usc import BTU
+from isqx.usc import BTU
 ENERGY_BTU = QtyKind(BTU)  # BAD!
 ```
 
@@ -105,7 +105,7 @@ ENERGY_BTU = QtyKind(BTU)  # BAD!
 Details are entirely optional.
 
 ```py
-from isq.definitions import _iso80000
+from isqx.definitions import _iso80000
 
 MECHANICS: Details = {
     # keys should be direct object references
@@ -149,7 +149,7 @@ r"(\eta_{th})_{max}"
 The where clause connects symbols in the KaTeX string to their meanings.
 
 ```py
-from isq import SELF
+from isqx import SELF
 
 # good
 _iso80000.PHASE_SPEED: (

@@ -10,8 +10,7 @@ from decimal import (
 from fractions import Fraction
 
 import pytest
-
-from isq import (
+from isqx import (
     LazyProduct,
     Number,
 )

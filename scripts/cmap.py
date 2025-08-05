@@ -247,7 +247,7 @@ if __name__ == "__main__":
     with open(
         Path(__file__).parent.parent
         / "src"
-        / "isq_vis"
+        / "isqx_vis"
         / "assets"
         / "logo.svg",
         "w",

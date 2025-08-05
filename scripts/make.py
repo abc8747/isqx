@@ -15,7 +15,7 @@ import typer
 from docs import copy_docs_file
 
 PATH_ROOT = Path(__file__).parent.parent
-PATH_VIS = PATH_ROOT / "src" / "isq_vis"
+PATH_VIS = PATH_ROOT / "src" / "isqx_vis"
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -36,8 +36,8 @@ def check() -> None:
 @app.command()
 def check_katex() -> None:
     r"""Highlight underscores in katex"""
-    os.system(r"rg -i '_\\{([A-Za-z_ ,]+)\\}' src/isq/details --no-heading")
-    os.system(r"rg -i '\"\w_([A-Za-z_ ,]+)\w*\"' src/isq/details --no-heading")
+    os.system(r"rg -i '_\\{([A-Za-z_ ,]+)\\}' src/isqx/details --no-heading")
+    os.system(r"rg -i '\"\w_([A-Za-z_ ,]+)\w*\"' src/isqx/details --no-heading")
 
 
 @app.command()
@@ -60,10 +60,10 @@ EXCLUDE_VIS = [
     "assets/*",
 ]
 EXCLUDE_ALL = [
-    "src/isq/py.typed",
-    "src/isq/_citations.py",
+    "src/isqx/py.typed",
+    "src/isqx/_citations.py",
     "docs/assets/",
-    *(f"src/isq_vis/{fp}" for fp in EXCLUDE_VIS),
+    *(f"src/isqx_vis/{fp}" for fp in EXCLUDE_VIS),
 ]
 
 copy = typer.Typer(no_args_is_help=True)
@@ -87,10 +87,13 @@ def web(exclude: list[str] = EXCLUDE_VIS) -> None:
 @copy.command()
 def all(exclude: list[str] = EXCLUDE_ALL, slim: bool = False) -> None:
     g = _g(
-        exclude + (["src/isq/details/", "src/isq/_iso80000.py"] if slim else [])
+        exclude
+        + (["src/isqx/details/", "src/isqx/_iso80000.py"] if slim else [])
     )
     os.system(
-        xclip(f"cd {PATH_ROOT} && bash {PATH_DUMP} mkdocs.yml docs src {g}")
+        xclip(
+            f"cd {PATH_ROOT} && bash {PATH_DUMP} README.md mkdocs.yml docs src {g}"
+        )
     )
 
 

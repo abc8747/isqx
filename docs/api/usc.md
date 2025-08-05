@@ -1,5 +1,5 @@
-Definitions for U.S. customary and British imperial units ([feet][isq.usc.FT], [slugs][isq.usc.SLUG], [pound force][isq.usc.LBF] etc.).
+Definitions for U.S. customary and British imperial units ([feet][isqx.usc.FT], [slugs][isqx.usc.SLUG], [pound force][isqx.usc.LBF] etc.).
 
-The public API is the `isq.usc` module.
+The public API is the `isqx.usc` module.
 
-::: isq.usc
+::: isqx.usc

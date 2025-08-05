@@ -59,7 +59,7 @@ def on_pre_build(config) -> None:  # type: ignore
     copy_contributing()
 
 
-PATH_VIS_SOURCE = Path(__file__).parent.parent / "src" / "isq_vis"
+PATH_VIS_SOURCE = Path(__file__).parent.parent / "src" / "isqx_vis"
 
 
 def on_post_build(config) -> None:  # type: ignore
@@ -84,7 +84,7 @@ def on_post_build(config) -> None:  # type: ignore
         PATH_VIS_SOURCE / "dist" / "index.html",
         path_vis_html,
     )
-    logger.info(f"built isq-vis to {path_vis_html}")
+    logger.info(f"built isqx-vis to {path_vis_html}")
 
 
 if __name__ == "__main__":

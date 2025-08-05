@@ -39,7 +39,7 @@ used to query data.
 ### quantity
 
 - `Q71550118`: individual quantity
-- `P4020`: isq dimension (math)
+- `P4020`: isqx dimension (math)
 - `P2534`: defining formula (math)
 - `P7235`: in defining formula
 - `P9758`: symbol represents

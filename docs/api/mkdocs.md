@@ -1,2 +1,2 @@
-::: isq.mkdocs.plugin
-::: isq.mkdocs.extension
+::: isqx.mkdocs.plugin
+::: isqx.mkdocs.extension

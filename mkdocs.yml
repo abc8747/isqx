@@ -1,18 +1,18 @@
-site_name: isq
+site_name: isqx
 site_description: A system for representing physical units
-repo_name: abc8747/isq
-repo_url: https://github.com/abc8747/isq
-site_url: https://abc8747.github.io/isq/
+repo_name: abc8747/isqx
+repo_url: https://github.com/abc8747/isqx
+site_url: https://abc8747.github.io/isqx/
 nav:
   - Home: "index.md"
   - Examples: "examples.md"
   - API Reference:
-    - isq (core, fmt): "api/core.md"
-    - isq (iso80000): "api/iso80000.md"
-    - isq.usc: "api/usc.md"
-    - isq.aerospace: "api/aerospace.md"
-    - isq.details: "api/details.md"
-    - isq.mkdocs: "api/mkdocs.md"
+      - isqx (core, fmt): "api/core.md"
+      - isqx (iso80000): "api/iso80000.md"
+      - isqx.usc: "api/usc.md"
+      - isqx.aerospace: "api/aerospace.md"
+      - isqx.details: "api/details.md"
+      - isqx.mkdocs: "api/mkdocs.md"
   - Design: "design.md"
   - Visualiser: "vis.md"
   - Contributing: "contributing.md"
@@ -39,25 +39,25 @@ theme:
 plugins:
   - search
   - social
-  - isq:
+  - isqx:
       definitions:
-        - isq._iso80000
-        - isq.aerospace
-        - isq.usc
-        - isq.chemistry
+        - isqx._iso80000
+        - isqx.aerospace
+        - isqx.usc
+        - isqx.chemistry
       details:
-        - isq.details.iso80000.SPACE_AND_TIME
-        - isq.details.iso80000.MECHANICS
-        - isq.details.iso80000.THERMODYNAMICS
-        - isq.details.iso80000.ELECTROMAGNETISM
-        - isq.details.iso80000.LIGHT_AND_RADIATION
-        - isq.details.iso80000.ACOUSTICS
-        - isq.details.iso80000.PHYSICAL_CHEMISTRY_AND_MOLECULAR_PHYSICS
-        - isq.details.iso80000.ATOMIC_AND_NUCLEAR_PHYSICS
-        - isq.details.iso80000.CHARACTERISTIC_NUMBERS
-        - isq.details.iso80000.CONDENSED_MATTER_PHYSICS
-        - isq.details.iso80000.INFORMATION_SCIENCE_AND_TECHNOLOGY
-        - isq.details.chemistry.PHYSICAL_CHEMISTRY
+        - isqx.details.iso80000.SPACE_AND_TIME
+        - isqx.details.iso80000.MECHANICS
+        - isqx.details.iso80000.THERMODYNAMICS
+        - isqx.details.iso80000.ELECTROMAGNETISM
+        - isqx.details.iso80000.LIGHT_AND_RADIATION
+        - isqx.details.iso80000.ACOUSTICS
+        - isqx.details.iso80000.PHYSICAL_CHEMISTRY_AND_MOLECULAR_PHYSICS
+        - isqx.details.iso80000.ATOMIC_AND_NUCLEAR_PHYSICS
+        - isqx.details.iso80000.CHARACTERISTIC_NUMBERS
+        - isqx.details.iso80000.CONDENSED_MATTER_PHYSICS
+        - isqx.details.iso80000.INFORMATION_SCIENCE_AND_TECHNOLOGY
+        - isqx.details.chemistry.PHYSICAL_CHEMISTRY
   - mkdocstrings:
       default_handler: python
       handlers:

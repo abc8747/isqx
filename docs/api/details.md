@@ -1,1 +1,1 @@
-::: isq.details
+::: isqx.details
