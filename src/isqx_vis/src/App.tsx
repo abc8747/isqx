@@ -11,7 +11,6 @@ import {
 import { createStore } from "solid-js/store";
 import type { IsqxData, AppState, CanonicalPath } from "./types";
 import { processGraphData } from "./graph";
-import { phaseRainbow } from "./cmap";
 import Graph from "./Graph";
 import Panel from "./Panel";
 import { JumpContext } from "./JumpContext";
@@ -129,9 +128,8 @@ const App: Component = () => {
     const { nodes, links, linkMap } = processGraphData(data.qtyKinds);
     const numNodes = nodes.length || 1;
     const colorMap = nodes.map((_, i) => {
-      const t = (i / numNodes) * 0.7;
-      const [r, g, b] = phaseRainbow(t);
-      return `rgb(${r},${g},${b})`;
+      const hue = (i / numNodes) * 360 * 0.7;
+      return `oklch(0.5498 0.0934 ${hue})`; // darker: 0.4216 0.0715
     });
     setStore({ nodes, links, linkMap, colorMap });
 
