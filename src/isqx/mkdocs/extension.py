@@ -18,17 +18,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Union
 
-from _griffe.expressions import (
-    Expr,
-    ExprAttribute,
-    ExprCall,
-    ExprDict,
-    ExprKeyword,
-    ExprName,
-    ExprSubscript,
-    ExprTuple,
-)
-from _griffe.models import Attribute
 from griffe import (
     Alias,
     Docstring,
@@ -40,6 +29,17 @@ from griffe import (
     dynamic_import,
     get_logger,
 )
+from griffe._internal.expressions import (
+    Expr,
+    ExprAttribute,
+    ExprCall,
+    ExprDict,
+    ExprKeyword,
+    ExprName,
+    ExprSubscript,
+    ExprTuple,
+)
+from griffe._internal.models import Attribute
 from typing_extensions import TypeAlias
 
 from .. import (
@@ -70,8 +70,8 @@ from . import PATH_PLUGIN
 if TYPE_CHECKING:
     from typing import Generator
 
-    from _griffe.models import Attribute
     from griffe import GriffeLoader, Module
+    from griffe._internal.models import Attribute
 
     from .. import AnnotatedMetadata, NamedExpr, Number
     from .._fmt import _BasicFormatterState
@@ -227,7 +227,7 @@ class IsqxExtension(Extension):
             if isinstance(obj, _ARGS_DEFINITION)
         }
 
-    def on_alias(
+    def on_alias_instance(
         self,
         *,
         node: ast.AST | ObjectNode,
@@ -239,7 +239,7 @@ class IsqxExtension(Extension):
         if alias.path in self.definitions:
             del self.definitions[alias.path]
 
-    def on_package_loaded(
+    def on_package(
         self, *, pkg: Module, loader: GriffeLoader, **kwargs: Any
     ) -> None:
         logger.info(f"loaded {len(self.definitions)} definitions")

@@ -52,7 +52,7 @@ class IsqxPluginConfig(Config):  # type: ignore
 
 
 PLUGIN_ASSETS_JS = (PATH_PLUGIN_ASSETS / "js" / "detail-highlight.js",)
-KATEX_VERSION = "0.16.22"
+KATEX_VERSION = "0.16.25"
 
 
 class IsqxPlugin(BasePlugin[IsqxPluginConfig]):  # type: ignore

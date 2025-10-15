@@ -14,7 +14,7 @@ Shift click to select multiple nodes.
 
 ## Implementation
 
-Our [mkdocs/griffe plugin][isqx.mkdocs] uses of static and dynamic analysis to
+Our [mkdocs/griffe plugin][isqx.mkdocs.plugin] uses of static and dynamic analysis to
 collect all quantity kinds, constants and units into a single `objects.json`.
 
 The visualiser is written in [solidjs](https://github.com/solidjs/solid) and D3.

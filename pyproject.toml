@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "isqx"
-version = "0.1.0"
+version = "0.1.1"
 description = "Units and quantity kinds defined by ISO/IEC 80000 and other subfields."
 readme = "README.md"
 authors = [{ name = "Abraham Cheung", email = "abraham@ylcheung.com" }]
@@ -39,7 +39,7 @@ typing = ["mypy>=1.16.0"]
 docs = [
     "mkdocs-material[imaging]>=9.6.14",
     "mkdocstrings-python>=1.16.11",
-    "griffe>=1.8.0",
+    "griffe>=1.14.0",
 ]
 wikidata = ["httpx>=0.28.1", "polars>=1.31.0"]
 
