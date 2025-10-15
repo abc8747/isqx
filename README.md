@@ -4,11 +4,13 @@
 [![image](https://img.shields.io/pypi/l/isqx.svg)](https://pypi.python.org/pypi/isqx)
 [![image](https://img.shields.io/pypi/pyversions/isqx.svg)](https://pypi.python.org/pypi/isqx)
 
+[**Docs**](https://abc8747.github.io/isqx) | [**Visualiser**](https://abc8747.github.io/isqx/vis.html?autoLoad)
+
 Documenting physical units in Python often relies on ambiguous docstrings or performance-heavy wrapper libraries that break interoperability.
 
 `isqx` provides a comprehensive set of metadata objects based on the International System of Quantities (ISQ). These objects represent physical units (`kg`, `knots`), [quantity kinds](#quantity-kinds) (mass, velocity) and make crucial distinctions between them (internal energy vs. work done vs. heat).
 
-Crucially, `isqx` objects are metadata-only: they do not wrap numerical types at runtime. `Annotated[np.ndarray, isqx.M]` should be treated as `np.ndarray`, ensuring zero performance overhead and immediate interoperability with external libraries.
+`isqx` objects are metadata-only: they do not wrap numerical types at runtime. `Annotated[np.ndarray, isqx.M]` should be treated as `np.ndarray`, ensuring zero performance overhead and immediate interoperability with external libraries.
 
 It also comes with optional utilities like unit [conversion](#unit-conversion), [simplification](#simplification) and [extensible formatting](#formatting).
 
@@ -27,6 +29,12 @@ You can find more examples, search the list of units/quantity kinds and find the
 API reference in the [documentation](https://abc8747.github.io/isqx/).
 
 An interactive visualisation of all quantity kinds can also be viewed [here](https://abc8747.github.io/isqx/vis.html?autoLoad).
+
+![](docs/assets/img/vis.png)
+
+<p style="text-align: center;">
+  <i>Visualisation of quantity kinds and equations related to the Reynolds number.</i>
+</p>
 
 ## Tutorial: Documenting code with type annotations
 
@@ -100,6 +108,7 @@ print_metadata(GasState)
 ___
 
 But there is a flaw in using units alone:
+
 ![](docs/assets/img/readme_meters.drawio.svg)
 
 `isqx` encourages you to use a more abstract **quantity kind**, which can contain
