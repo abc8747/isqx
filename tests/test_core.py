@@ -3,6 +3,7 @@ from decimal import getcontext
 from fractions import Fraction
 
 import pytest
+
 from isqx import (
     CELSIUS,
     DAY,
@@ -301,15 +302,15 @@ def test_tagged_conversion() -> None:
 
 def test_qty_kind_call() -> None:
     from isqx import UnitKindMismatchError
-    from isqx.aerospace import TAS
+    from isqx.aerospace import TRUE_AIRSPEED
     from isqx.usc import KNOT
 
-    tas_mps = TAS(M_PERS)
+    tas_mps = TRUE_AIRSPEED(M_PERS)
     assert isinstance(tas_mps, Tagged)
     assert tas_mps.reference == M_PERS
     assert tas_mps.tags == ("airspeed", "true")
 
-    tas_knots = TAS(KNOT)
+    tas_knots = TRUE_AIRSPEED(KNOT)
     assert isinstance(tas_knots, Tagged)
     assert tas_knots.reference == KNOT
     assert tas_knots.tags == ("airspeed", "true")
@@ -318,7 +319,7 @@ def test_qty_kind_call() -> None:
     assert mps_to_knots(1.0) == pytest.approx(1.94384449)
 
     with pytest.raises(UnitKindMismatchError, match="kind: `L · T⁻¹`"):
-        _ = TAS(M)
+        _ = TRUE_AIRSPEED(M)
 
     alt_m = GEOPOTENTIAL_ALTITUDE(M)
     alt_ft = GEOPOTENTIAL_ALTITUDE(FT)

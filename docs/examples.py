@@ -113,7 +113,7 @@ def sphinx_doc(
 # --8<-- [start:breguet_example]
 _T = t.TypeVar("_T")
 
-MPerSCruiseTas = t.Annotated[_T, aero.TAS["cruise"](isqx.M_PERS)]
+MPerSCruiseTas = t.Annotated[_T, aero.TRUE_AIRSPEED["cruise"](isqx.M_PERS)]
 LOverD = t.Annotated[_T, isqx.ratio(isqx.LIFT(isqx.N), isqx.DRAG(isqx.N))]
 SIsp = t.Annotated[_T, isqx.TIME["specific_impulse"](isqx.S)]
 WiOverWf = t.Annotated[

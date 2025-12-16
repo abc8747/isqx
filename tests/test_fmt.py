@@ -12,9 +12,9 @@ STATC = (DYN ** Fraction(1, 2) * M).alias("statc")
 
 def test_fmt_basic_tagged() -> None:
     from isqx import M_PERS
-    from isqx.aerospace import TAS
+    from isqx.aerospace import TRUE_AIRSPEED
 
-    M_PERS_TAS = TAS(M_PERS)
+    M_PERS_TAS = TRUE_AIRSPEED(M_PERS)
     assert (
         fmt(M_PERS_TAS, formatter=BasicFormatter())
         == "(meter · second⁻¹)['airspeed', 'true']"
