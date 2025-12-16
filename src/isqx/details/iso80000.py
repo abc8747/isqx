@@ -8,8 +8,8 @@ SPACE_AND_TIME: Details = {
     _iso80000.WIDTH: (Wikidata("Q35059"), Symbol("b"), Symbol("B")),
     _iso80000.HEIGHT: (Wikidata("Q208826"), Symbol("h"), Symbol("H")),
     _iso80000.DEPTH: (Symbol("d"), Symbol("D")),
-    _iso80000.ALTITUDE: (Symbol("h"), Symbol("H")),
-    _iso80000.ELEVATION: (Symbol("z"), Symbol("Z")),
+    _iso80000.ALTITUDE: (Wikidata("Q190200"), Symbol("h"), Symbol("H")),
+    _iso80000.ELEVATION: (Wikidata("Q2633778"), Symbol("z"), Symbol("Z")),
     _iso80000.THICKNESS: (
         Wikidata("Q3589038"),
         Symbol("t"),

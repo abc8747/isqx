@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "isqx"
-version = "0.1.1"
+version = "0.1.2"
 description = "Units and quantity kinds defined by ISO/IEC 80000 and other subfields."
 readme = "README.md"
 authors = [{ name = "Abraham Cheung", email = "abraham@ylcheung.com" }]

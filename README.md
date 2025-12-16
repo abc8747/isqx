@@ -23,7 +23,7 @@ pip install isqx
 uv add isqx
 ```
 
-`isqx` is designed to be documentation-first and can be used
+`isqx` has zero dependencies and is designed to be documentation-first. It can be used
 [without introducing a hard dependency on your project](#quick-note-on-hard-dependencies).
 You can find more examples, search the list of units/quantity kinds and find the
 API reference in the [documentation](https://abc8747.github.io/isqx/).

@@ -58,6 +58,7 @@ plugins:
         - isqx.details.iso80000.CONDENSED_MATTER_PHYSICS
         - isqx.details.iso80000.INFORMATION_SCIENCE_AND_TECHNOLOGY
         - isqx.details.chemistry.PHYSICAL_CHEMISTRY
+        - isqx.details.aerospace.AEROSPACE
   - mkdocstrings:
       default_handler: python
       handlers:
