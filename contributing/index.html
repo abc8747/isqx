@@ -1,0 +1,915 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A system for representing physical units">
+      
+      
+      
+        <link rel="canonical" href="https://abc8747.github.io/isqx/contributing/">
+      
+      
+        <link rel="prev" href="../vis/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Contributing - isqx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../css/detail-highlight.css">
+    
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Contributing - isqx" />
+<meta property="og:description" content="A system for representing physical units" />
+<meta property="og:image" content="https://abc8747.github.io/isqx/assets/images/social/contributing.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:url" content="https://abc8747.github.io/isqx/contributing/" />
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:title" content="Contributing - isqx" />
+<meta property="twitter:description" content="A system for representing physical units" />
+<meta property="twitter:image" content="https://abc8747.github.io/isqx/assets/images/social/contributing.png" />
+</head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#development" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="isqx" class="md-header__button md-logo" aria-label="isqx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            isqx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Contributing
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/abc8747/isqx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    abc8747/isqx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="isqx" class="md-nav__button md-logo" aria-label="isqx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    isqx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/abc8747/isqx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    abc8747/isqx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx (core, fmt)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/iso80000/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx (iso80000)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/usc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.usc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/aerospace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.aerospace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/details/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.details
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/mkdocs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.mkdocs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualiser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- DO NOT EDIT! CHANGES WILL BE LOST. edit `README.md` and run `scripts/docs.py` instead. -->
+<h1 id="development">Development<a class="headerlink" href="#development" title="Permanent link">¤</a></h1>
+<div class="language-shell highlight"><pre><span></span><code>$<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/abc8747/isqx.git
+$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>isqx
+$<span class="w"> </span>uv<span class="w"> </span>venv
+$<span class="w"> </span>uv<span class="w"> </span>sync<span class="w"> </span>--dev
+</code></pre></div>
+<p>We use utility scripts under <code class="language-py3 highlight"><span class="n">scripts</span><span class="o">/</span></code> to lint, format and check for
+typing issues. Dependencies are automatically managed by <code class="language-py3 highlight"><span class="n">uv</span></code>.</p>
+<div class="language-shell highlight"><pre><span></span><code>$<span class="w"> </span>./scripts/make.py
+
+<span class="w"> </span>Usage:<span class="w"> </span>make.py<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...<span class="w">                                     </span>
+
+╭─<span class="w"> </span>Commands<span class="w"> </span>───────────────────────────────────────────────────────────────────╮
+│<span class="w"> </span>copy-docs-file<span class="w">   </span>Copy<span class="w"> </span>a<span class="w"> </span>file<span class="w"> </span>from<span class="w"> </span><span class="sb">`</span>path_in<span class="sb">`</span><span class="w"> </span>to<span class="w"> </span><span class="sb">`</span>path_out<span class="sb">`</span><span class="w"> </span>with<span class="w"> </span>warnings.<span class="w">     </span>│
+│<span class="w"> </span>check<span class="w">                                                                        </span>│
+│<span class="w"> </span>check-katex<span class="w">      </span>Highlight<span class="w"> </span>underscores<span class="w"> </span><span class="k">in</span><span class="w"> </span>katex<span class="w">                              </span>│
+│<span class="w"> </span>fix<span class="w">                                                                          </span>│
+╰──────────────────────────────────────────────────────────────────────────────╯
+$<span class="w"> </span>./scripts/wikidata.py
+
+<span class="w"> </span>Usage:<span class="w"> </span>wikidata.py<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...<span class="w">                                 </span>
+
+╭─<span class="w"> </span>Commands<span class="w"> </span>───────────────────────────────────────────────────────────────────╮
+│<span class="w"> </span>fetch-json<span class="w">              </span>Execute<span class="w"> </span>a<span class="w"> </span>SPARQL<span class="w"> </span>query<span class="w"> </span>from<span class="w"> </span>a<span class="w"> </span>file<span class="w"> </span>and<span class="w"> </span>save<span class="w"> </span>the<span class="w"> </span>raw<span class="w">  </span>│
+│<span class="w">                         </span>response<span class="w"> </span>as<span class="w"> </span>JSON.<span class="w">                                    </span>│
+│<span class="w"> </span>quantities-to-parquet<span class="w">   </span>Organise<span class="w"> </span>the<span class="w"> </span>raw<span class="w"> </span>quantities<span class="w"> </span>JSON<span class="w"> </span>response<span class="w"> </span><span class="k">in</span><span class="w"> </span>a<span class="w">       </span>│
+│<span class="w">                         </span>parquet<span class="w"> </span>file.<span class="w">                                        </span>│
+│<span class="w"> </span>quantities-to-md<span class="w">        </span>Organise<span class="w"> </span>the<span class="w"> </span>quantities<span class="w"> </span>parquet<span class="w"> </span>file<span class="w"> </span><span class="k">in</span><span class="w"> </span>a<span class="w">            </span>│
+│<span class="w">                         </span>human-readable<span class="w"> </span>markdown<span class="w"> </span>file.<span class="w">                        </span>│
+╰──────────────────────────────────────────────────────────────────────────────╯
+</code></pre></div>
+<p>To build and serve the documentation:</p>
+<div class="language-shell highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>mkdocs<span class="w"> </span>serve
+</code></pre></div>
+<p>Note that this loads in some custom extensions under <code class="language-py3 highlight"><span class="n">src</span><span class="o">/</span><span class="n">isqx</span><span class="o">/</span><span class="n">mkdocs</span></code> and
+<strong>overwrites</strong> <code class="language-py3 highlight"><span class="n">docs</span><span class="o">/</span><span class="n">index</span><span class="o">.</span><span class="n">md</span></code> with the one from the top level <code class="language-py3 highlight"><span class="n">README</span><span class="o">.</span><span class="n">md</span></code>.</p>
+<h1 id="defining-units-and-quantity-kinds">Defining units and quantity kinds.<a class="headerlink" href="#defining-units-and-quantity-kinds" title="Permanent link">¤</a></h1>
+<p>The ISO/IEC 80000 (<code class="language-py3 highlight"><span class="n">iso80000</span><span class="o">.</span><span class="n">py</span></code>) contains many useful core objects and is
+considered complete. If you would like to add new definitions for your own
+subfield, you should place them in two files:</p>
+<ul>
+<li>Core definitions (<code class="language-py3 highlight"><span class="n">src</span><span class="o">/</span><span class="n">isqx</span><span class="o">/</span><span class="p">{{</span><span class="n">domain</span><span class="p">}}</span><span class="o">.</span><span class="n">py</span></code>): this is where runtime objects like
+  <code class="language-py3 highlight"><span class="n">QtyKind</span></code>, <code class="language-py3 highlight"><span class="n">BaseUnit</span></code> etc. are defined.</li>
+<li>Descriptive Details (<code class="language-py3 highlight"><span class="n">src</span><span class="o">/</span><span class="n">isqx</span><span class="o">/</span><span class="n">details</span><span class="o">/</span><span class="p">{{</span><span class="n">domain</span><span class="p">}}</span><span class="o">.</span><span class="n">py</span></code>): this is where
+  non-essential metadata like <code class="language-py3 highlight"><span class="n">Wikidata</span></code>, <code class="language-py3 highlight"><span class="n">Symbol</span></code> and <code class="language-py3 highlight"><span class="n">Equation</span></code> etc. are defined.</li>
+</ul>
+<h2 id="units-and-constants">Units and constants<a class="headerlink" href="#units-and-constants" title="Permanent link">¤</a></h2>
+<p>First, define the essential runtime objects.</p>
+<ul>
+<li>use <code class="language-py3 highlight"><span class="n">SCREAMING_SNAKE_CASE</span></code></li>
+<li>for constants, prefer using stdlib <code class="language-py3 highlight"><span class="n">decimal</span><span class="o">.</span><span class="n">Decimal</span></code> and <code class="language-py3 highlight"><span class="n">fractions</span><span class="o">.</span><span class="n">Fraction</span></code>.
+  downstream users are responsible for casting to float if they wish.</li>
+</ul>
+<div class="language-py highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">decimal</span><span class="w"> </span><span class="kn">import</span> <span class="n">Decimal</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseDimension</span><span class="p">,</span> <span class="n">BaseUnit</span><span class="p">,</span> <span class="n">KG</span><span class="p">,</span> <span class="n">M</span><span class="p">,</span> <span class="n">S</span>
+
+<span class="c1"># base units</span>
+<span class="n">DIM_TIME</span> <span class="o">=</span> <span class="n">BaseDimension</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
+<span class="n">S</span> <span class="o">=</span> <span class="n">BaseUnit</span><span class="p">(</span><span class="n">DIM_TIME</span><span class="p">,</span> <span class="s2">&quot;second&quot;</span><span class="p">)</span>
+<span class="c1"># derived units</span>
+<span class="n">N</span> <span class="o">=</span> <span class="p">(</span><span class="n">KG</span> <span class="o">*</span> <span class="n">M</span> <span class="o">*</span> <span class="n">S</span><span class="o">**-</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;newton&quot;</span><span class="p">,</span> <span class="n">allow_prefix</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="c1"># scaled units</span>
+<span class="n">FT</span> <span class="o">=</span> <span class="p">(</span><span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;0.3048&quot;</span><span class="p">)</span> <span class="o">*</span> <span class="n">M</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;foot&quot;</span><span class="p">)</span>
+
+<span class="c1"># constants</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">StdUncertainty</span>  <span class="c1"># optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
+<span class="n">G0</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">Decimal</span><span class="p">,</span> <span class="n">M</span> <span class="o">*</span> <span class="n">S</span><span class="o">**-</span><span class="mi">2</span><span class="p">,</span> <span class="n">StdUncertainty</span><span class="p">(</span><span class="s2">&quot;12&quot;</span><span class="p">)]</span> <span class="o">=</span> <span class="n">Decimal</span><span class="p">(</span><span class="s2">&quot;9.8065&quot;</span><span class="p">)</span>
+<span class="c1"># do not do this:</span>
+<span class="n">G0</span> <span class="o">=</span> <span class="n">isqx</span><span class="o">.</span><span class="n">Quantity</span><span class="p">(</span><span class="mf">9.8065</span><span class="p">,</span> <span class="n">M</span> <span class="o">*</span> <span class="n">S</span><span class="o">**-</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="quantity-kinds">Quantity kinds<a class="headerlink" href="#quantity-kinds" title="Permanent link">¤</a></h2>
+<div class="language-py highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">QtyKind</span>
+
+<span class="c1"># must be defined with coherent SI units (i.e. not scaled)</span>
+<span class="c1"># it can have optional tags.</span>
+<span class="n">ENERGY</span> <span class="o">=</span> <span class="n">QtyKind</span><span class="p">(</span><span class="n">J</span><span class="p">)</span>
+<span class="c1"># add a tag: kinetic energy can be thought of a &quot;subclass&quot; of length.</span>
+<span class="n">KINETIC_ENERGY</span> <span class="o">=</span> <span class="n">ENERGY</span><span class="p">[</span><span class="s2">&quot;kinetic&quot;</span><span class="p">]</span>
+<span class="c1"># alternatively, if it doesn&#39;t make sense to &quot;subclass&quot;.</span>
+<span class="n">WORK_DONE</span> <span class="o">=</span> <span class="n">QtyKind</span><span class="p">(</span><span class="n">J</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;work_done&quot;</span><span class="p">,))</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">isqx.usc</span><span class="w"> </span><span class="kn">import</span> <span class="n">BTU</span>
+<span class="n">ENERGY_BTU</span> <span class="o">=</span> <span class="n">QtyKind</span><span class="p">(</span><span class="n">BTU</span><span class="p">)</span>  <span class="c1"># BAD!</span>
+</code></pre></div>
+<h1 id="defining-details">Defining details<a class="headerlink" href="#defining-details" title="Permanent link">¤</a></h1>
+<p>Details are entirely optional.</p>
+<div class="language-py highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">_iso80000</span>
+
+<span class="n">MECHANICS</span><span class="p">:</span> <span class="n">Details</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="c1"># keys should be direct object references</span>
+    <span class="n">_iso80000</span><span class="o">.</span><span class="n">MASS</span><span class="p">:</span> <span class="p">(</span>
+        <span class="c1"># values can be a tuple of detail objects or just a bare object</span>
+        <span class="c1"># it is not required to specify the equation if it does not have one.</span>
+        <span class="n">Wikidata</span><span class="p">(</span><span class="s2">&quot;Q11423&quot;</span><span class="p">),</span>
+        <span class="n">Symbol</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;m&quot;</span><span class="p">)</span>
+    <span class="p">),</span>
+    <span class="n">_iso80000</span><span class="o">.</span><span class="n">FORCE</span><span class="p">:</span> <span class="p">(</span>
+        <span class="n">Wikidata</span><span class="p">(</span><span class="s2">&quot;Q11402&quot;</span><span class="p">),</span>
+        <span class="n">Equation</span><span class="p">(</span>
+            <span class="sa">r</span><span class="s2">&quot;\boldsymbol</span><span class="si">{F}</span><span class="s2"> = m\boldsymbol</span><span class="si">{a}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="sa">r</span><span class="s2">&quot;\boldsymbol</span><span class="si">{F}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">SELF</span><span class="p">,</span>
+                <span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="n">_iso80000</span><span class="o">.</span><span class="n">MASS</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;\boldsymbol</span><span class="si">{a}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">_iso80000</span><span class="o">.</span><span class="n">ACCELERATION</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">),</span>
+    <span class="p">),</span>
+<span class="p">}</span>
+</code></pre></div>
+<h2 id="equations-and-the-where-clause">Equations and the where clause<a class="headerlink" href="#equations-and-the-where-clause" title="Permanent link">¤</a></h2>
+<ul>
+<li>use the KaTeX subset (no macros)</li>
+<li>Vectors: use <code class="language-py3 highlight">\<span class="n">boldsymbol</span><span class="p">{</span><span class="o">...</span><span class="p">}</span></code> for vector quantities like force, velocity</li>
+<li>use <code class="language-py3 highlight">\<span class="n">mathrm</span><span class="p">{</span><span class="o">...</span><span class="p">}</span></code> for subscripts (where applicable)</li>
+<li>use <code class="language-py3 highlight">\<span class="n">text</span><span class="p">{</span><span class="o">...</span><span class="p">}</span></code> for subscripts that are descriptive words.</li>
+</ul>
+<div class="language-py highlight"><pre><span></span><code><span class="c1"># good</span>
+<span class="sa">r</span><span class="s2">&quot;p = p_\text</span><span class="si">{total}</span><span class="s2"> - p_\text</span><span class="si">{static}</span><span class="s2">&quot;</span>
+<span class="sa">r</span><span class="s2">&quot;(\eta_\text</span><span class="si">{th}</span><span class="s2">)_\text</span><span class="si">{max}</span><span class="s2">&quot;</span>
+
+<span class="c1"># bad</span>
+<span class="sa">r</span><span class="s2">&quot;p = p_</span><span class="si">{total}</span><span class="s2"> - p_</span><span class="si">{static}</span><span class="s2">&quot;</span>
+<span class="sa">r</span><span class="s2">&quot;(\eta_</span><span class="si">{th}</span><span class="s2">)_</span><span class="si">{max}</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>The where clause connects symbols in the KaTeX string to their meanings.</p>
+<div class="language-py highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">SELF</span>
+
+<span class="c1"># good</span>
+<span class="n">_iso80000</span><span class="o">.</span><span class="n">PHASE_SPEED</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">Equation</span><span class="p">(</span>
+        <span class="sa">r</span><span class="s2">&quot;c = \frac{\omega}</span><span class="si">{k}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;c&quot;</span><span class="p">:</span> <span class="n">SELF</span><span class="p">,</span>  <span class="c1"># special marker to refer to the quantity being defined</span>
+            <span class="o">...</span>
+        <span class="p">},</span>
+        <span class="n">assumptions</span><span class="o">=</span><span class="p">{</span><span class="o">...</span><span class="p">}</span>
+    <span class="p">),</span>
+    <span class="n">Symbol</span><span class="p">(</span><span class="s2">&quot;v&quot;</span><span class="p">),</span> <span class="c1"># alternative symbols are fine</span>
+    <span class="c1"># do not add redundant `Symbol(&quot;c&quot;)` </span>
+<span class="p">),</span>
+</code></pre></div>
+<p>Always reference other quantities where possible. If it is awkward to define a
+formal definition (e.g. "around some axis of rotation"), use fragments of
+strings.</p>
+<div class="language-py highlight"><pre><span></span><code><span class="c1"># good</span>
+<span class="p">{</span><span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="n">_iso80000</span><span class="o">.</span><span class="n">MASS</span><span class="p">}</span>
+
+<span class="c1"># bad</span>
+<span class="p">{</span><span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="s2">&quot;mass&quot;</span><span class="p">}</span>
+<span class="c1"># do not create objects inline: mkdocs will be unable to generate a reference</span>
+<span class="p">{</span><span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="n">_iso80000</span><span class="o">.</span><span class="n">MASS</span><span class="p">[</span><span class="s2">&quot;body&quot;</span><span class="p">]}</span>
+</code></pre></div>
+<h2 id="symbols">Symbols<a class="headerlink" href="#symbols" title="Permanent link">¤</a></h2>
+<p>Use it to define alternative symbols, or when a quantity has no defining equation.</p>
+<div class="language-py highlight"><pre><span></span><code><span class="n">_iso80000</span><span class="o">.</span><span class="n">MOLE_FRACTION</span><span class="p">:</span> <span class="p">(</span>
+    <span class="c1"># ...</span>
+    <span class="n">Symbol</span><span class="p">(</span>
+        <span class="sa">r</span><span class="s2">&quot;y_\mathrm</span><span class="si">{X}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">where</span><span class="o">=</span><span class="p">{</span><span class="sa">r</span><span class="s2">&quot;\mathrm</span><span class="si">{X}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="s2">&quot;Substance&quot;</span><span class="p">},</span>
+        <span class="n">remarks</span><span class="o">=</span><span class="s2">&quot;for gaseous mixtures&quot;</span><span class="p">,</span>  <span class="c1"># provide context on when it should be used</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "navigation.expand"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+        <script src="../js/cmap.mjs" type="module" defer></script>
+      
+        <script src="../js/detail-highlight.mjs" type="module" defer></script>
+      
+        <script src="../js/katex.mjs" type="module" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.js" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/auto-render.min.js" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/copy-tex.min.js" defer></script>
+      
+    
+  </body>
+</html>

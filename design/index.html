@@ -1,0 +1,1539 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A system for representing physical units">
+      
+      
+      
+        <link rel="canonical" href="https://abc8747.github.io/isqx/design/">
+      
+      
+        <link rel="prev" href="../api/mkdocs/">
+      
+      
+        <link rel="next" href="../vis/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Design - isqx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../css/detail-highlight.css">
+    
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Design - isqx" />
+<meta property="og:description" content="A system for representing physical units" />
+<meta property="og:image" content="https://abc8747.github.io/isqx/assets/images/social/design.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:url" content="https://abc8747.github.io/isqx/design/" />
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:title" content="Design - isqx" />
+<meta property="twitter:description" content="A system for representing physical units" />
+<meta property="twitter:image" content="https://abc8747.github.io/isqx/assets/images/social/design.png" />
+</head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#why-do-existing-uom-libraries-not-proliferate" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="isqx" class="md-header__button md-logo" aria-label="isqx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            isqx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/abc8747/isqx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    abc8747/isqx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="isqx" class="md-nav__button md-logo" aria-label="isqx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    isqx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/abc8747/isqx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    abc8747/isqx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx (core, fmt)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/iso80000/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx (iso80000)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/usc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.usc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/aerospace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.aerospace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/details/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.details
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/mkdocs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.mkdocs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-do-existing-uom-libraries-not-proliferate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why do existing UoM libraries not proliferate?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-1-the-friction-of-newtypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 1: The friction of newtypes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-2-quantities-of-the-same-dimension-but-different-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 2: Quantities of the same dimension but different kinds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Problem 2: Quantities of the same dimension but different kinds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reusing-tagged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reusing Tagged
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#note-on-qtykind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Note on QtyKind
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-3-exact-representation-and-formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 3: Exact representation and formatting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#faq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FAQ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FAQ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#whats-the-point-if-there-is-no-runtime-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's the point if there is no runtime checks?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-are-details-stored-in-a-separate-isqxdetails-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why are details stored in a separate isqx.details module?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-can-i-parse-units-from-a-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How can I parse units from a string?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#having-to-define-m-annotated_t-isqxm-is-annoying-why-not-make-isqxm-a-type-instead-of-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Having to define M = Annotated[_T, isqx.M] is annoying. Why not make isqx.M a type instead of object?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualiser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-do-existing-uom-libraries-not-proliferate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why do existing UoM libraries not proliferate?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-1-the-friction-of-newtypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 1: The friction of newtypes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-2-quantities-of-the-same-dimension-but-different-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 2: Quantities of the same dimension but different kinds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Problem 2: Quantities of the same dimension but different kinds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reusing-tagged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reusing Tagged
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#note-on-qtykind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Note on QtyKind
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-3-exact-representation-and-formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem 3: Exact representation and formatting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#faq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FAQ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FAQ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#whats-the-point-if-there-is-no-runtime-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's the point if there is no runtime checks?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-are-details-stored-in-a-separate-isqxdetails-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why are details stored in a separate isqx.details module?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-can-i-parse-units-from-a-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How can I parse units from a string?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#having-to-define-m-annotated_t-isqxm-is-annoying-why-not-make-isqxm-a-type-instead-of-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Having to define M = Annotated[_T, isqx.M] is annoying. Why not make isqx.M a type instead of object?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>Design</h1>
+
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> tries not to follow the patterns of existing units of measurement (UoM)
+libraries: it prioritises incremental adoption over runtime enforcement.</p>
+<p>It is inspired by libraries like:</p>
+<ul>
+<li><a href="https://github.com/annotated-types/annotated-types"><code class="language-py3 highlight"><span class="n">annotated</span><span class="o">-</span><span class="n">types</span></code></a> and
+  <a href="https://github.com/fastapi/fastapi"><code class="language-py3 highlight"><span class="n">fastapi</span></code></a>, which popularised the use of
+  metadata objects with <code class="language-py3 highlight"><span class="n">typing</span><span class="o">.</span><span class="n">Annotated</span></code>,</li>
+<li><a href="https://achevrot.github.io/impunity/"><code class="language-py3 highlight"><span class="n">impunity</span></code></a>, which also use <code class="language-py3 highlight"><span class="n">Annotated</span></code>
+to enforce dimension correctness.</li>
+</ul>
+<h2 id="why-do-existing-uom-libraries-not-proliferate">Why do existing UoM libraries not proliferate?<a class="headerlink" href="#why-do-existing-uom-libraries-not-proliferate" title="Permanent link">¤</a></h2>
+<p><a href="https://doi.org/10.1002/spe.2926">McKeever et al. (2020)</a> cited the main
+reasons being "solutions interfere with code too much" (31%) and the "effort of
+learning" (28%). The frustrations are best captured by the survey responses:</p>
+<ul>
+<li><em>"We depend on a number of libraries (<code class="language-py3 highlight"><span class="n">PETSc</span></code>, <code class="language-py3 highlight"><span class="n">Eigen</span></code>...) that interact very
+  poorly with UoM libraries."</em></li>
+<li><em>"Very few languages have the affordances to make numbers with units both
+  statically type-checked and as ergonomic to pass in and out of functions
+  as bare numbers."</em></li>
+<li><em>"I tried working with <code class="language-py3 highlight"><span class="n">Boost</span><span class="o">.</span><span class="n">Units</span></code> multiple times ... simply setting up the
+  whole system took more time than I had to invest."</em></li>
+<li><em>"I recently helped develop the simulation of fluid flow in Fortran and nobody
+  ever asked for units anywhere, but everyone was really interested in
+  performance."</em></li>
+<li><em>"manual conversions functions covered most use cases"</em></li>
+</ul>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> is designed to be opt-in only, decoupling the unit from the runtime value.
+It builds upon the idea of what's already excellent: writing docstrings
+<em>orthogonal</em> to the code responsible for computation.</p>
+<h2 id="problem-1-the-friction-of-newtypes">Problem 1: The friction of newtypes<a class="headerlink" href="#problem-1-the-friction-of-newtypes" title="Permanent link">¤</a></h2>
+<p>Most UoM libraries, especially in compiled languages like
+<a href="https://github.com/boostorg/units">C++ <code class="language-py3 highlight"><span class="n">Boost</span><span class="p">::</span><span class="n">Units</span></code></a> and
+<a href="https://github.com/iliekturtles/uom">Rust <code class="language-py3 highlight"><span class="n">uom</span></code></a>, model a "wrapper" or
+"newtype" around a numerical value. This pattern uses the type system to enforce
+dimensional correctness at compile-time, promising zero runtime overhead.</p>
+<div class="language-rs highlight"><span class="filename">pseudocode</span><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">Quantity</span><span class="o">&lt;</span><span class="n">V</span><span class="p">,</span><span class="w"> </span><span class="n">U</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="nc">V</span><span class="p">,</span><span class="w">               </span><span class="c1">// a numerical value: float, int...</span>
+<span class="w">    </span><span class="n">units</span><span class="p">:</span><span class="w"> </span><span class="nc">PhantomData</span><span class="o">&lt;</span><span class="n">U</span><span class="o">&gt;</span><span class="p">,</span><span class="w">  </span><span class="c1">// zero-sized &quot;ghost&quot;, erased at runtime</span>
+<span class="p">}</span>
+<span class="c1">// operator overloads to enforce rules</span>
+<span class="k">impl</span><span class="o">&lt;</span><span class="n">Ul</span><span class="p">,</span><span class="w"> </span><span class="n">Ur</span><span class="p">,</span><span class="w"> </span><span class="n">V</span><span class="o">&gt;</span><span class="w"> </span><span class="n">Mul</span><span class="o">&lt;</span><span class="n">Quantity</span><span class="o">&lt;</span><span class="n">V</span><span class="p">,</span><span class="w"> </span><span class="n">Ur</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">Quantity</span><span class="o">&lt;</span><span class="n">V</span><span class="p">,</span><span class="w"> </span><span class="n">Ul</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* ... */</span><span class="w"> </span><span class="p">}</span>
+<span class="c1">// ... and so on for `Div`, `Add`, `Sub` ...</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Length</span><span class="p">::</span><span class="n">new</span><span class="p">::</span><span class="o">&lt;</span><span class="n">meter</span><span class="o">&gt;</span><span class="p">(</span><span class="mf">1.0</span><span class="p">);</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Time</span><span class="p">::</span><span class="n">new</span><span class="p">::</span><span class="o">&lt;</span><span class="n">second</span><span class="o">&gt;</span><span class="p">(</span><span class="mf">3.0</span><span class="p">);</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">speed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">time</span><span class="p">;</span><span class="w">    </span><span class="c1">// ok, `Div` is implemented</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">nonsense</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">time</span><span class="p">;</span><span class="w"> </span><span class="c1">// compile error  </span>
+</code></pre></div>
+<p>While powerful, this newtype is immediately incompatible with the vast majority
+of external libraries that expect a raw numerical type (<code class="language-py3 highlight"><span class="nb">float</span></code>, <code class="language-py3 highlight"><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></code>...).
+Users are forced to constantly unwrap the quantity and re-wrap it at every single
+function boundary, leading to the frustrations described earlier.</p>
+<details class="note">
+<summary>Case study: <code class="language-py3 highlight"><span class="n">pint</span></code></summary>
+<p>Python is a dynamic language with an optional (and relatively weak) type system.
+Trying to model this newtype pattern at runtime with operator overloads brings
+even more friction.</p>
+<p>Imagine developing a simple library with <code class="language-py3 highlight"><span class="n">pint</span></code>:
+<div class="language-py highlight"><span class="filename">airspeed.py</span><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pint</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitRegistry</span>
+
+<span class="n">ureg</span> <span class="o">=</span> <span class="n">UnitRegistry</span><span class="p">()</span>
+<span class="n">RHO_0</span> <span class="o">=</span> <span class="mf">1.225</span> <span class="o">*</span> <span class="p">(</span><span class="n">ureg</span><span class="o">.</span><span class="n">kilogram</span> <span class="o">*</span> <span class="n">ureg</span><span class="o">.</span><span class="n">meter</span><span class="o">**-</span><span class="mi">3</span><span class="p">)</span>
+<span class="sd">&quot;&quot;&quot;Density of air at mean sea level&quot;&quot;&quot;</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">eas</span><span class="p">(</span><span class="n">tas</span><span class="p">,</span> <span class="n">air_density</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts TAS to EAS.</span>
+
+<span class="sd">    :param tas: true airspeed (meters per second)</span>
+<span class="sd">    :param air_density: atmospheric density (kilograms per meter cubed)</span>
+<span class="sd">    :returns: equivalent airspeed (meters per second)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">tas</span> <span class="o">*</span> <span class="p">(</span><span class="n">air_density</span> <span class="o">/</span> <span class="n">RHO_0</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+</code></pre></div></p>
+<p>Since <code class="language-py3 highlight"><span class="n">RHO_0</span></code> (a <code class="language-py3 highlight"><span class="n">pint</span><span class="o">.</span><span class="n">Quantity</span></code>) implements the <code class="language-py3 highlight"><span class="n">__array_ufunc__</span></code> protocol,
+any <code class="language-py3 highlight"><span class="n">numpy</span></code>-like array inputs should be not cause any problem.</p>
+<p>A downstream user, unfamiliar with <code class="language-py3 highlight"><span class="n">pint</span></code>, might perform a standard data
+processing task:
+<div class="language-pycon highlight"><span class="filename">uv run --with pint --with polars --with jax python3</span><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">airspeed</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+<span class="gp">... </span>    <span class="s2">&quot;air_density&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.13</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="s2">&quot;tas&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">130</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="gp">... </span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">eas</span> <span class="o">=</span> <span class="n">airspeed</span><span class="o">.</span><span class="n">eas</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;tas&quot;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;air_density&quot;</span><span class="p">])</span>
+<span class="go">    return tas * (air_density / RHO_0) ** 0.5</span>
+<span class="go">                  ~~~~~~~~~~~~^~~~~~~</span>
+<span class="go">TypeError: cannot convert Python type &#39;pint.Quantity&#39; to Float64</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># ok, maybe it wants numpy arrays instead.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">eas</span> <span class="o">=</span> <span class="n">airspeed</span><span class="o">.</span><span class="n">eas</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;tas&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;air_density&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">eas</span><span class="o">=</span><span class="n">eas</span><span class="p">)</span>
+<span class="go">TypeError: cannot create expression literal for value of type Quantity.</span>
+
+<span class="go">Hint: Pass `allow_object=True` to accept any value and create a literal of type</span>
+<span class="go">Object.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">eas</span>  <span class="c1"># what is a `Quantity`?</span>
+<span class="go">&lt;Quantity([127.775313   ... 124.85746976], &#39;meter ** 1.5 / kilogram ** 0.5&#39;)&gt;</span>
+</code></pre></div></p>
+<p>The user might expect a <code class="language-py3 highlight"><span class="n">numpy</span></code> input to return a <code class="language-py3 highlight"><span class="n">numpy</span></code> output, but what
+they got was a new <code class="language-py3 highlight"><span class="n">Quantity</span></code> wrapper with nonsensical units. After reading
+the docs, the user understands to pass in a <code class="language-py3 highlight"><span class="n">Quantity</span></code> instead:</p>
+<div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">airspeed</span><span class="o">.</span><span class="n">ureg</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tas_with_u</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;tas&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">meter</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">second</span><span class="o">**-</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">densities_with_u</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;air_density&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">kilogram</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">meter</span><span class="o">**-</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">eas</span> <span class="o">=</span> <span class="n">airspeed</span><span class="o">.</span><span class="n">eas</span><span class="p">(</span><span class="n">tas_with_u</span><span class="p">,</span> <span class="n">densities_with_u</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">eas</span>
+<span class="go">&lt;Quantity([127.775313   ... 124.85746976], &#39;meter / second ** 2&#39;)&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># units are correct, create a df but make sure to get the magnitude</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">eas</span><span class="o">=</span><span class="n">eas</span><span class="o">.</span><span class="n">m</span><span class="p">)</span>
+</code></pre></div>
+<p>Which works well, but the user had to guess whether the library supports a
+<code class="language-py3 highlight"><span class="n">Quantity</span></code> input. Will it support <code class="language-py3 highlight"><span class="n">scipy</span><span class="o">.</span><span class="n">optimize</span></code>? Or <code class="language-py3 highlight"><span class="n">einops</span><span class="o">.</span><span class="n">einsum</span></code>?
+Maybe, maybe not.</p>
+<p>The burden is not just on the user, but also the authors. Having to provide
+support for the ever-changing APIs of the entire Python ecosystem within the
+<code class="language-py3 highlight"><span class="n">Quantity</span></code> newtype is impossible.</p>
+<p>The user might also want to compute the gradient of <code class="language-py3 highlight"><span class="n">eas</span></code> and try to speedup
+the code with JIT, only to come to even more roadblocks:</p>
+<div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">airspeed</span><span class="o">.</span><span class="n">eas</span><span class="p">))(</span><span class="n">tas_with_u</span><span class="p">,</span> <span class="n">densities_with_u</span><span class="p">)</span>
+<span class="go">TypeError: Argument &#39;[200.0 ... 130.0] meter / second ** 2&#39; of type</span>
+<span class="go">&lt;class &#39;pint.Quantity&#39;&gt; is not a valid JAX type.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">airspeed</span><span class="o">.</span><span class="n">eas</span><span class="p">))(</span><span class="n">tas_with_u</span><span class="o">.</span><span class="n">m</span><span class="p">,</span> <span class="n">densities_with_u</span><span class="o">.</span><span class="n">m</span><span class="p">)</span>
+<span class="go">TypeError: Argument &#39;Traced&lt;float32[100]&gt;with&lt;JVPTrace&gt; with</span>
+<span class="go">  primal = Array([127.775314, ..., 124.85747 ],      dtype=float32)</span>
+<span class="go">  tangent = Traced&lt;float32[100]&gt;with&lt;JaxprTrace&gt; with</span>
+<span class="go">    pval = (ShapedArray(float32[100]), None)</span>
+<span class="go">    recipe = JaxprEqnRecipe(eqn_id=0, ...) meter ** 1.5 / kilogram ** 0.5&#39;</span>
+<span class="go">    of type &#39;&lt;class &#39;pint.Quantity&#39;&gt;&#39; is not a valid JAX type</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">airspeed</span><span class="o">.</span><span class="n">eas</span><span class="p">)(</span><span class="n">tas_with_u</span><span class="o">.</span><span class="n">m</span><span class="p">,</span> <span class="n">densities_with_u</span><span class="o">.</span><span class="n">m</span><span class="p">)</span>
+<span class="go">TypeError: function eas at /home/user/airspeed.py:7 traced for jit returned a</span>
+<span class="go">value of type &lt;class &#39;pint.Quantity&#39;&gt;, which is not a valid JAX type</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numba</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">numba</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">airspeed</span><span class="o">.</span><span class="n">eas</span><span class="p">)(</span><span class="n">tas_with_u</span><span class="o">.</span><span class="n">m</span><span class="p">,</span> <span class="n">densities_with_u</span><span class="o">.</span><span class="n">m</span><span class="p">)</span>
+<span class="go">Untyped global name &#39;RHO_0&#39;: Cannot determine Numba type of</span>
+<span class="go">&lt;class &#39;pint.Quantity&#39;&gt;</span>
+</code></pre></div>
+<p><figure markdown="span">
+    <img alt="benchmark" src="../assets/design/bench.png" />
+    <figcaption>Performance analysis indicates up to an order of magnitude 
+    slowdown due to the repeated runtime checks in the <code class="language-py3 highlight"><span class="n">Quantity</span></code> newtype.
+    </figcaption>
+</figure></p>
+<details class="note">
+<summary>bench script</summary>
+<p><div class="language-py highlight"><span class="filename">airspeed.py</span><pre><span></span><code><span class="c1"># mypy: ignore-errors</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pint</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitRegistry</span>
+
+<span class="n">ureg</span> <span class="o">=</span> <span class="n">UnitRegistry</span><span class="p">()</span>
+<span class="n">RHO_0</span> <span class="o">=</span> <span class="mf">1.225</span> <span class="o">*</span> <span class="p">(</span><span class="n">ureg</span><span class="o">.</span><span class="n">kilogram</span> <span class="o">*</span> <span class="n">ureg</span><span class="o">.</span><span class="n">meter</span><span class="o">**-</span><span class="mi">3</span><span class="p">)</span>
+<span class="sd">&quot;&quot;&quot;Density of air at mean sea level&quot;&quot;&quot;</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">eas</span><span class="p">(</span><span class="n">tas</span><span class="p">,</span> <span class="n">air_density</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts TAS to EAS.</span>
+
+<span class="sd">    :param tas: true airspeed (meters per second)</span>
+<span class="sd">    :param air_density: atmospheric density (kilograms per meter cubed)</span>
+<span class="sd">    :returns: equivalent airspeed (meters per second)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">tas</span> <span class="o">*</span> <span class="p">(</span><span class="n">air_density</span> <span class="o">/</span> <span class="n">RHO_0</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+
+
+<span class="n">RHO_0_PURE_PY</span> <span class="o">=</span> <span class="mf">1.225</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">eas_pure_py</span><span class="p">(</span><span class="n">tas</span><span class="p">,</span> <span class="n">air_density</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">tas</span> <span class="o">*</span> <span class="p">(</span><span class="n">air_density</span> <span class="o">/</span> <span class="n">RHO_0_PURE_PY</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+</code></pre></div>
+<div class="language-py highlight"><span class="filename">bench.py</span><pre><span></span><code><span class="ch">#!/usr/bin/env -S uv run --script</span>
+<span class="c1"># /// script</span>
+<span class="c1"># requires-python = &quot;&gt;=3.9&quot;</span>
+<span class="c1"># dependencies = [</span>
+<span class="c1">#     &quot;jax&quot;,</span>
+<span class="c1">#     &quot;numpy&quot;,</span>
+<span class="c1">#     &quot;perfplot&quot;,</span>
+<span class="c1">#     &quot;numba&quot;,</span>
+<span class="c1">#     &quot;pint&quot;</span>
+<span class="c1"># ]</span>
+<span class="c1"># ///</span>
+<span class="c1"># mypy: ignore-errors</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">perfplot</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">airspeed</span><span class="w"> </span><span class="kn">import</span> <span class="n">eas</span><span class="p">,</span> <span class="n">eas_pure_py</span><span class="p">,</span> <span class="n">ureg</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numba</span><span class="w"> </span><span class="kn">import</span> <span class="n">njit</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">setup</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="n">tas_np</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">*</span> <span class="mi">250</span> <span class="o">+</span> <span class="mi">50</span>
+    <span class="n">density_np</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.825</span> <span class="o">+</span> <span class="mf">0.4</span>
+    <span class="k">return</span> <span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">run_pint_quantity_in</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">):</span>
+    <span class="n">tas_pint</span> <span class="o">=</span> <span class="n">tas_np</span> <span class="o">*</span> <span class="p">(</span><span class="n">ureg</span><span class="o">.</span><span class="n">meter</span> <span class="o">/</span> <span class="n">ureg</span><span class="o">.</span><span class="n">second</span><span class="p">)</span>
+    <span class="n">density_pint</span> <span class="o">=</span> <span class="n">density_np</span> <span class="o">*</span> <span class="p">(</span><span class="n">ureg</span><span class="o">.</span><span class="n">kilogram</span> <span class="o">/</span> <span class="n">ureg</span><span class="o">.</span><span class="n">meter</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">result_pint</span> <span class="o">=</span> <span class="n">eas</span><span class="p">(</span><span class="n">tas_pint</span><span class="p">,</span> <span class="n">density_pint</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result_pint</span><span class="o">.</span><span class="n">magnitude</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">run_pint_numpy_in</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">):</span>
+    <span class="n">result_pint</span> <span class="o">=</span> <span class="n">eas</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result_pint</span><span class="o">.</span><span class="n">magnitude</span>  <span class="c1"># NOTE: wrong units</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">run_numpy</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">eas_pure_py</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">)</span>
+
+
+<span class="n">eas_jax_jit_cpu</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">eas_pure_py</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+<span class="n">eas_numba_jit</span> <span class="o">=</span> <span class="n">njit</span><span class="p">(</span><span class="n">eas_pure_py</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">nogil</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">run_jax_cpu</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">eas_jax_jit_cpu</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">run_numba</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">eas_numba_jit</span><span class="p">(</span><span class="n">tas_np</span><span class="p">,</span> <span class="n">density_np</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">path_root</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="p">):</span>
+    <span class="n">n_range</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="o">**</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">27</span><span class="p">)]</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">n_range</span><span class="p">:</span>  <span class="c1"># precompile</span>
+        <span class="n">run_jax_cpu</span><span class="p">(</span><span class="o">*</span><span class="n">setup</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="n">run_numba</span><span class="p">(</span><span class="o">*</span><span class="n">setup</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">perfplot</span><span class="o">.</span><span class="n">bench</span><span class="p">(</span>
+        <span class="n">setup</span><span class="o">=</span><span class="n">setup</span><span class="p">,</span>
+        <span class="n">kernels</span><span class="o">=</span><span class="p">[</span>
+            <span class="n">run_pint_quantity_in</span><span class="p">,</span>
+            <span class="n">run_pint_numpy_in</span><span class="p">,</span>
+            <span class="n">run_numpy</span><span class="p">,</span>
+            <span class="n">run_jax_cpu</span><span class="p">,</span>
+            <span class="n">run_numba</span><span class="p">,</span>
+        <span class="p">],</span>
+        <span class="n">n_range</span><span class="o">=</span><span class="n">n_range</span><span class="p">,</span>
+        <span class="n">labels</span><span class="o">=</span><span class="p">[</span>
+            <span class="s2">&quot;pint (Quantity inputs)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pint&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;baseline (np.ndarray inputs)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;baseline + jax.jit&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;baseline + numba.njit&quot;</span><span class="p">,</span>
+        <span class="p">],</span>
+        <span class="n">xlabel</span><span class="o">=</span><span class="s2">&quot;np.ndarray size&quot;</span><span class="p">,</span>
+        <span class="n">equality_check</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">out</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">path_root</span> <span class="o">/</span> <span class="s2">&quot;bench.png&quot;</span><span class="p">,</span> <span class="n">transparent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</code></pre></div></p>
+</details>
+</details>
+<p>Python shines in its flexibility. Introducing a hard dependency on the
+<code class="language-py3 highlight"><span class="n">Quantity</span></code> newtype interferes too much with what we're trying to achieve, and
+<code class="language-py3 highlight"><span class="n">isqx</span></code> crucially avoids using the newtype pattern in the first place.</p>
+<h2 id="problem-2-quantities-of-the-same-dimension-but-different-kinds">Problem 2: Quantities of the same dimension but different kinds<a class="headerlink" href="#problem-2-quantities-of-the-same-dimension-but-different-kinds" title="Permanent link">¤</a></h2>
+<p>Documenting code with units alone are often insufficient
+(see <a href="../#quantity-kinds">README</a>). For example, annotating a function
+parameter with <code class="language-py3 highlight"><span class="n">Joules</span></code> is too ambiguous: using
+<code class="language-py3 highlight"><span class="n">the</span> <span class="n">change</span> <span class="ow">in</span> <span class="n">internal</span> <span class="n">energy</span> <span class="p">(</span><span class="n">joules</span><span class="p">)</span></code> is far more precise.</p>
+<p>Surprisingly, most UoM libraries only offer units to work with (see
+<a href="https://github.com/hgrecco/pint/issues/551"><code class="language-py3 highlight"><span class="n">pint</span><span class="c1">#551</span></code></a>).</p>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> tackles this with two key ideas:</p>
+<ul>
+<li>units can be "refined": <code class="language-py3 highlight"><span class="n">J</span><span class="p">[</span><span class="s2">&quot;work&quot;</span><span class="p">]</span></code> and <code class="language-py3 highlight"><span class="n">J</span><span class="p">[</span><span class="s2">&quot;heat&quot;</span><span class="p">]</span></code> both still represent
+  <code class="language-py3 highlight"><span class="n">Joules</span></code>, but additional metadata stored within the expression makes sure
+  they are not interchangeable.</li>
+<li>downstream users should be able to pick the unit they prefer
+  (<code class="language-py3 highlight"><span class="n">MJ</span></code>, <code class="language-py3 highlight"><span class="n">GJ</span></code>, <code class="language-py3 highlight"><span class="n">Btu</span></code>...) easily.</li>
+</ul>
+<p>The former idea is implemented with <a class="autorefs autorefs-internal" title="            Tagged" href="../api/core/#isqx._core.Tagged"><code class="language-py3 highlight">isqx.Tagged</code></a>, responsible for binding
+arbitrary metadata to a unit. Its design is strongly inspired by
+<code class="language-py3 highlight"><span class="n">typing</span><span class="o">.</span><span class="n">Annotated</span></code> itself, providing a very flexible system to specify what they
+want. <code class="language-py3 highlight"><span class="n">Expr</span><span class="o">.</span><span class="fm">__getitem__</span></code> provides an ergonomic way to "refining" an existing
+unit.</p>
+<p>The latter idea is implemented with the <a class="autorefs autorefs-internal" title="            QtyKind" href="../api/core/#isqx._core.QtyKind"><code class="language-py3 highlight">isqx.QtyKind</code></a> factory, which also
+stores the metadata but makes the unit "generic". <code class="language-py3 highlight"><span class="n">QtyKind</span><span class="o">.</span><span class="fm">__call__</span></code> with any
+user-defined, dimensionally-compatible unit produces a <a class="autorefs autorefs-internal" title="            Tagged" href="../api/core/#isqx._core.Tagged"><code class="language-py3 highlight">isqx.Tagged</code></a>
+expression.</p>
+<h3 id="reusing-tagged">Reusing <code class="language-py3 highlight"><span class="n">Tagged</span></code><a class="headerlink" href="#reusing-tagged" title="Permanent link">¤</a></h3>
+<p>When users write <code class="language-py3 highlight"><span class="n">x</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">M</span><span class="p">]</span></code>, it naturally reads: "the numeric
+value of <code class="language-py3 highlight"><span class="n">x</span></code> is a point/measurement on the meter scale". But where is the
+<em>origin</em> of the meter scale defined? Should the altitude be measured w.r.t.
+to the center of the Earth, or above mean sea level, or above the ground
+elevation?</p>
+<p>Another point of confusion is that it can also be interpreted as: "the numeric
+value of <code class="language-py3 highlight"><span class="n">x</span></code> represents the difference in length between two points on the meter
+scale (position-independent)".</p>
+<p>Because <a class="autorefs autorefs-internal" title="            Tagged" href="../api/core/#isqx._core.Tagged"><code class="language-py3 highlight">isqx.Tagged</code></a> can store any hashable object, one can use the
+<a class="autorefs autorefs-internal" title="            OriginAt" href="../api/core/#isqx._core.OriginAt"><code class="language-py3 highlight">isqx.OriginAt</code></a> or <a class="autorefs autorefs-internal" title="            DELTA" href="../api/core/#isqx._core.DELTA"><code class="language-py3 highlight">isqx.DELTA</code></a> tags to reduce ambiguity.</p>
+<h3 id="note-on-qtykind">Note on <code class="language-py3 highlight"><span class="n">QtyKind</span></code><a class="headerlink" href="#note-on-qtykind" title="Permanent link">¤</a></h3>
+<p>One important caveat is that while <a class="autorefs autorefs-internal" title="            Expr" href="../api/core/#isqx._core.Expr"><code class="language-py3 highlight">isqx.Expr</code></a> can be composed with each
+other to form a "larger tree", <a class="autorefs autorefs-internal" title="            QtyKind" href="../api/core/#isqx._core.QtyKind"><code class="language-py3 highlight">isqx.QtyKind</code></a> <strong>cannot be further composed</strong>.
+This may sound surprising: wouldn't something like <code class="language-py3 highlight"><span class="n">force</span> <span class="o">=</span> <span class="n">mass</span> <span class="o">*</span> <span class="n">acceleration</span></code>,
+<code class="language-py3 highlight"><span class="n">kinetic_energy</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">mass</span> <span class="o">*</span> <span class="n">velocity</span><span class="o">**</span><span class="mi">2</span></code> be an ergonomic way of defining new
+quantities?</p>
+<p>While it makes sense to do so, <code class="language-py3 highlight"><span class="n">isqx</span></code> avoids this because many quantities are not
+defined by simple products of powers:</p>
+<table>
+<thead>
+<tr>
+<th>Quantity Kind</th>
+<th>Definition</th>
+<th>Additional expression nodes needed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="            WORK" href="../api/iso80000/#isqx._iso80000.WORK">work</a></td>
+<td><span class="arithmatex">\(W = \int_C \mathbf{F} \cdot d\mathbf{s}\)</span></td>
+<td>integral, dot product</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="            ENTHALPY" href="../api/iso80000/#isqx._iso80000.ENTHALPY">enthalpy</a></td>
+<td><span class="arithmatex">\(H = U + pV\)</span></td>
+<td>addition, subtraction</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="            ISENTROPIC_EXPONENT" href="../api/iso80000/#isqx._iso80000.ISENTROPIC_EXPONENT">isentropic exponent</a></td>
+<td><span class="arithmatex">\(-\frac{V}{\rho} \left(\frac{\partial p}{\partial V}\right)_S\)</span></td>
+<td>partial derivatives</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="            POYNTING_VECTOR" href="../api/iso80000/#isqx._iso80000.POYNTING_VECTOR">poynting vector</a></td>
+<td><span class="arithmatex">\(\mathbf{S} = \mathbf{E} \times \mathbf{H}\)</span></td>
+<td>cross product</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="            COMPLEX_POWER" href="../api/iso80000/#isqx._iso80000.COMPLEX_POWER">complex power</a></td>
+<td><span class="arithmatex">\(\underline{S} = \underline{U} \underline{I}^*\)</span></td>
+<td>complex conjugate</td>
+</tr>
+</tbody>
+</table>
+<p>We would have to build another SymPy just to define a quantity kind and resolve
+its units. <code class="language-py3 highlight"><span class="n">mp</span><span class="o">-</span><span class="n">units</span></code> tries to do exactly this, but it resorts to simplifying or
+ignoring operations that are too hard to model.</p>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> tries to keep it simple by storing its definitions in a separate (and
+optional) <a class="autorefs autorefs-internal" title="            Details" href="../api/details/#isqx.details.Details">details dictionary</a> under the <a class="autorefs autorefs-internal" title="            details" href="../api/details/#isqx.details"><code class="language-py3 highlight">isqx.details</code></a>
+module instead. Our documentation uses a custom <code class="language-py3 highlight"><span class="n">mkdocstrings</span><span class="o">-</span><span class="n">python</span></code> and
+<code class="language-py3 highlight"><span class="n">griffe</span></code> plugin to scan for expressions, generate cross-references. It is also
+emits an JSON file for the <a href="../vis/">visualiser</a>.</p>
+<h2 id="problem-3-exact-representation-and-formatting">Problem 3: Exact representation and formatting<a class="headerlink" href="#problem-3-exact-representation-and-formatting" title="Permanent link">¤</a></h2>
+<p>Consider the unit for fuel economy, <a class="autorefs autorefs-internal" title="            MPG" href="../api/usc/#isqx.usc.MPG">miles per gallon</a>.
+Dimensionally, this is equivalent to the inverse area:
+<span class="arithmatex">\(\frac{\mathsf{L}}{\mathsf{L}^3} = \mathsf{L}^{-2}\)</span>.</p>
+<p>Many runtime libraries would eagerly simplify <code class="language-py3 highlight"><span class="n">MPG</span></code> to a base form like <code class="language-py3 highlight"><span class="n">m</span><span class="err">⁻²</span></code>
+to improve performance in dimensional checks. This however, loses the
+human-readable intent.</p>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> preserving the exact tree representation.
+This allows the formatted output to be exactly in the form the user defined it.</p>
+<h2 id="faq">FAQ<a class="headerlink" href="#faq" title="Permanent link">¤</a></h2>
+<h3 id="whats-the-point-if-there-is-no-runtime-checks">What's the point if there is no runtime checks?<a class="headerlink" href="#whats-the-point-if-there-is-no-runtime-checks" title="Permanent link">¤</a></h3>
+<blockquote>
+<p>Since <code class="language-py3 highlight"><span class="n">x</span></code> in <code class="language-py3 highlight"><span class="n">Annotated</span><span class="p">[</span><span class="n">T</span><span class="p">,</span> <span class="n">x</span><span class="p">]</span></code> are ignored by the Python interpreter and
+you're not using <code class="language-py3 highlight"><span class="n">x</span></code> for checking dimension errors, isn't <code class="language-py3 highlight"><span class="n">isqx</span></code> just
+glorified comments?</p>
+</blockquote>
+<p>Yes. <code class="language-py3 highlight"><span class="n">isqx</span></code> provides a machine-readable, centralised vocabulary for documentation.
+It avoids the "newtype" friction by decoupling the documentation from the
+runtime value.</p>
+<p>Expressive, unambiguous documentation can significantly reduce accidental
+errors without imposing runtime or interoperability costs.</p>
+<blockquote>
+<p>In that case, why not just use <code class="language-py3 highlight"><span class="n">pint</span><span class="o">.</span><span class="n">Unit</span></code> within <code class="language-py3 highlight"><span class="n">Annotated</span></code>, without
+the <code class="language-py3 highlight"><span class="n">Quantity</span></code> wrapper?</p>
+</blockquote>
+<p>Indeed, many existing libraries already has solid support for units.
+However, painpoints boil down to:</p>
+<ul>
+<li>inability to define quantity kinds</li>
+<li>odd ways to define new units (e.g. modifying a file with DSL)</li>
+<li>no intersphinx</li>
+<li>LSP: inability to "jump to definition" all the way to its base units</li>
+</ul>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> tries to be minimal.</p>
+<blockquote>
+<p>What about parsing the Python AST and collecting all <code class="language-py3 highlight"><span class="n">x</span></code> in functions or
+dataclasses, and building a static analyzer?</p>
+</blockquote>
+<p>This is a direction that <a href="https://achevrot.github.io/impunity/"><code class="language-py3 highlight"><span class="n">impunity</span></code></a>
+explored.</p>
+<p>However, building a useful static analyser that doesn't produce too many
+false positives is very difficult. Some challenges include:</p>
+<ul>
+<li>Complicated functions:<ul>
+<li><code class="language-py3 highlight"><span class="n">numpy</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span></code>: The relationship between the input and output units is
+  non-trivial: if the input signal is in <code class="language-py3 highlight"><span class="n">volts</span></code> over an implicit
+  time domain, then the output is in <code class="language-py3 highlight"><span class="n">volt</span><span class="o">-</span><span class="n">seconds</span></code> over an implicit
+  frequency domain.</li>
+<li><code class="language-py3 highlight"><span class="n">einops</span><span class="o">.</span><span class="n">einsum</span></code>: The operation is defined by a string like <code class="language-py3 highlight"><span class="n">ij</span><span class="p">,</span><span class="n">jk</span><span class="o">-&gt;</span><span class="n">ik</span></code>.
+  The analyzer would need to parse and interpret this string notation to
+  understand which tensor operation is being performed before it could even
+  begin to calculate the output unit.</li>
+</ul>
+</li>
+<li>Complicated data structures like <code class="language-py3 highlight"><span class="n">polars</span><span class="o">.</span><span class="n">DataFrame</span></code> may have different units
+  for different columns. Should we support <code class="language-py3 highlight"><span class="n">pandera</span></code>'s approach, or have a more
+  generic way to annotate multidimensional arrays like <code class="language-py3 highlight"><span class="n">xarray</span></code>?</li>
+<li>Ambiguous operations: Should adding a <code class="language-py3 highlight"><span class="n">height</span></code> and <code class="language-py3 highlight"><span class="n">thickness</span></code> be an error?
+  ISO 80000 permits this, but it might be physically questionable in some
+  contexts (e.g. <code class="language-py3 highlight"><span class="n">force</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">x</span> <span class="n">direction</span></code> + <code class="language-py3 highlight"><span class="n">force</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">y</span> <span class="n">direction</span></code>)</li>
+</ul>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> provides the necessary expressiveness to build a smart static analyzer.
+If one is built, it should learn from the success of gradual typing systems
+like mypy and offer configurable strictness levels.</p>
+<h3 id="why-are-details-stored-in-a-separate-isqxdetails-module">Why are details stored in a separate <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">details</span></code> module?<a class="headerlink" href="#why-are-details-stored-in-a-separate-isqxdetails-module" title="Permanent link">¤</a></h3>
+<p>Some quantity kinds are defined in terms of quantity kinds that are defined
+later. For example, <a class="autorefs autorefs-internal" title="            ACTION" href="../api/iso80000/#isqx._iso80000.ACTION">action</a> [ISO 80000-3] is defined in terms of
+<a class="autorefs autorefs-internal" title="            WORK" href="../api/iso80000/#isqx._iso80000.WORK">work</a> [ISO 80000-5]. We can either:</p>
+<ul>
+<li>couple details with the <a class="autorefs autorefs-internal" title="            QtyKind" href="../api/core/#isqx._core.QtyKind"><code class="language-py3 highlight">isqx.QtyKind</code></a> and forward-reference with strings</li>
+<li>define all <a class="autorefs autorefs-internal" title="            QtyKind" href="../api/core/#isqx._core.QtyKind"><code class="language-py3 highlight">isqx.QtyKind</code></a>s first and define definitions separately.</li>
+</ul>
+<p>The latter is adopted because:</p>
+<ol>
+<li>LSP support is far better: enables go-to-definition interactions.
+   refactoring will be far easier.</li>
+<li>Our <a class="autorefs autorefs-internal" title="            plugin" href="../api/mkdocs/#isqx.mkdocs.plugin">mkdocs plugin</a> will be able to easily build
+   cross-references</li>
+<li>Extensibility: downstream users can easily append their own domain-specific
+   definitions.</li>
+<li>Performance: avoids loading non-critical information on <code class="language-py3 highlight"><span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span></code>.</li>
+<li><code class="language-py3 highlight"><span class="n">USD</span> <span class="o">&lt;-&gt;</span> <span class="n">HKD</span></code> is not fixed</li>
+</ol>
+<p>Similarly, the <a class="autorefs autorefs-internal" title="            Expr" href="../api/core/#isqx._core.Expr">formatting</a> of expressions are decoupled from their
+definitions for the same reason. Users might want to maintain their own set of
+symbols/locales and we don't want downstream users to have to monkeypatch
+classes.</p>
+<h3 id="how-can-i-parse-units-from-a-string">How can I parse units from a string?<a class="headerlink" href="#how-can-i-parse-units-from-a-string" title="Permanent link">¤</a></h3>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> does not come with a built-in parser because there are endless variety of
+formats:</p>
+<ul>
+<li>plain text</li>
+<li>different flavours of <span class="arithmatex">\(\LaTeX\)</span>,</li>
+<li>locale/subfield-specific symbols</li>
+<li>user defined custom tags</li>
+</ul>
+<p>However, the expression tree of <code class="language-py3 highlight"><span class="n">isqx</span></code> can be used as a target for a custom
+parser. A simple recursive descent or Pratt parser can be written to transform
+a string into a <a class="autorefs autorefs-internal" title="            Expr" href="../api/core/#isqx._core.Expr"><code class="language-py3 highlight">isqx.Expr</code></a> object.</p>
+<h3 id="having-to-define-m-annotated_t-isqxm-is-annoying-why-not-make-isqxm-a-type-instead-of-object">Having to define <code class="language-py3 highlight"><span class="n">M</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">_T</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="p">]</span></code> is annoying. Why not make <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">M</span></code> a type instead of object?<a class="headerlink" href="#having-to-define-m-annotated_t-isqxm-is-annoying-why-not-make-isqxm-a-type-instead-of-object" title="Permanent link">¤</a></h3>
+<p>Unfortunately, there is no way to create our own <code class="language-py3 highlight"><span class="n">Annotated</span></code> and have
+static type checkers understand it. One possible path is:</p>
+<p><div class="language-py highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">Generic</span><span class="p">,</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">_AnnotatedAlias</span>
+
+<span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Expr</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
+    <span class="c1"># mimic what `typing.Annotated` does</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__class_getitem__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">T</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">_AnnotatedAlias</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="p">(</span><span class="bp">cls</span><span class="p">,))</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">M</span><span class="p">(</span><span class="n">Expr</span><span class="p">):</span> <span class="c1"># define meter as a type, not a runtime object</span>
+    <span class="k">pass</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">M</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="c1"># this indeed produces an `Annotated` at runtime</span>
+<span class="c1"># typing.Annotated[int, &lt;class &#39;__main__.M&#39;&gt;]</span>
+
+<span class="c1"># unfortunately mypy does not understand this as an `Annotated` special form:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">foo</span><span class="p">(</span><span class="n">bar</span><span class="p">:</span> <span class="n">M</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">baz</span><span class="p">:</span> <span class="n">M</span><span class="p">[</span><span class="nb">float</span><span class="p">]):</span>
+    <span class="k">return</span> <span class="n">bar</span> <span class="o">/</span> <span class="n">baz</span>
+<span class="c1"># main.py:16: error: &quot;M&quot; expects no type arguments, but 1 given  [type-arg]</span>
+<span class="c1"># main.py:17: error: Unsupported left operand type for / (&quot;M&quot;)  [operator]</span>
+<span class="c1"># Found 2 errors in 1 file (checked 1 source file)</span>
+</code></pre></div>
+See also:</p>
+<ul>
+<li><a href="https://stackoverflow.com/questions/78536551/variable-not-allowed-in-type-expression-how-can-i-create-parameterized-typin">https://stackoverflow.com/questions/78536551/variable-not-allowed-in-type-expression-how-can-i-create-parameterized-typin</a></li>
+<li><a href="https://stackoverflow.com/questions/78845949/how-to-define-a-typing-special-form-for-use-with-static-type-checking">https://stackoverflow.com/questions/78845949/how-to-define-a-typing-special-form-for-use-with-static-type-checking</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "navigation.expand"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+        <script src="../js/cmap.mjs" type="module" defer></script>
+      
+        <script src="../js/detail-highlight.mjs" type="module" defer></script>
+      
+        <script src="../js/katex.mjs" type="module" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.js" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/auto-render.min.js" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/copy-tex.min.js" defer></script>
+      
+    
+  </body>
+</html>

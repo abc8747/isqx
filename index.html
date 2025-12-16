@@ -1,0 +1,1409 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A system for representing physical units">
+      
+      
+      
+        <link rel="canonical" href="https://abc8747.github.io/isqx/">
+      
+      
+      
+        <link rel="next" href="examples/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>isqx</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="css/detail-highlight.css">
+    
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+<meta property="og:type" content="website" />
+<meta property="og:title" content="isqx" />
+<meta property="og:description" content="A system for representing physical units" />
+<meta property="og:image" content="https://abc8747.github.io/isqx/assets/images/social/index.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:url" content="https://abc8747.github.io/isqx/" />
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:title" content="isqx" />
+<meta property="twitter:description" content="A system for representing physical units" />
+<meta property="twitter:image" content="https://abc8747.github.io/isqx/assets/images/social/index.png" />
+</head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#isqx" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="isqx" class="md-header__button md-logo" aria-label="isqx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            isqx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/abc8747/isqx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    abc8747/isqx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="isqx" class="md-nav__button md-logo" aria-label="isqx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    isqx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/abc8747/isqx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    abc8747/isqx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tutorial-documenting-code-with-type-annotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorial: Documenting code with type annotations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tutorial: Documenting code with type annotations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-note-on-hard-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick note on hard dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tutorial-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorial: Utilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tutorial: Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#simplification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simplification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unit-conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit conversion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tutorial-creating-your-own-units-and-quantity-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorial: Creating your own units and quantity kinds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tutorial: Creating your own units and quantity kinds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quantity-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quantity Kinds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx (core, fmt)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/iso80000/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx (iso80000)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/usc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.usc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/aerospace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.aerospace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/details/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.details
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/mkdocs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    isqx.mkdocs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="vis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualiser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tutorial-documenting-code-with-type-annotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorial: Documenting code with type annotations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tutorial: Documenting code with type annotations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-note-on-hard-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick note on hard dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tutorial-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorial: Utilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tutorial: Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#simplification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simplification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unit-conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit conversion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tutorial-creating-your-own-units-and-quantity-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorial: Creating your own units and quantity kinds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tutorial: Creating your own units and quantity kinds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quantity-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quantity Kinds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- DO NOT EDIT! CHANGES WILL BE LOST. edit `README.md` and run `scripts/docs.py` instead. -->
+<h1 id="isqx">isqx<a class="headerlink" href="#isqx" title="Permanent link">¤</a></h1>
+<p><a href="https://pypi.python.org/pypi/isqx"><img alt="image" src="https://img.shields.io/pypi/v/isqx.svg" /></a>
+<a href="https://pypi.python.org/pypi/isqx"><img alt="image" src="https://img.shields.io/pypi/l/isqx.svg" /></a>
+<a href="https://pypi.python.org/pypi/isqx"><img alt="image" src="https://img.shields.io/pypi/pyversions/isqx.svg" /></a></p>
+<p><a href="https://abc8747.github.io/isqx"><strong>Docs</strong></a> | <a href="https://abc8747.github.io/isqx/vis.html?autoLoad"><strong>Visualiser</strong></a></p>
+<p>Documenting physical units in Python often relies on ambiguous docstrings or performance-heavy wrapper libraries that break interoperability.</p>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> provides a comprehensive set of metadata objects based on the International System of Quantities (ISQ). These objects represent physical units (<code class="language-py3 highlight"><span class="n">kg</span></code>, <code class="language-py3 highlight"><span class="n">knots</span></code>), <a href="#quantity-kinds">quantity kinds</a> (mass, velocity) and make crucial distinctions between them (internal energy vs. work done vs. heat).</p>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> objects are metadata-only: they do not wrap numerical types at runtime. <code class="language-py3 highlight"><span class="n">Annotated</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="p">]</span></code> should be treated as <code class="language-py3 highlight"><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></code>, ensuring zero performance overhead and immediate interoperability with external libraries.</p>
+<p>It also comes with optional utilities like unit <a href="#unit-conversion">conversion</a>, <a href="#simplification">simplification</a> and <a href="#formatting">extensible formatting</a>.</p>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">¤</a></h2>
+<div class="language-sh highlight"><pre><span></span><code><span class="c1"># with pip</span>
+pip<span class="w"> </span>install<span class="w"> </span>isqx
+<span class="c1"># with uv</span>
+uv<span class="w"> </span>add<span class="w"> </span>isqx
+</code></pre></div>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> has zero dependencies and is designed to be documentation-first. It can be used
+<a href="#quick-note-on-hard-dependencies">without introducing a hard dependency on your project</a>.
+You can find more examples, search the list of units/quantity kinds and find the
+API reference in the <a href="https://abc8747.github.io/isqx/">documentation</a>.</p>
+<p>An interactive visualisation of all quantity kinds can also be viewed <a href="https://abc8747.github.io/isqx/vis.html?autoLoad">here</a>.</p>
+<p><img alt="" src="assets/img/vis.png" /></p>
+<p style="text-align: center;">
+  <i>Visualisation of quantity kinds and equations related to the Reynolds number.</i>
+</p>
+
+<h2 id="tutorial-documenting-code-with-type-annotations">Tutorial: Documenting code with type annotations<a class="headerlink" href="#tutorial-documenting-code-with-type-annotations" title="Permanent link">¤</a></h2>
+<p>Most libraries use docstrings for simplicity. <code class="language-py3 highlight"><span class="n">isqx</span></code> recommends incrementally adopting <a href="https://typing.python.org/en/latest/spec/qualifiers.html#annotated">PEP 593</a>.</p>
+<p>First, define generic types that you will use throughout the codebase:</p>
+<p><div class="language-py highlight"><pre><span></span><code><span class="c1"># isqx_types.py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">TypeVar</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span>
+
+<span class="n">_T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;_T&quot;</span><span class="p">)</span>
+<span class="n">M</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">_T</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="p">]</span>
+<span class="n">K</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">_T</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">K</span><span class="p">]</span>
+<span class="n">Pa</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">_T</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">PA</span><span class="p">]</span>
+
+<span class="n">M</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>  <span class="c1"># is the same as a plain float.</span>
+<span class="n">M</span>         <span class="c1"># a bare type is inferred by static type checkers as `Unknown`</span>
+</code></pre></div>
+Annotate function arguments or data containers like <code class="language-py3 highlight"><span class="n">dataclasses</span></code>:</p>
+<p><div class="language-py highlight"><pre><span></span><code><span class="c1"># in another file</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.isqx_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">M</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">Pa</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">pressure_isa</span><span class="p">(</span><span class="n">altitude</span><span class="p">:</span> <span class="n">M</span><span class="p">,</span> <span class="n">isa_dev</span><span class="p">:</span> <span class="n">K</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Pa</span><span class="p">:</span>
+    <span class="c1"># `altitude` has `Unknown` type</span>
+    <span class="o">...</span>
+
+<span class="c1"># or, if you prefer stricter typing:</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numpy.typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayLike</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">pressure_isa</span><span class="p">(</span><span class="n">altitude</span><span class="p">:</span> <span class="n">M</span><span class="p">[</span><span class="n">ArrayLike</span><span class="p">],</span> <span class="n">isa_dev</span><span class="p">:</span> <span class="n">K</span><span class="p">[</span><span class="n">ArrayLike</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Pa</span><span class="p">[</span><span class="n">ArrayLike</span><span class="p">]:</span>
+    <span class="c1"># `altitude` now expects the type `ArrayLike` (not a wrapper over it!) </span>
+    <span class="o">...</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GasState</span><span class="p">:</span>
+    <span class="n">temperature</span><span class="p">:</span> <span class="n">K</span>
+    <span class="n">pressure</span><span class="p">:</span> <span class="n">Pa</span>
+</code></pre></div>
+Since annotations are ignored by the Python interpreter at runtime, and
+<code class="language-py3 highlight"><span class="n">Annotated</span><span class="p">[</span><span class="n">T</span><span class="p">,</span> <span class="n">x</span><span class="p">]</span></code> is equivalent to <code class="language-py3 highlight"><span class="n">T</span></code>, there is no interoperability cost.
+Internally, unit objects are defined by composing with each other:
+<code class="language-py3 highlight"><span class="n">J</span> <span class="o">=</span> <span class="p">(</span><span class="n">N</span> <span class="o">*</span> <span class="n">M</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;joule&quot;</span><span class="p">)</span></code> and <code class="language-py3 highlight"><span class="n">N</span> <span class="o">=</span> <span class="p">(</span><span class="n">KG</span> <span class="o">*</span> <span class="n">M</span> <span class="o">*</span> <span class="n">S</span><span class="o">**-</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;newton&quot;</span><span class="p">)</span></code>.</p>
+<p>You can also retrieve the annotations at runtime:
+<div class="language-py highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_type_hints</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">print_metadata</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">param</span><span class="p">,</span> <span class="n">hint</span> <span class="ow">in</span> <span class="n">get_type_hints</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">include_extras</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;`</span><span class="si">{</span><span class="n">param</span><span class="si">}</span><span class="s2">`: </span><span class="si">{</span><span class="n">hint</span><span class="o">.</span><span class="n">__metadata__</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">print_metadata</span><span class="p">(</span><span class="n">pressure_isa</span><span class="p">)</span>
+<span class="c1"># `altitude`: meter</span>
+<span class="c1"># `isa_dev`: kelvin</span>
+<span class="c1"># `return`: pascal</span>
+<span class="c1"># - pascal = newton · meter⁻²</span>
+<span class="c1">#   - newton = kilogram · meter · second⁻²</span>
+<span class="n">print_metadata</span><span class="p">(</span><span class="n">GasState</span><span class="p">)</span>
+<span class="c1"># `temperature`: kelvin</span>
+<span class="c1"># `pressure`: pascal</span>
+<span class="c1"># - pascal = newton · meter⁻²</span>
+<span class="c1">#   - newton = kilogram · meter · second⁻²</span>
+</code></pre></div></p>
+<hr />
+<p>But there is a flaw in using units alone:</p>
+<p><img alt="" src="assets/img/readme_meters.drawio.svg" /></p>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> encourages you to use a more abstract <strong>quantity kind</strong>, which can contain
+arbitrary <em>tags</em> that store important metadata.</p>
+<p>A quantity kind can take any unit system (MKS, imperial...): calling it with a
+particular unit returns a <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">Tagged</span></code> expression:</p>
+<div class="language-py highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">TypeVar</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span>
+
+<span class="n">_T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;_T&quot;</span><span class="p">)</span>
+<span class="n">GeopAltM</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">_T</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">aerospace</span><span class="o">.</span><span class="n">GEOPOTENTIAL_ALTITUDE</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="p">)]</span>
+<span class="n">TempDevIsaK</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">_T</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">aerospace</span><span class="o">.</span><span class="n">TEMPERATURE_DEVIATION_ISA</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">K</span><span class="p">)]</span>
+<span class="n">StaticPressurePa</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">_T</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">STATIC_PRESSURE</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">PA</span><span class="p">)]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">pressure_isa</span><span class="p">(</span><span class="n">altitude</span><span class="p">:</span> <span class="n">GeopAltM</span><span class="p">,</span> <span class="n">isa_dev</span><span class="p">:</span> <span class="n">TempDevIsaK</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StaticPressurePa</span><span class="p">:</span>
+    <span class="o">...</span>
+
+<span class="c1"># altitude: meter[&#39;altitude&#39;, relative to `&#39;mean_sea_level&#39;`, &#39;geopotential&#39;]</span>
+<span class="c1"># isa_dev: kelvin[&#39;static&#39;, Δ, relative to `288.15 · kelvin`]</span>
+<span class="c1"># return: pascal[&#39;static&#39;]</span>
+<span class="c1"># - pascal = newton · meter⁻²</span>
+<span class="c1">#   - newton = kilogram · meter · second⁻²</span>
+</code></pre></div>
+<p>To create your own quantity kinds, see <a href="#tutorial-creating-your-own-units-and-quantity-kinds">below</a>.</p>
+<h3 id="quick-note-on-hard-dependencies">Quick note on hard dependencies<a class="headerlink" href="#quick-note-on-hard-dependencies" title="Permanent link">¤</a></h3>
+<p>If you intend to use <code class="language-py3 highlight"><span class="n">isqx</span></code> for documenting code only (without runtime features
+like <a href="#unit-conversion">conversions</a> or <a href="#simplification">simplification</a>
+, which we will explore below), it is recommended to make <code class="language-py3 highlight"><span class="n">isqx</span></code> an
+<a href="https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#dependencies-optional-dependencies">optional dependency</a>
+of your project instead:</p>
+<p><div class="language-sh highlight"><pre><span></span><code>uv<span class="w"> </span>add<span class="w"> </span>isqx<span class="w"> </span>--optional<span class="w"> </span>typing
+</code></pre></div>
+Put <code class="language-py3 highlight"><span class="n">isqx</span></code> imports within the <code class="language-py3 highlight"><span class="n">typing</span><span class="o">.</span><span class="n">TYPE_CHECKING</span></code> block:</p>
+<p><div class="language-py highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>  <span class="c1"># see PEP 563, PEP 649</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span>
+
+    <span class="n">FloatM</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="p">]</span>  <span class="c1"># or put them in a separate module</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">foo</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">FloatM</span><span class="p">):</span> <span class="o">...</span>
+
+<span class="c1"># to inspect annotations at runtime in another module:</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_type_hints</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span>
+
+<span class="k">for</span> <span class="n">param</span><span class="p">,</span> <span class="n">hint</span> <span class="ow">in</span> <span class="n">get_type_hints</span><span class="p">(</span>
+    <span class="n">foo</span><span class="p">,</span>
+    <span class="n">include_extras</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">localns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;isqx&quot;</span><span class="p">:</span> <span class="n">isqx</span><span class="p">}</span>  <span class="c1"># add the location of your custom definitions (if any)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;`</span><span class="si">{</span><span class="n">param</span><span class="si">}</span><span class="s2">`: </span><span class="si">{</span><span class="n">hint</span><span class="o">.</span><span class="n">__metadata__</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="c1"># `x`: meter</span>
+</code></pre></div>
+This makes sure that your code doesn't fail with <code class="language-py3 highlight"><span class="ne">ImportError</span></code> if downstream
+users decide not to install <code class="language-py3 highlight"><span class="n">your_project</span><span class="p">[</span><span class="n">typing</span><span class="p">]</span></code>.</p>
+<h2 id="tutorial-utilities">Tutorial: Utilities<a class="headerlink" href="#tutorial-utilities" title="Permanent link">¤</a></h2>
+<p>So far, we have covered usecases for code documentation.</p>
+<p>Units are <strong>immutable expression trees</strong> and <code class="language-py3 highlight"><span class="n">isqx</span></code> provides some runtime
+utilities to <em>transform</em> the expression tree.</p>
+<h3 id="simplification">Simplification<a class="headerlink" href="#simplification" title="Permanent link">¤</a></h3>
+<p>The <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">simplify</span></code> function canonicalises it into a flat form:</p>
+<p><div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">isqx.usc</span><span class="w"> </span><span class="kn">import</span> <span class="n">PSI</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">PSI</span><span class="p">)</span>
+<span class="go">psi</span>
+<span class="go">- psi = lbf · inch⁻²</span>
+<span class="go">  - lbf = pound · 9.80665 · (meter · second⁻²)</span>
+<span class="go">    - pound = 0.45359237 · kilogram</span>
+<span class="go">  - inch = 1/12 · foot</span>
+<span class="go">    - foot = 0.3048 · meter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">simplify</span><span class="p">,</span> <span class="n">dimension</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">simplify</span><span class="p">(</span><span class="n">PSI</span><span class="p">))</span>
+<span class="go">0.45359237 · 9.80665 · (1/12)⁻² · 0.3048⁻² · (kilogram · meter⁻¹ · second⁻²)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">dimension</span><span class="p">(</span><span class="n">simplify</span><span class="p">(</span><span class="n">PSI</span><span class="p">)))</span>
+<span class="go">L⁻¹ · M · T⁻²</span>
+</code></pre></div>
+Note that the final scaling factor is not eagerly evaluated. This enables you to
+choose between approximate and exact arithmetic (useful for financial
+applications).</p>
+<h3 id="unit-conversion">Unit conversion<a class="headerlink" href="#unit-conversion" title="Permanent link">¤</a></h3>
+<p>The <code class="language-py3 highlight"><span class="n">convert</span></code> function creates a callable that allow you to convert between
+compatible units. Under the hood, it uses <code class="language-py3 highlight"><span class="n">simplify</span></code> to check dimensions and
+computes the conversion factors <em>once</em>:</p>
+<p><div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">M</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">MIN</span><span class="p">,</span> <span class="n">convert</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">isqx.usc</span><span class="w"> </span><span class="kn">import</span> <span class="n">FT</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fpm_to_mps</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">FT</span> <span class="o">*</span> <span class="n">MIN</span><span class="o">**-</span><span class="mi">1</span><span class="p">,</span> <span class="n">M</span> <span class="o">*</span> <span class="n">S</span><span class="o">**-</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fpm_to_mps</span>
+<span class="go">Converter(scale=0.00508)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fpm_to_mps</span><span class="p">(</span><span class="mf">7200.0</span><span class="p">)</span>
+<span class="go">36.576</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">convert</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">FT</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">True</span><span class="p">)(</span><span class="mi">11000</span><span class="p">)</span>
+<span class="go">Fraction(13750000, 381)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">convert</span><span class="p">(</span><span class="n">FT</span> <span class="o">*</span> <span class="n">MIN</span><span class="o">**-</span><span class="mi">1</span><span class="p">,</span> <span class="n">M</span> <span class="o">*</span> <span class="n">S</span><span class="o">**-</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># velocity -&gt; acceleration fails</span>
+<span class="go">isqx._core.DimensionMismatchError: cannot convert from `foot · minute⁻¹</span>
+<span class="go">- foot = 0.3048 · meter</span>
+<span class="go">- minute = 60 · second` to `meter · second⁻²`.</span>
+<span class="go">= help: expected compatible dimensions, but found:</span>
+<span class="go">dimension of origin: `L · T⁻¹`</span>
+<span class="go">dimension of target: `L · T⁻²`</span>
+</code></pre></div>
+It is compatible many libraries, including using it for functional
+transformations like <code class="language-py3 highlight"><span class="n">jax</span><span class="o">.</span><span class="n">jit</span></code>:</p>
+<p><div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fpm_to_mps</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">1300</span><span class="p">,</span> <span class="mi">1300</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+<span class="go">array([-6.604     , -5.13644444, -3.66888889, -2.20133333, -0.73377778,</span>
+<span class="go">        0.73377778,  2.20133333,  3.66888889,  5.13644444,  6.604     ])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">fpm_to_mps</span><span class="p">)(</span><span class="mf">0.0</span><span class="p">)</span>
+<span class="go">Array(0.00508, dtype=float32, weak_type=True)</span>
+</code></pre></div>
+Converting between logarithmic units is also supported:</p>
+<div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">DBM</span><span class="p">,</span> <span class="n">DBW</span><span class="p">,</span> <span class="n">convert</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">DBM</span><span class="p">)</span>
+<span class="go">dBm</span>
+<span class="go">- dBm = 10 · log₁₀(ratio[`watt` to `1 · milliwatt`])</span>
+<span class="go">  - watt = joule · second⁻¹</span>
+<span class="go">    - joule = newton · meter</span>
+<span class="go">      - newton = kilogram · meter · second⁻²</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">convert</span><span class="p">(</span><span class="n">DBW</span><span class="p">,</span> <span class="n">DBM</span><span class="p">)</span>
+<span class="go">NonAffineConverter(scale=1.0, offset=29.999999999999996)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">convert</span><span class="p">(</span><span class="n">DBW</span><span class="p">,</span> <span class="n">DBM</span><span class="p">)(</span><span class="mi">10</span><span class="p">)</span>
+<span class="go">40.0</span>
+</code></pre></div>
+<p>Note that converting between linear and logarithmic quantities are not supported.
+Representing quantities like attenuation (<span class="arithmatex">\(\text{dB}\text{ m}^{-1}\)</span>)
+is permitted, but conversion of them is not yet implemented.</p>
+<h3 id="formatting">Formatting<a class="headerlink" href="#formatting" title="Permanent link">¤</a></h3>
+<p>The <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">fmt</span></code> function (called by <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">Expr</span><span class="o">.</span><span class="fm">__format__</span></code>) by default
+uses a <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">BasicFormatter</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>, but also supports customisation.
+To use shorter symbols for example:</p>
+<div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">isqx</span><span class="w"> </span><span class="kn">import</span> <span class="n">N</span><span class="p">,</span> <span class="n">fmt</span><span class="p">,</span> <span class="n">BasicFormatter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">N</span><span class="si">}</span><span class="s2">&quot;</span> <span class="o">==</span> <span class="n">fmt</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">BasicFormatter</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">fmt</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">BasicFormatter</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">overrides</span><span class="o">=</span><span class="p">{</span>  <span class="c1"># alias names</span>
+<span class="gp">... </span>        <span class="s2">&quot;newton&quot;</span><span class="p">:</span> <span class="s2">&quot;N&quot;</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;kilogram&quot;</span><span class="p">:</span> <span class="s2">&quot;kg&quot;</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;meter&quot;</span><span class="p">:</span> <span class="s2">&quot;m&quot;</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;second&quot;</span><span class="p">:</span> <span class="s2">&quot;s&quot;</span>
+<span class="gp">... </span>    <span class="p">},</span>
+<span class="gp">... </span><span class="p">)))</span>
+<span class="go">N</span>
+<span class="go">- N = kg · m · s⁻²</span>
+</code></pre></div>
+<p>Internally, the basic formatter uses <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">Visitor</span></code> to traverse each node in
+post-order. You can pass in your own formatter as long as it adheres to the
+<code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">Formatter</span></code> protocol.</p>
+<p>A <span class="arithmatex">\(\LaTeX\)</span> formatter is WIP.</p>
+<h2 id="tutorial-creating-your-own-units-and-quantity-kinds">Tutorial: Creating your own units and quantity kinds<a class="headerlink" href="#tutorial-creating-your-own-units-and-quantity-kinds" title="Permanent link">¤</a></h2>
+<p>We follow the code-as-data principle: creating units and quantity kinds can be
+done effortlessly with pure Python:</p>
+<div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">fractions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Fraction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">SMOOT</span> <span class="o">=</span> <span class="p">((</span><span class="mi">5</span> <span class="o">+</span> <span class="n">Fraction</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">))</span> <span class="o">*</span> <span class="n">isqx</span><span class="o">.</span><span class="n">usc</span><span class="o">.</span><span class="n">FT</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;smoot&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">SMOOT</span><span class="p">)</span>
+<span class="go">smoot</span>
+<span class="go">- smoot = 67/12 · foot</span>
+<span class="go">  - foot = 0.3048 · meter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">((</span><span class="n">SMOOT</span><span class="o">**-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">isqx</span><span class="o">.</span><span class="n">M</span> <span class="o">*</span> <span class="n">SMOOT</span> <span class="o">*</span> <span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="o">**-</span><span class="mi">1</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+<span class="go">(smoot⁻¹ · meter · smoot · meter⁻¹)²</span>
+<span class="go">- smoot = 67/12 · foot</span>
+<span class="go">  - foot = 0.3048 · meter</span>
+</code></pre></div>
+<p>Note that expressions are represented exactly in the order you define it:
+no attempt is made to distribute exponents or combine terms unless you
+<a href="#simplification">instruct it to</a>.</p>
+<hr />
+<p>As explored earlier, units alone are insufficient to describe a quantity kind.
+Consider we might want to represent:</p>
+<table>
+<thead>
+<tr>
+<th>Common Units</th>
+<th>Possible Quantity Kinds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="arithmatex">\(\text{m}\)</span>, <span class="arithmatex">\(\text{ft}\)</span>, <span class="arithmatex">\(\text{in}\)</span>...</td>
+<td><em>geopotential altitude</em> / <em>geometric altitude</em> / <em>wingspan</em> / <em>chord length</em> / <em>radius</em> / <em>thickness</em> / <em>wavelength</em></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\text{m}\text{ s}^{-1}\)</span>, <span class="arithmatex">\(\text{kt}\)</span>...</td>
+<td><em>indicated</em> / <em>true</em> / <em>ground</em> speed</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\text{J}\)</span>, <span class="arithmatex">\(\text{Btu}\)</span></td>
+<td><em>internal</em> / <em>kinetic</em> / <em>potential</em> / <em>enthalpy</em> / <em>Gibbs free</em> energy / <em>work done</em> / <em>heat</em> / <em>moment of force</em></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\text{W}\)</span>, <span class="arithmatex">\(\text{kWh}\)</span></td>
+<td><em>instantaneous</em> / <em>RMS</em> / <em>peak-to-peak</em> / <em>time-averaged</em> power</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\text{mol}\)</span></td>
+<td>amount of <em>hydrogen</em> / <em>oxygen</em> / <em>(some arbitrary compound)</em></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\text{USD}\)</span>, <span class="arithmatex">\(\text{EUR}\)</span>...</td>
+<td><em>nominal</em> / <em>real</em>, <em>capex</em> / <em>opex</em></td>
+</tr>
+<tr>
+<td>-</td>
+<td>radians / aspect ratio / Reynolds number &lt;of some <em>characteristic length</em>&gt; / coefficient of drag (zero-lift / lift-induced)</td>
+</tr>
+</tbody>
+</table>
+<p>And that particular quantity kind may also refer to a specific:</p>
+<ul>
+<li><em>inertial</em> / <em>body</em> / <em>stability</em> reference frame</li>
+<li><em>x</em> / <em>y</em> / <em>z</em> direction</li>
+<li>temperature / pressure at location <em>A</em> / <em>B</em> / <em>C</em>...</li>
+</ul>
+<h4 id="tags">Tags<a class="headerlink" href="#tags" title="Permanent link">¤</a></h4>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> allows you to <em>constrain</em> an existing unit with arbitrary <em>tags</em> using the
+<code class="language-py3 highlight"><span class="p">[]</span></code> operator:</p>
+<div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">MOL_H2_L</span> <span class="o">=</span> <span class="n">isqx</span><span class="o">.</span><span class="n">MOL</span><span class="p">[</span><span class="s2">&quot;H_2&quot;</span><span class="p">,</span> <span class="s2">&quot;liquid&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">MOL_O2_G</span> <span class="o">=</span> <span class="n">isqx</span><span class="o">.</span><span class="n">MOL</span><span class="p">[</span><span class="s2">&quot;O_2&quot;</span><span class="p">,</span> <span class="s2">&quot;gas&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">MOL_H2_L</span> <span class="o">*</span> <span class="n">MOL_O2_G</span><span class="o">**-</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># does not reduce to dimensionless!</span>
+<span class="go">mole[&#39;H_2&#39;, &#39;liquid&#39;] · (mole[&#39;O_2&#39;, &#39;gas&#39;])⁻¹</span>
+</code></pre></div>
+<p>You can use any <a href="https://docs.python.org/3/reference/datamodel.html#object.__hash__">hashable object</a>
+including strings, frozen dataclasses, or even <code class="language-py3 highlight"><span class="n">isqx</span></code> units itself!
+This is helpful when you want to represent something awkward like
+<em>Reynolds number</em> with <em>characteristic length</em> = <em>chord length</em>.</p>
+<p><code class="language-py3 highlight"><span class="n">isqx</span></code> provides two important tags, <code class="language-py3 highlight"><span class="n">Delta</span></code> and <code class="language-py3 highlight"><span class="n">OriginAt</span></code>:</p>
+<div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">isqx</span><span class="o">.</span><span class="n">DELTA</span><span class="p">])</span>  <span class="c1"># finite interval/difference in temperature</span>
+<span class="go">kelvin[Δ]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">J</span><span class="p">[</span><span class="n">isqx</span><span class="o">.</span><span class="n">INEXACT_DIFFERENTIAL</span><span class="p">,</span> <span class="s2">&quot;heat&quot;</span><span class="p">])</span>  <span class="c1"># &quot;small change&quot;</span>
+<span class="go">joule[&#39;inexact differential&#39;, &#39;heat&#39;]</span>
+<span class="go">- joule = newton · meter</span>
+<span class="go">  - newton = kilogram · meter · second⁻²</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="p">[</span><span class="n">isqx</span><span class="o">.</span><span class="n">OriginAt</span><span class="p">(</span><span class="s2">&quot;ground level&quot;</span><span class="p">)])</span>  <span class="c1"># elevation varies</span>
+<span class="go">meter[relative to `&#39;ground level&#39;`]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">isqx</span><span class="o">.</span><span class="n">DELTA</span><span class="p">,</span> <span class="n">isqx</span><span class="o">.</span><span class="n">OriginAt</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">Quantity</span><span class="p">(</span><span class="mi">130</span><span class="p">,</span> <span class="n">K</span><span class="p">))])</span>
+<span class="go">kelvin[Δ, relative to `130 · kelvin`]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">DBU</span><span class="p">)</span>
+<span class="go">dBu</span>
+<span class="go">- dBu = 20 · log₁₀(ratio[`volt` relative to `0.6¹⸍² · volt`])</span>
+<span class="go">  - volt = watt · ampere⁻¹</span>
+<span class="go">    - watt = joule · second⁻¹</span>
+<span class="go">      - joule = newton · meter</span>
+<span class="go">        - newton = kilogram · meter · second⁻²</span>
+</code></pre></div>
+<h4 id="quantity-kinds">Quantity Kinds<a class="headerlink" href="#quantity-kinds" title="Permanent link">¤</a></h4>
+<p>The <code class="language-py3 highlight"><span class="n">Tagged</span></code> class is useful, but it forces downstream users to use a specific
+unit system.</p>
+<p>Instead, use the more generic <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">QtyKind</span></code>, a factory that produces <code class="language-py3 highlight"><span class="n">isqx</span><span class="o">.</span><span class="n">Tagged</span></code>:</p>
+<div class="language-pycon highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">isqx</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">DIAMETER_PIPE</span> <span class="o">=</span> <span class="n">isqx</span><span class="o">.</span><span class="n">QtyKind</span><span class="p">(</span><span class="n">unit_si_coherent</span><span class="o">=</span><span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;diameter&quot;</span><span class="p">,</span> <span class="s2">&quot;pipe&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">DIAMETER_PIPE</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">M</span><span class="p">))</span>
+<span class="go">meter[&#39;diameter&#39;, &#39;pipe&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">DIAMETER_PIPE</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">usc</span><span class="o">.</span><span class="n">IN</span><span class="p">))</span>
+<span class="go">inch[&#39;diameter&#39;, &#39;pipe&#39;]</span>
+<span class="go">- inch = 1/12 · foot</span>
+<span class="go">  - foot = 0.3048 · meter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">DIAMETER_PIPE</span><span class="p">(</span><span class="n">isqx</span><span class="o">.</span><span class="n">usc</span><span class="o">.</span><span class="n">LB</span><span class="p">))</span>
+<span class="go">isqx._core.UnitKindMismatchError: cannot create tagged unit for kind `(&#39;diameter&#39;, &#39;pipe&#39;)` with unit `pound</span>
+<span class="go">- pound = 0.45359237 · kilogram`.</span>
+<span class="go">expected dimension of kind: `L` (`meter`)</span>
+<span class="go">   found dimension of unit: `M` (`pound</span>
+<span class="go">- pound = 0.45359237 · kilogram`)</span>
+</code></pre></div>
+<p>Users can now select the unit system they prefer, while ensuring the dimensions are correct.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "navigation.expand"], "search": "assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+        <script src="js/cmap.mjs" type="module" defer></script>
+      
+        <script src="js/detail-highlight.mjs" type="module" defer></script>
+      
+        <script src="js/katex.mjs" type="module" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.js" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/auto-render.min.js" defer></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/copy-tex.min.js" defer></script>
+      
+    
+  </body>
+</html>
