@@ -65,7 +65,7 @@ First, define the essential runtime objects.
 
 ```py
 from decimal import Decimal
-from isqx import BaseDimension, BaseUnit
+from isqx import BaseDimension, BaseUnit, KG, M, S
 
 # base units
 DIM_TIME = BaseDimension("T")
@@ -92,7 +92,7 @@ from isqx import QtyKind
 # it can have optional tags.
 ENERGY = QtyKind(J)
 # add a tag: kinetic energy can be thought of a "subclass" of length.
-KINETIC_ENERGY = LENGTH["kinetic"]
+KINETIC_ENERGY = ENERGY["kinetic"]
 # alternatively, if it doesn't make sense to "subclass".
 WORK_DONE = QtyKind(J, ("work_done",))
 
@@ -105,7 +105,7 @@ ENERGY_BTU = QtyKind(BTU)  # BAD!
 Details are entirely optional.
 
 ```py
-from isqx.definitions import _iso80000
+from isqx import _iso80000
 
 MECHANICS: Details = {
     # keys should be direct object references
@@ -167,7 +167,7 @@ _iso80000.PHASE_SPEED: (
 ```
 
 Always reference other quantities where possible. If it is awkward to define a
-formal definition (e.g. "around some axis of rotation"), use a fragments of
+formal definition (e.g. "around some axis of rotation"), use fragments of
 strings.
 
 ```py

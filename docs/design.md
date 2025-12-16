@@ -1,7 +1,7 @@
 `isqx` tries not to follow the patterns of existing units of measurement (UoM)
 libraries: it prioritises incremental adoption over runtime enforcement.
 
-It is inspired libraries like:
+It is inspired by libraries like:
 
 - [`annotated-types`](https://github.com/annotated-types/annotated-types) and
   [`fastapi`](https://github.com/fastapi/fastapi), which popularised the use of
@@ -234,8 +234,8 @@ quantities?
 While it makes sense to do so, `isqx` avoids this because many quantities are not
 defined by simple products of powers:
 
-| Quantity Kind                                  | Definition                                                     | Additional expression nodes needed |
-| ---------------------------------------------- | -------------------------------------------------------------- | ---------------------------------- |
+| Quantity Kind                                   | Definition                                                     | Additional expression nodes needed |
+| ----------------------------------------------- | -------------------------------------------------------------- | ---------------------------------- |
 | [work][isqx.WORK]                               | $W = \int_C \mathbf{F} \cdot d\mathbf{s}$                      | integral, dot product              |
 | [enthalpy][isqx.ENTHALPY]                       | $H = U + pV$                                                   | addition, subtraction              |
 | [isentropic exponent][isqx.ISENTROPIC_EXPONENT] | $-\frac{V}{\rho} \left(\frac{\partial p}{\partial V}\right)_S$ | partial derivatives                |
@@ -286,7 +286,7 @@ errors without imposing runtime or interoperability costs.
 Indeed, many existing libraries already has solid support for units.
 However, painpoints boil down to:
 
-- inability to defining quantity kinds
+- inability to define quantity kinds
 - odd ways to define new units (e.g. modifying a file with DSL)
 - no intersphinx
 - LSP: inability to "jump to definition" all the way to its base units
