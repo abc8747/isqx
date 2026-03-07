@@ -35,4 +35,3 @@ The colour of the nodes is determined by the order they are defined in code.
 - implement clickable links for units
 - show numerical value for constants
 - cross-ref to this items in this documentation
-- fix label overlapping

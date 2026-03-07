@@ -1,3 +1,6 @@
+docs_python := "uv run --group docs --python 3.10"
+vis_dir := "src/isqx_vis"
+
 check:
     uv run --python 3.9 ruff check src tests
     uv run --python 3.9 ruff format --check src tests
@@ -20,16 +23,25 @@ _sync-docs:
     printf '%s\n' '<!-- DO NOT EDIT! CHANGES WILL BE LOST. edit `CONTRIBUTING.md` and run `just docs-build` instead. -->' > docs/contributing.md
     cat CONTRIBUTING.md >> docs/contributing.md
 
-_build-vis:
-    if [ ! -d src/isqx_vis/node_modules ]; then echo 'src/isqx_vis/node_modules not found; run pnpm install in src/isqx_vis' >&2; exit 1; fi
-    cd src/isqx_vis && pnpm build
-    rsync -a --exclude=index.html src/isqx_vis/dist/ site/
-    cp src/isqx_vis/dist/index.html site/vis.html
+_require-vis:
+    if [ ! -d {{ vis_dir }}/node_modules ]; then echo '{{ vis_dir }}/node_modules not found; run pnpm install in {{ vis_dir }}' >&2; exit 1; fi
+
+_stage-vis-data:
+    if [ ! -f site/assets/objects.json ]; then echo 'site/assets/objects.json not found; run just docs-build once first' >&2; exit 1; fi
+    cp site/assets/objects.json {{ vis_dir }}/assets/objects.json
+
+_build-vis: _require-vis
+    cd {{ vis_dir }} && pnpm build
+    rsync -a --exclude=index.html {{ vis_dir }}/dist/ site/
+    cp {{ vis_dir }}/dist/index.html site/vis.html
+
+vis-dev: _require-vis _stage-vis-data
+    cd {{ vis_dir }} && pnpm run dev:autoload
 
 docs-build:
     just _sync-docs
-    uv run --group docs --python 3.10 zensical build --config-file mkdocs.yml
-    uv run --group docs --python 3.10 python -c "from isqx.mkdocs.extension import write_objects_from_config; write_objects_from_config('mkdocs.yml')"
+    {{ docs_python }} zensical build --config-file mkdocs.yml
+    {{ docs_python }} python -c "from isqx.mkdocs.extension import write_objects_from_config; write_objects_from_config('mkdocs.yml')"
     just _build-vis
 
 preview:

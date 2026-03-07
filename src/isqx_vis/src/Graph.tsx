@@ -2,12 +2,19 @@ import { createStore } from "solid-js/store";
 import type { Component } from "solid-js";
 import { For, createEffect, on, createMemo, onCleanup } from "solid-js";
 import type { AppState, GraphNode, GraphLink, CanonicalPath } from "./types";
-import { niceName, wrapText } from "./utils";
 import * as d3 from "d3";
 import styles from "./Graph.module.scss";
 import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from "./graph";
-
-const LABEL_LINE_HEIGHT = 1.1; // em
+import {
+  LABEL_LINE_HEIGHT,
+  getActiveLinks,
+  getActiveNodeIndexSet,
+  getFocusedNodeIndex,
+  getNodeViewStates,
+  getVisibleLabelIndices,
+  getWrappedNodeLabels,
+  hasFocus
+} from "./graphView";
 
 const Graph: Component<{
   store: AppState;
@@ -34,81 +41,33 @@ const Graph: Component<{
     () => new Set(props.store.ui.selectedNodeIndices)
   );
 
-  /**
-   * Computes the set of all links that should be visible when a node is
-   * selected or highlighted.
-   */
   const activeLinks = createMemo(() => {
-    const selected = props.store.ui.selectedNodeIndices;
-    const highlighted = props.store.ui.highlightedNodeIndex;
-    const linkMap = props.store.linkMap;
-
-    if (selected.length === 0 && highlighted === null) {
-      return [];
-    }
-
-    const focusIndices = new Set(selected);
-    if (highlighted !== null) {
-      focusIndices.add(highlighted);
-    }
-
-    const linksToShow = new Set<GraphLink>();
-    for (const index of focusIndices) {
-      const links = linkMap.get(index);
-      if (links) {
-        for (const link of links) {
-          linksToShow.add(link);
-        }
-      }
-    }
-    return [...linksToShow];
+    return getActiveLinks(
+      props.store.ui.selectedNodeIndices,
+      props.store.ui.highlightedNodeIndex,
+      props.store.linkMap
+    );
   });
 
-  /**
-   * Computes the set of all node indices that are part of the active
-   * neighborhood (i.e., connected to a selected or highlighted node).
-   */
   const activeNodeIndexSet = createMemo(() => {
-    const selected = props.store.ui.selectedNodeIndices;
-    const highlighted = props.store.ui.highlightedNodeIndex;
-    const linkMap = props.store.linkMap;
-
-    if (selected.length === 0 && highlighted === null) {
-      return new Set<number>();
-    }
-
-    const focusIndices = new Set(selected);
-    if (highlighted !== null) {
-      focusIndices.add(highlighted);
-    }
-
-    const active = new Set(focusIndices);
-
-    for (const index of focusIndices) {
-      const links = linkMap.get(index);
-      if (links) {
-        for (const link of links) {
-          active.add(link.source);
-          active.add(link.target);
-        }
-      }
-    }
-    return active;
+    return getActiveNodeIndexSet(
+      props.store.ui.selectedNodeIndices,
+      props.store.ui.highlightedNodeIndex,
+      props.store.linkMap
+    );
   });
 
   const isFocusActive = createMemo(
     () =>
-      props.store.ui.selectedNodeIndices.length > 0 ||
-      props.store.ui.highlightedNodeIndex !== null
+      hasFocus(
+        props.store.ui.selectedNodeIndices,
+        props.store.ui.highlightedNodeIndex
+      )
   );
 
-  const focusedNodeIndex = createMemo(() => {
-    const highlightedIndex = ui.highlightedNodeIndex;
-    if (highlightedIndex !== null) return highlightedIndex;
-
-    const selectedIndices = ui.selectedNodeIndices;
-    return selectedIndices.length === 1 ? selectedIndices[0] : null;
-  });
+  const focusedNodeIndex = createMemo(() =>
+    getFocusedNodeIndex(ui.selectedNodeIndices, ui.highlightedNodeIndex)
+  );
 
   createEffect(
     on(
@@ -180,20 +139,30 @@ const Graph: Component<{
     });
   };
 
-  const nodeLabelWrapped = createMemo(() => {
-    return props.store.nodes.map(node => {
-      const lines = wrapText(niceName(node.canonicalPath));
-      return {
-        lines,
-        startYOffset: -((lines.length - 1) * LABEL_LINE_HEIGHT) / 2
-      };
+  const nodeLabelWrapped = createMemo(() => getWrappedNodeLabels(props.store.nodes));
+
+  const visibleLabelIndices = createMemo(() => {
+    return getVisibleLabelIndices({
+      nodes: props.store.nodes,
+      labels: nodeLabelWrapped(),
+      activeNodeIndices: activeNodeIndexSet(),
+      selectedNodeIndices: selectedIndices(),
+      highlightedNodeIndex: ui.highlightedNodeIndex,
+      focusActive: isFocusActive(),
+      zoomScale: props.store.ui.view.k
     });
   });
 
-  const isNodeLabelLegible = (node: GraphNode) => {
-    const screenRadius = node.radius * props.store.ui.view.k;
-    return screenRadius > 36 && screenRadius < 224;
-  };
+  const nodeViewStates = createMemo(() =>
+    getNodeViewStates({
+      nodes: props.store.nodes,
+      activeNodeIndices: activeNodeIndexSet(),
+      selectedNodeIndices: selectedIndices(),
+      highlightedNodeIndex: ui.highlightedNodeIndex,
+      focusActive: isFocusActive(),
+      visibleLabelIndices: visibleLabelIndices()
+    })
+  );
 
   return (
     <svg
@@ -222,41 +191,42 @@ const Graph: Component<{
         </g>
         <g>
           <For each={props.store.nodes}>
-            {(node, i) => (
-              <circle
-                cx={node.x}
-                cy={node.y}
-                r={node.radius}
-                fill={node.isGroup ? "transparent" : props.store.colorMap[i()]}
-                stroke={node.isGroup ? props.store.colorMap[i()] : "none"}
-                stroke-width={4 / ui.view.k}
-                class={styles.node}
-                classList={{
-                  [styles.dimmed]:
-                    isFocusActive() && !activeNodeIndexSet().has(i()),
-                  [styles.selected]: selectedIndices().has(i())
-                }}
-                onClick={[handleNodeClick, i()]}
-                onMouseEnter={() => setUi("highlightedNodeIndex", i())}
-                onMouseLeave={() => setUi("highlightedNodeIndex", null)}
-              />
-            )}
+            {(node, i) => {
+              const nodeState = () => nodeViewStates()[i()];
+              return (
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r={node.radius}
+                  fill={node.isGroup ? "transparent" : props.store.colorMap[i()]}
+                  stroke={node.isGroup ? props.store.colorMap[i()] : "none"}
+                  stroke-width={4 / ui.view.k}
+                  class={styles.node}
+                  classList={{
+                    [styles.dimmed]: nodeState().isDimmed,
+                    [styles.selected]: nodeState().isSelected
+                  }}
+                  onClick={[handleNodeClick, i()]}
+                  onMouseEnter={() => setUi("highlightedNodeIndex", i())}
+                  onMouseLeave={() => setUi("highlightedNodeIndex", null)}
+                />
+              );
+            }}
           </For>
         </g>
         <g class={styles.labels}>
           <For each={nodeLabelWrapped()}>
             {(label, i) => {
               const node = props.store.nodes[i()];
+              const nodeState = () => nodeViewStates()[i()];
               return (
                 <text
                   x={node.x}
                   y={node.y}
-                  font-size={Math.max(3, node.radius / 3)}
+                  font-size={`${Math.max(3, node.radius / 3)}`}
                   class={styles.nodeLabel}
                   classList={{
-                    [styles.visible]: isFocusActive()
-                      ? activeNodeIndexSet().has(i())
-                      : isNodeLabelLegible(node)
+                    [styles.visible]: nodeState().showLabel
                   }}
                 >
                   <For each={label.lines}>
@@ -330,7 +300,7 @@ const LinkPath: Component<{
     <path
       d={pathData()}
       class={linkStyle().class}
-      marker-mid={linkStyle().marker}
+      marker-mid={linkStyle().marker ?? undefined}
       stroke-width={3 / props.k}
     />
   );

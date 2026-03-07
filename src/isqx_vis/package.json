@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:autoload": "vite --open '/?autoLoad'",
     "build": "vite build --base=./",
     "preview": "vite preview",
     "fmt": "prettier --write --cache \"**/*.[tj]s?(x)\""
