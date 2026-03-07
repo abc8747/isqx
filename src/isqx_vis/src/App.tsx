@@ -13,6 +13,7 @@ import type { IsqxData, AppState, CanonicalPath } from "./types";
 import { processGraphData } from "./graph";
 import Graph from "./Graph";
 import Panel from "./Panel";
+import Search from "./Search";
 import { JumpContext } from "./JumpContext";
 import { resizable } from "./resize";
 import styles from "./App.module.scss";
@@ -34,6 +35,8 @@ const App: Component = () => {
   });
   const [panelSize, setSidePanelSize] = createSignal(350);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
+  const [isMac, setIsMac] = createSignal(false);
+  let searchApi: { focus: () => void } | undefined;
 
   const [dataSource, setDataSource] = createSignal<string | File | IsqxData>();
   const fetchData = async (
@@ -61,8 +64,21 @@ const App: Component = () => {
 
   onMount(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchApi?.focus();
+      }
+    };
     window.addEventListener("resize", handleResize);
     onCleanup(() => window.removeEventListener("resize", handleResize));
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+
+    setIsMac(
+      /Mac|iPhone|iPad|iPod/.test(navigator.platform) ||
+      /Mac OS|Macintosh/.test(navigator.userAgent)
+    );
 
     const urlParams = new URLSearchParams(window.location.search);
     const autoLoad = urlParams.has("autoLoad");
@@ -158,6 +174,8 @@ const App: Component = () => {
   );
 
   createEffect(() => {
+    if (store.nodes.length === 0) return;
+
     const paths = store.ui.selectedNodeIndices
       .map(index => store.nodes[index]?.canonicalPath)
       .filter(Boolean);
@@ -188,11 +206,34 @@ const App: Component = () => {
     }
   };
 
+  const addNodeToSelection = (path: CanonicalPath) => {
+    const index = pathToIndexMap().get(path);
+    if (index === undefined) return;
+
+    setStore("ui", "selectedNodeIndices", currentSelection =>
+      currentSelection.includes(index)
+        ? currentSelection
+        : [...currentSelection, index]
+    );
+    setStore("ui", "highlightedNodeIndex", index);
+    graphApi?.zoomToNode(path);
+  };
+
+  const previewNode = (path: CanonicalPath | null) => {
+    const index = path ? pathToIndexMap().get(path) ?? null : null;
+    setStore("ui", "highlightedNodeIndex", index);
+  };
+
   const mainLayoutStyle = createMemo(() => {
     const size = `${panelSize()}px`;
     return isMobile()
       ? { "grid-template-rows": `1fr ${size}` }
       : { "grid-template-columns": `${size} 1fr` };
+  });
+
+  const searchShortcutHint = createMemo(() => {
+    if (isMobile()) return undefined;
+    return isMac() ? "Cmd+K" : "Ctrl+K";
   });
 
   return (
@@ -215,6 +256,14 @@ const App: Component = () => {
               style={mainLayoutStyle()}
             >
               <aside class={styles.panel}>
+                <Search
+                  onAddToSelection={addNodeToSelection}
+                  nodes={store.nodes}
+                  onPreview={previewNode}
+                  onSelect={jumpToNode}
+                  shortcutHint={searchShortcutHint()}
+                  setApi={api => (searchApi = api)}
+                />
                 <Panel store={store} onClearData={clearData} />
               </aside>
               <main class={styles.svgContainer}>

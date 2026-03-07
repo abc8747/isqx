@@ -159,10 +159,10 @@ const IncomingLinksSection: Component<{
         };
       })
       .filter(Boolean) as {
-      sourceNode: GraphNode;
-      sourceIndex: number;
-      equations: EquationDetail[];
-    }[];
+        sourceNode: GraphNode;
+        sourceIndex: number;
+        equations: EquationDetail[];
+      }[];
   });
 
   return (

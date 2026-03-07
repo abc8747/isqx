@@ -59,9 +59,11 @@
     pointer-events: none;
     margin: 0;
   }
+
   h2 {
     margin-bottom: 0.5rem;
   }
+
   p {
     color: var(--text-muted);
   }
@@ -102,7 +104,8 @@ input[type="file"] {
         width 0.2s ease;
     }
 
-    &:hover::after, &:active::after {
+    &:hover::after,
+    &:active::after {
       background-color: var(--accent-dark-blue);
       width: var(--resizer-line-width-active);
     }
@@ -132,7 +135,8 @@ input[type="file"] {
         transform: translateY(-50%);
       }
 
-      &:hover::after, &:active::after {
+      &:hover::after,
+      &:active::after {
         width: 100%;
         height: var(--resizer-line-width-active);
       }
@@ -188,6 +192,7 @@ input[type="file"] {
     padding: 0.25rem 0.5rem;
     font-size: 14px;
     border: none;
+
     &:hover {
       background: var(--bg-button-hover);
     }
@@ -195,9 +200,10 @@ input[type="file"] {
 }
 
 @supports selector(::-webkit-scrollbar) {
+
   // fix ugly chrome scrollbar
   *::-webkit-scrollbar-track {
-    border-radius:  4px;
+    border-radius: 4px;
     background-color: var(--bg-border);
   }
 

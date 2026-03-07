@@ -1,0 +1,112 @@
+.searchShell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+}
+
+.searchInput {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--bg-border);
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 0.5rem 0.65rem;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 14px;
+    outline: none;
+
+    &:focus {
+        border-color: var(--accent-dark-blue);
+    }
+}
+
+.results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 18rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.resultRow {
+    position: relative;
+}
+
+.result {
+    width: 100%;
+    min-width: 0;
+    border: none;
+    background: var(--bg-button);
+    color: inherit;
+    text-align: left;
+    padding: 0.45rem 2rem 0.45rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    cursor: pointer;
+    border-radius: 6px;
+    font-family: "IBM Plex Sans", sans-serif;
+    transition: background-color 0.14s ease;
+
+    &:hover,
+    &.active {
+        background: var(--bg-button-hover);
+    }
+}
+
+.addButton {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    width: 1.35rem;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    border: none;
+    border-radius: 999px;
+    background: var(--bg-button);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.14s ease;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--bg-button-hover);
+    }
+
+    svg {
+        width: 0.8rem;
+        height: 0.8rem;
+    }
+}
+
+.resultName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-primary);
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+.resultPath {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-family: "IBM Plex Mono", monospace;
+}
+
+.empty {
+    padding: 0.4rem 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}

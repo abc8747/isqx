@@ -193,13 +193,22 @@ const Graph: Component<{
           <For each={props.store.nodes}>
             {(node, i) => {
               const nodeState = () => nodeViewStates()[i()];
+              const nodeColor = () => props.store.colorMap[i()];
+              const selectedStroke = () =>
+                `color-mix(in oklch, ${nodeColor()} 68%, white)`;
               return (
                 <circle
                   cx={node.x}
                   cy={node.y}
                   r={node.radius}
-                  fill={node.isGroup ? "transparent" : props.store.colorMap[i()]}
-                  stroke={node.isGroup ? props.store.colorMap[i()] : "none"}
+                  fill={node.isGroup ? "transparent" : nodeColor()}
+                  stroke={
+                    nodeState().isSelected
+                      ? selectedStroke()
+                      : node.isGroup
+                        ? nodeColor()
+                        : "none"
+                  }
                   stroke-width={4 / ui.view.k}
                   class={styles.node}
                   classList={{

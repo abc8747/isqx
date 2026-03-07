@@ -1,5 +1,6 @@
 .graphSvg {
   cursor: grab;
+
   &:active {
     cursor: grabbing;
   }
@@ -8,6 +9,7 @@
 .node {
   transition:
     opacity 0.2s ease-in-out,
+    stroke 0.18s ease-out,
     stroke-width 0.1s ease-out;
   cursor: pointer;
 
@@ -16,7 +18,6 @@
   }
 
   &.selected {
-    stroke: white !important;
     stroke-width: 2px !important;
     stroke-opacity: 1;
   }
@@ -38,6 +39,7 @@
   &.incoming {
     stroke: var(--accent-blue);
   }
+
   &.outgoing {
     stroke: var(--accent-green);
   }
