@@ -71,7 +71,10 @@ export const getActiveLinks = (
   }
 
   const linksToShow = new Set<GraphLink>();
-  for (const index of getFocusIndexSet(selectedNodeIndices, highlightedNodeIndex)) {
+  for (const index of getFocusIndexSet(
+    selectedNodeIndices,
+    highlightedNodeIndex
+  )) {
     const links = linkMap.get(index);
     if (!links) continue;
     for (const link of links) {
@@ -111,7 +114,7 @@ export const getActiveNodeIndexSet = (
 
 export const getWrappedNodeLabels = (nodes: GraphNode[]) => {
   return nodes.map(node => {
-    const lines = wrapText(niceName(node.canonicalPath));
+    const lines = wrapText(niceName(node.publicApiPath));
     return {
       lines,
       lineCount: lines.length,
@@ -226,11 +229,11 @@ const getLabelBounds = (
 ): LabelBounds => {
   const fontSize = Math.max(3, node.radius / 3);
   const halfWidth =
-    (((label.longestLineLength * LABEL_CHAR_WIDTH) / 2) +
+    ((label.longestLineLength * LABEL_CHAR_WIDTH) / 2 +
       LABEL_HORIZONTAL_PADDING) *
     fontSize;
   const halfHeight =
-    (((label.lineCount * LABEL_LINE_HEIGHT) / 2) + LABEL_VERTICAL_PADDING) *
+    ((label.lineCount * LABEL_LINE_HEIGHT) / 2 + LABEL_VERTICAL_PADDING) *
     fontSize;
 
   return {
@@ -243,10 +246,7 @@ const getLabelBounds = (
 
 const gridCellKey = (x: number, y: number) => `${x},${y}`;
 
-const forEachGridCell = (
-  bounds: LabelBounds,
-  visit: (key: string) => void
-) => {
+const forEachGridCell = (bounds: LabelBounds, visit: (key: string) => void) => {
   const minX = Math.floor(bounds.left / LABEL_GRID_SIZE);
   const maxX = Math.floor(bounds.right / LABEL_GRID_SIZE);
   const minY = Math.floor(bounds.top / LABEL_GRID_SIZE);
@@ -260,12 +260,12 @@ const forEachGridCell = (
 };
 
 const overlaps = (a: LabelBounds, b: LabelBounds) =>
-  a.left < b.right &&
-  a.right > b.left &&
-  a.top < b.bottom &&
-  a.bottom > b.top;
+  a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 
-const gridHasOverlap = (grid: Map<string, LabelBounds[]>, bounds: LabelBounds) => {
+const gridHasOverlap = (
+  grid: Map<string, LabelBounds[]>,
+  bounds: LabelBounds
+) => {
   let didOverlap = false;
 
   forEachGridCell(bounds, key => {

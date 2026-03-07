@@ -4,16 +4,16 @@ import type {
   QtyKindDetail,
   GraphNode,
   GraphLink,
-  CanonicalPath,
+  PublicApiPath,
   NodeIndex
 } from "./types";
-import { findCanonicalPathInDescription } from "./utils";
+import { findPublicApiPathInDescription } from "./utils";
 
 export const VIEWBOX_WIDTH = 1024;
 export const VIEWBOX_HEIGHT = 1024;
 
 interface SimulationNode {
-  canonicalPath: CanonicalPath;
+  publicApiPath: PublicApiPath;
   details: QtyKindDetail;
   x: number;
   y: number;
@@ -34,13 +34,13 @@ function createSimulationGraph(qtyKindData: QtyKindData): {
   nodes: SimulationNode[];
   simulationLinks: { source: SimulationNode; target: SimulationNode }[];
 } {
-  const canonicalPaths = Object.keys(qtyKindData);
-  const pathToIndex = new Map<CanonicalPath, NodeIndex>(
-    canonicalPaths.map((p, i) => [p, i])
+  const publicApiPaths = Object.keys(qtyKindData);
+  const pathToIndex = new Map<PublicApiPath, NodeIndex>(
+    publicApiPaths.map((p, i) => [p, i])
   );
 
-  const nodes: SimulationNode[] = canonicalPaths.map(path => ({
-    canonicalPath: path,
+  const nodes: SimulationNode[] = publicApiPaths.map(path => ({
+    publicApiPath: path,
     details: qtyKindData[path],
     x: 0,
     y: 0,
@@ -57,7 +57,7 @@ function createSimulationGraph(qtyKindData: QtyKindData): {
   nodes.forEach((sourceNode, sourceIndex) => {
     sourceNode.details.equations?.forEach(eq => {
       eq.where?.forEach(clause => {
-        const targetPath = findCanonicalPathInDescription(clause.description);
+        const targetPath = findPublicApiPathInDescription(clause.description);
         if (!targetPath) return;
 
         const targetIndex = pathToIndex.get(targetPath);
@@ -88,7 +88,7 @@ function layoutGraph(
   simulationLinks: { source: SimulationNode; target: SimulationNode }[]
 ): SimulationNode[] {
   const rootNodes: SimulationNode[] = [];
-  const pathToNode = new Map(nodes.map(n => [n.canonicalPath, n]));
+  const pathToNode = new Map(nodes.map(n => [n.publicApiPath, n]));
 
   nodes.forEach(node => {
     const parentPath = node.details.parent;
@@ -102,7 +102,7 @@ function layoutGraph(
   });
 
   const hierarchyRoot: SimulationNode = {
-    canonicalPath: "root",
+    publicApiPath: "root",
     details: {} as any,
     x: 0,
     y: 0,
@@ -133,7 +133,7 @@ function layoutGraph(
       value: hNode.value,
       depth: hNode.depth
     });
-    if (hNode.parent && hNode.parent.data.canonicalPath !== "root") {
+    if (hNode.parent && hNode.parent.data.publicApiPath !== "root") {
       Object.assign(node, {
         relX: hNode.x - hNode.parent.x,
         relY: hNode.y - hNode.parent.y
@@ -144,7 +144,7 @@ function layoutGraph(
   const topLevelNodes = root.children?.map(c => c.data) ?? [];
   const getTopLevel = (node: SimulationNode): SimulationNode => {
     let current = node;
-    while (current.parent && current.parent.canonicalPath !== "root") {
+    while (current.parent && current.parent.publicApiPath !== "root") {
       current = current.parent;
     }
     return current;
@@ -163,11 +163,14 @@ function layoutGraph(
     .domain([0, d3.max(topLevelNodes, n => n.value) ?? 1])
     .range([VIEWBOX_HEIGHT * 0.8, VIEWBOX_HEIGHT * 0.2]);
 
-  d3.forceSimulation(topLevelNodes)
+  d3.forceSimulation<SimulationNode>(topLevelNodes)
     .force(
       "link",
       d3
-        .forceLink(forceLinks)
+        .forceLink<
+          SimulationNode,
+          { source: SimulationNode; target: SimulationNode }
+        >(forceLinks)
         .strength(l => 4 / Math.min(l.source.value ?? 1, l.target.value ?? 1))
         .distance(d => d.source.r + d.target.r + 30)
     )
@@ -175,19 +178,22 @@ function layoutGraph(
     .force(
       "collide",
       d3
-        .forceCollide()
+        .forceCollide<SimulationNode>()
         .radius(d => d.r + 10)
         .strength(0.5)
     )
     .force("x", d3.forceX(VIEWBOX_WIDTH / 2).strength(0.02))
-    .force("y", d3.forceY(d => yPosScale(d.value ?? 0)).strength(0.06))
+    .force(
+      "y",
+      d3.forceY<SimulationNode>(d => yPosScale(d.value ?? 0)).strength(0.06)
+    )
     .tick(250);
 
   const finalSimNodes = d3Nodes.map(hNode => hNode.data);
   finalSimNodes.sort((a, b) => (a.depth ?? 0) - (b.depth ?? 0));
 
   for (const simNode of finalSimNodes) {
-    if (simNode.parent && simNode.parent.canonicalPath !== "root") {
+    if (simNode.parent && simNode.parent.publicApiPath !== "root") {
       simNode.x = simNode.parent.x + (simNode.relX ?? 0);
       simNode.y = simNode.parent.y + (simNode.relY ?? 0);
     }
@@ -206,12 +212,12 @@ export function processGraphData(qtyKindData: QtyKindData | null): {
     createSimulationGraph(qtyKindData);
   const finalSimNodes = layoutGraph(initialNodes, simulationLinks);
 
-  const finalPathToIndex = new Map<CanonicalPath, NodeIndex>(
-    finalSimNodes.map((n, i) => [n.canonicalPath, i])
+  const finalPathToIndex = new Map<PublicApiPath, NodeIndex>(
+    finalSimNodes.map((n, i) => [n.publicApiPath, i])
   );
 
   const graphNodes: GraphNode[] = finalSimNodes.map(n => ({
-    canonicalPath: n.canonicalPath,
+    publicApiPath: n.publicApiPath,
     details: n.details,
     x: n.x,
     y: n.y,
@@ -221,8 +227,8 @@ export function processGraphData(qtyKindData: QtyKindData | null): {
   }));
 
   const links: GraphLink[] = simulationLinks.map(link => ({
-    source: finalPathToIndex.get(link.source.canonicalPath)!,
-    target: finalPathToIndex.get(link.target.canonicalPath)!
+    source: finalPathToIndex.get(link.source.publicApiPath)!,
+    target: finalPathToIndex.get(link.target.publicApiPath)!
   }));
 
   const linkMap = new Map<number, GraphLink[]>();

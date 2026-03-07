@@ -9,7 +9,7 @@ import {
   createResource
 } from "solid-js";
 import { createStore } from "solid-js/store";
-import type { IsqxData, AppState, CanonicalPath } from "./types";
+import type { IsqxData, AppState, PublicApiPath } from "./types";
 import { processGraphData } from "./graph";
 import Graph from "./Graph";
 import Panel from "./Panel";
@@ -77,7 +77,7 @@ const App: Component = () => {
 
     setIsMac(
       /Mac|iPhone|iPad|iPod/.test(navigator.platform) ||
-      /Mac OS|Macintosh/.test(navigator.userAgent)
+        /Mac OS|Macintosh/.test(navigator.userAgent)
     );
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -149,7 +149,7 @@ const App: Component = () => {
     });
     setStore({ nodes, links, linkMap, colorMap });
 
-    const map = new Map(nodes.map((n, i) => [n.canonicalPath, i]));
+    const map = new Map(nodes.map((n, i) => [n.publicApiPath, i]));
     const urlParams = new URLSearchParams(window.location.search);
     const selectedPaths =
       urlParams.get("selected")?.split(",").filter(Boolean) ?? [];
@@ -167,17 +167,17 @@ const App: Component = () => {
     history.pushState({}, "", window.location.pathname);
   };
 
-  let graphApi: { zoomToNode: (path: CanonicalPath) => void };
+  let graphApi: { zoomToNode: (path: PublicApiPath) => void };
 
   const pathToIndexMap = createMemo(
-    () => new Map(store.nodes.map((n, i) => [n.canonicalPath, i]))
+    () => new Map(store.nodes.map((n, i) => [n.publicApiPath, i]))
   );
 
   createEffect(() => {
     if (store.nodes.length === 0) return;
 
     const paths = store.ui.selectedNodeIndices
-      .map(index => store.nodes[index]?.canonicalPath)
+      .map(index => store.nodes[index]?.publicApiPath)
       .filter(Boolean);
 
     const url = new URL(window.location.href);
@@ -197,7 +197,7 @@ const App: Component = () => {
     }
   });
 
-  const jumpToNode = (path: CanonicalPath) => {
+  const jumpToNode = (path: PublicApiPath) => {
     const index = pathToIndexMap().get(path);
     if (index !== undefined) {
       setStore("ui", "selectedNodeIndices", [index]);
@@ -206,7 +206,7 @@ const App: Component = () => {
     }
   };
 
-  const addNodeToSelection = (path: CanonicalPath) => {
+  const addNodeToSelection = (path: PublicApiPath) => {
     const index = pathToIndexMap().get(path);
     if (index === undefined) return;
 
@@ -219,8 +219,8 @@ const App: Component = () => {
     graphApi?.zoomToNode(path);
   };
 
-  const previewNode = (path: CanonicalPath | null) => {
-    const index = path ? pathToIndexMap().get(path) ?? null : null;
+  const previewNode = (path: PublicApiPath | null) => {
+    const index = path ? (pathToIndexMap().get(path) ?? null) : null;
     setStore("ui", "highlightedNodeIndex", index);
   };
 

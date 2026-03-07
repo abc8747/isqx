@@ -15,9 +15,9 @@ import ast
 import inspect
 import json
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar, Union
 
 from griffe import (
     Alias,
@@ -43,7 +43,7 @@ from griffe._internal.expressions import (
     ExprTuple,
 )
 from griffe._internal.models import Attribute
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, TypeGuard
 
 from .. import (
     Anchor,
@@ -51,6 +51,7 @@ from .. import (
     Dimensionless,
     LazyProduct,
     QtyKind,
+    Scaled,
     StrFragment,
     Tagged,
     kind,
@@ -78,7 +79,7 @@ if TYPE_CHECKING:
 
     from .. import AnnotatedMetadata, NamedExpr, Number
     from .._fmt import _BasicFormatterState
-    from ..details import Detail, DetailKey, Details, RefDetail, WhereValue
+    from ..details import Detail, DetailKey, Details, WhereValue
 
 
 logger = get_logger(__name__)
@@ -142,7 +143,8 @@ class Quantity:
     unit: Unit  # for now
 
 
-CanonicalPath: TypeAlias = str
+DefinitionPath: TypeAlias = str
+PublicApiPath: TypeAlias = str
 
 
 @dataclass
@@ -185,6 +187,10 @@ class IsqxExtension(Extension):
         self.possible_parent_maps: dict[str, str] = {}  # child -> parent
         """Note that items in this map are not guaranteed to be isqx objects
         because griffe works with static analysis."""
+        self.alias_targets: dict[PublicApiPath, DefinitionPath] = {}
+        self.public_api_candidates: dict[
+            DefinitionPath, set[PublicApiPath]
+        ] = {}
 
     def on_instance(
         self,
@@ -250,6 +256,14 @@ class IsqxExtension(Extension):
         agent: Visitor | Inspector,
         **kwargs: Any,
     ) -> None:
+        target_path = _get_alias_definition_path(alias)
+        if target_path is not None:
+            _register_public_api_candidate(
+                alias.path,
+                target_path,
+                alias_targets=self.alias_targets,
+                public_api_candidates=self.public_api_candidates,
+            )
         # todo: actually we probably shouldn't do this
         if alias.path in self.definitions:
             del self.definitions[alias.path]
@@ -257,6 +271,12 @@ class IsqxExtension(Extension):
     def on_package(
         self, *, pkg: Module, loader: GriffeLoader, **kwargs: Any
     ) -> None:
+        _collect_alias_candidates(
+            pkg_path=pkg.path,
+            modules_collection=loader.modules_collection,
+            alias_targets=self.alias_targets,
+            public_api_candidates=self.public_api_candidates,
+        )
         logger.info(f"loaded {len(self.definitions)} definitions")
         reverse_definitions = _build_reverse_definitions(self.definitions)
         formatter = MkdocsFormatter(reverse_definitions)
@@ -299,10 +319,14 @@ class IsqxExtension(Extension):
                 details.tags = tuple(str(t) for t in v.tags)  # str for now
 
     def write_objects(self, output_dir: str | Path) -> Path:
-        constants = {}
+        path_resolver = _PathResolver(
+            alias_targets=self.alias_targets,
+            public_api_candidates=self.public_api_candidates,
+        )
         formatter = MkdocsFormatter(
             _build_reverse_definitions(self.definitions)
         )
+        constants_by_definition_path: dict[str, Quantity] = {}
         for path, definition in self.definitions.items():
             if not isinstance(definition.value, (LazyProduct, *_ARGS_NUMBER)):
                 continue
@@ -319,7 +343,7 @@ class IsqxExtension(Extension):
                     f"no unit found for {path} in annotated metadata"
                 )
                 continue  # dimensionless quantities should be annotated anyways
-            constants[path] = Quantity(
+            constants_by_definition_path[path] = Quantity(
                 value=value_str,
                 unit=(
                     tuple(formatter.fmt(unit_expr))
@@ -328,10 +352,27 @@ class IsqxExtension(Extension):
                 ),
             )
 
+        qty_kinds = _remap_public_api_indexed_dict(
+            self.objects,
+            path_resolver=path_resolver,
+            remap_value=lambda details: _remap_qty_kind_detail(
+                details,
+                path_resolver,
+            ),
+        )
+        constants = _remap_public_api_indexed_dict(
+            constants_by_definition_path,
+            path_resolver=path_resolver,
+            remap_value=lambda quantity: _remap_quantity(
+                quantity,
+                path_resolver,
+            ),
+        )
+
         json_path = Path(output_dir) / "objects.json"
         output_data = {
             "qtyKinds": {
-                path: to_dict(details) for path, details in self.objects.items()
+                path: to_dict(details) for path, details in qty_kinds.items()
             },
             "constants": {
                 path: to_dict(details) for path, details in constants.items()
@@ -445,16 +486,240 @@ class Definition(NamedTuple):
     annotated_metadata: AnnotatedMetadata | None
 
 
-Definitions: TypeAlias = dict[CanonicalPath, Definition]
+Definitions: TypeAlias = dict[DefinitionPath, Definition]
 
 
 class _ReverseDefinition(NamedTuple):
-    path: CanonicalPath
+    path: DefinitionPath
     annotated_metadata: AnnotatedMetadata | None
 
 
 _ReverseDefinitions: TypeAlias = dict[int, _ReverseDefinition]
 """A mapping of the `builtins.id(value)` to the reverse definition."""
+
+#
+# public api resolution
+#
+
+
+def _public_api_path_preference_key(path: str) -> tuple[int, int, str]:
+    parts = path.split(".")
+    private_segments = sum(1 for part in parts[1:] if part.startswith("_"))
+    return private_segments, len(parts), path
+
+
+def _collect_alias_candidates(
+    *,
+    pkg_path: str,
+    modules_collection: Any,
+    alias_targets: dict[PublicApiPath, DefinitionPath],
+    public_api_candidates: dict[DefinitionPath, set[PublicApiPath]],
+) -> None:
+    # griffe's extension callbacks do not reliably surface wildcard-import
+    # aliases such as `isqx.N`, so we do one package-wide pass here.
+    # `ModulesCollection` is a Griffe internal type, hence `Any`.
+    for module_path, module_obj in modules_collection.members.items():
+        if not (
+            module_path == pkg_path or module_path.startswith(f"{pkg_path}.")
+        ):
+            continue
+        for member in module_obj.members.values():
+            if not isinstance(member, Alias):
+                continue
+            target_path = _get_alias_definition_path(member)
+            if target_path is None:
+                continue
+            _register_public_api_candidate(
+                member.path,
+                target_path,
+                alias_targets=alias_targets,
+                public_api_candidates=public_api_candidates,
+            )
+
+
+def _get_alias_definition_path(alias: Alias) -> DefinitionPath | None:
+    if alias.runtime is False:
+        return None
+    try:
+        # griffe stores the immediate hop on `target_path`; multi-hop re-exports
+        # only collapse to the real definition via `final_target`.
+        return alias.final_target.path
+    except Exception:
+        try:
+            return alias.target_path
+        except Exception:
+            return None
+
+
+def _register_public_api_candidate(
+    alias_path: PublicApiPath,
+    target_path: DefinitionPath,
+    *,
+    alias_targets: dict[PublicApiPath, DefinitionPath],
+    public_api_candidates: dict[DefinitionPath, set[PublicApiPath]],
+) -> None:
+    alias_targets[alias_path] = target_path
+    public_api_candidates.setdefault(target_path, set()).add(alias_path)
+
+
+_RemappedValueT = TypeVar("_RemappedValueT")
+
+
+def _remap_public_api_indexed_dict(
+    items: Mapping[str, _RemappedValueT],
+    *,
+    path_resolver: _PathResolver,
+    remap_value: Callable[[_RemappedValueT], _RemappedValueT],
+) -> dict[PublicApiPath, _RemappedValueT]:
+    remapped: dict[PublicApiPath, _RemappedValueT] = {}
+    source_paths: dict[PublicApiPath, str] = {}
+    for path, value in items.items():
+        public_path = path_resolver.to_public_api_path(path)
+        existing_source = source_paths.get(public_path)
+        if existing_source is not None and existing_source != path:
+            raise ValueError(
+                "multiple definition paths resolved to the same public API path: "
+                f"{existing_source}, {path} -> {public_path}"
+            )
+        remapped[public_path] = remap_value(value)
+        source_paths[public_path] = path
+    return remapped
+
+
+@dataclass(frozen=True)
+class _PathResolver:
+    alias_targets: Mapping[PublicApiPath, DefinitionPath]
+    public_api_candidates: Mapping[DefinitionPath, set[PublicApiPath]]
+
+    def to_definition_path(self, path: str) -> DefinitionPath:
+        current = path
+        seen: set[str] = set()
+        # this remains defensive because unresolved or cyclic aliases can still
+        # appear in griffe's graph even though we prefer `final_target.path`
+        # when harvesting candidates.
+        while current in self.alias_targets and current not in seen:
+            seen.add(current)
+            current = self.alias_targets[current]
+        return current
+
+    def to_public_api_path(self, path: str) -> PublicApiPath:
+        definition_path = self.to_definition_path(path)
+        candidates = {
+            definition_path,
+            *self.public_api_candidates.get(definition_path, ()),
+        }
+        return min(candidates, key=_public_api_path_preference_key)
+
+
+def _remap_fragment(
+    fragment: StrFragment,
+    path_resolver: _PathResolver,
+) -> StrFragment:
+    if isinstance(fragment, Anchor):
+        return Anchor(
+            text=fragment.text,
+            path=path_resolver.to_public_api_path(fragment.path),
+        )
+    return fragment
+
+
+def _remap_fragment_collection(
+    fragments: StrFragment | tuple[StrFragment, ...],
+    path_resolver: _PathResolver,
+) -> StrFragment | tuple[StrFragment, ...]:
+    if isinstance(fragments, tuple):
+        return tuple(
+            _remap_fragment(fragment, path_resolver) for fragment in fragments
+        )
+    return _remap_fragment(fragments, path_resolver)
+
+
+def _remap_where(
+    where: Where,
+    path_resolver: _PathResolver,
+) -> Where:
+    return replace(
+        where,
+        description=_remap_fragment_collection(
+            where.description,
+            path_resolver,
+        ),
+        unit=(
+            _remap_fragment_collection(where.unit, path_resolver)
+            if where.unit is not None
+            else None
+        ),
+    )
+
+
+_KaTeXWhereT = TypeVar("_KaTeXWhereT", bound=KaTeXWhere)
+
+
+def _remap_katex_where(
+    detail: _KaTeXWhereT,
+    path_resolver: _PathResolver,
+) -> _KaTeXWhereT:
+    if detail.where is None:
+        return detail
+    return replace(
+        detail,
+        where=tuple(
+            _remap_where(where, path_resolver) for where in detail.where
+        ),
+    )
+
+
+def _remap_qty_kind_detail(
+    detail: QtyKindDetail,
+    path_resolver: _PathResolver,
+) -> QtyKindDetail:
+    return replace(
+        detail,
+        parent=(
+            path_resolver.to_public_api_path(detail.parent)
+            if detail.parent is not None
+            else None
+        ),
+        unit_si_coherent=(
+            _remap_fragment_collection(detail.unit_si_coherent, path_resolver)
+            if detail.unit_si_coherent is not None
+            else None
+        ),
+        symbols=[
+            _remap_katex_where(symbol, path_resolver)
+            for symbol in detail.symbols
+        ],
+        equations=[
+            replace(
+                _remap_katex_where(equation, path_resolver),
+                assumptions=(
+                    tuple(
+                        _remap_fragment_collection(assumption, path_resolver)
+                        for assumption in equation.assumptions
+                    )
+                    if equation.assumptions is not None
+                    else None
+                ),
+            )
+            for equation in detail.equations
+        ],
+    )
+
+
+def _remap_quantity(
+    quantity: Quantity,
+    path_resolver: _PathResolver,
+) -> Quantity:
+    return replace(
+        quantity,
+        unit=(
+            _remap_fragment_collection(quantity.unit, path_resolver)
+            if quantity.unit is not None
+            else None
+        ),
+    )
+
+
 #
 # unit formatting
 #
@@ -549,7 +814,7 @@ def parse_where(
                 continue
             if isinstance(frag, _RefSelf):
                 mut_self_symbols.append(w_rt_k)
-                if isinstance(key_rt, _ARGS_DETAIL_KEY):
+                if _is_detail_key(key_rt):
                     unit_expr = _get_unit_expr(key_rt, reverse_definitions)
             else:
                 unit_expr = _get_unit_expr(frag, reverse_definitions)
@@ -569,6 +834,12 @@ def parse_where(
             description=description,
             unit=unit,
         )
+
+
+def _is_detail_key(
+    value: DetailKey | Callable[..., DetailKey],
+) -> TypeGuard[DetailKey]:
+    return isinstance(value, _ARGS_DETAIL_KEY)
 
 
 def _build_reverse_definitions(definitions: Definitions) -> _ReverseDefinitions:
@@ -738,11 +1009,19 @@ def _parse_fragment(
 
 
 def _get_unit_expr(
-    meaning: RefDetail, reverse_definitions: _ReverseDefinitions
+    meaning: DetailKey, reverse_definitions: _ReverseDefinitions
 ) -> IsqxExpr | None:
     if isinstance(meaning, QtyKind):
         return meaning.unit_si_coherent
     elif isinstance(meaning, (Dimensionless, Tagged)):
+        return meaning
+    elif isinstance(meaning, Scaled):
+        # `DetailKey` is wider than `RefDetail` because details can be keyed by
+        # logarithmic quantities such as absorbance (`-1 * Log(transmittance)`).
+        # for unit inference we keep the expression itself: `kind()` will still
+        # classify logarithmic cases as dimensionless, while any future
+        # unit-like scaled key will preserve its scaled unit information.
+        # TODO: revisit the correctness
         return meaning
     elif isinstance(meaning, (LazyProduct, *_ARGS_NUMBER)):
         if (

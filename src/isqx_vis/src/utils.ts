@@ -1,8 +1,8 @@
-import type { StrFragment, CanonicalPath } from "./types";
+import type { PublicApiPath, StrFragment } from "./types";
 
-export const niceName = (canonicalPath: CanonicalPath | undefined): string => {
-  if (!canonicalPath) return "";
-  const text = canonicalPath.split(".").pop()!.toLowerCase().replace(/_/g, " ");
+export const niceName = (publicApiPath: PublicApiPath | undefined): string => {
+  if (!publicApiPath) return "";
+  const text = publicApiPath.split(".").pop()!.toLowerCase().replace(/_/g, " ");
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
@@ -10,9 +10,9 @@ export const niceName = (canonicalPath: CanonicalPath | undefined): string => {
  * Extracts the first link target ID from a description fragment or array of fragments.
  * @returns null if no link is found.
  */
-export const findCanonicalPathInDescription = (
+export const findPublicApiPathInDescription = (
   description: StrFragment | StrFragment[] | undefined
-): CanonicalPath | null => {
+): PublicApiPath | null => {
   if (!description) return null;
   const items = Array.isArray(description) ? description : [description];
   for (const item of items) {

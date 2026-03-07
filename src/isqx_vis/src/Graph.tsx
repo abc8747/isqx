@@ -1,7 +1,7 @@
 import { createStore } from "solid-js/store";
 import type { Component } from "solid-js";
 import { For, createEffect, on, createMemo, onCleanup } from "solid-js";
-import type { AppState, GraphNode, GraphLink, CanonicalPath } from "./types";
+import type { AppState, GraphNode, GraphLink, PublicApiPath } from "./types";
 import * as d3 from "d3";
 import styles from "./Graph.module.scss";
 import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from "./graph";
@@ -18,7 +18,7 @@ import {
 
 const Graph: Component<{
   store: AppState;
-  setApi: (api: { zoomToNode: (path: CanonicalPath) => void }) => void;
+  setApi: (api: { zoomToNode: (path: PublicApiPath) => void }) => void;
 }> = props => {
   const [ui, setUi] = createStore(props.store.ui);
   // NOTE: `ui` creates a view, not a copy
@@ -57,12 +57,11 @@ const Graph: Component<{
     );
   });
 
-  const isFocusActive = createMemo(
-    () =>
-      hasFocus(
-        props.store.ui.selectedNodeIndices,
-        props.store.ui.highlightedNodeIndex
-      )
+  const isFocusActive = createMemo(() =>
+    hasFocus(
+      props.store.ui.selectedNodeIndices,
+      props.store.ui.highlightedNodeIndex
+    )
   );
 
   const focusedNodeIndex = createMemo(() =>
@@ -86,10 +85,10 @@ const Graph: Component<{
         const selection = d3.select(svgRef).call(zoom);
 
         props.setApi({
-          zoomToNode: (targetPath: CanonicalPath) => {
+          zoomToNode: (targetPath: PublicApiPath) => {
             if (!svgRef) return;
             const targetNode = props.store.nodes.find(
-              n => n.canonicalPath === targetPath
+              n => n.publicApiPath === targetPath
             );
             if (!targetNode) return;
 
@@ -139,7 +138,9 @@ const Graph: Component<{
     });
   };
 
-  const nodeLabelWrapped = createMemo(() => getWrappedNodeLabels(props.store.nodes));
+  const nodeLabelWrapped = createMemo(() =>
+    getWrappedNodeLabels(props.store.nodes)
+  );
 
   const visibleLabelIndices = createMemo(() => {
     return getVisibleLabelIndices({

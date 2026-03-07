@@ -1,5 +1,5 @@
-/** A unique, dot-separated string identifier for a quantity kind. */
-export type CanonicalPath = string;
+/** A unique, dot-separated public import path for a quantity kind. */
+export type PublicApiPath = string;
 
 /** A numeric index corresponding to a node's position in the `nodes` array. */
 export type NodeIndex = number;
@@ -8,7 +8,7 @@ export type NodeIndex = number;
 // raw data structures from objects.json
 //
 
-export type StrFragment = string | { text: string; path: CanonicalPath };
+export type StrFragment = string | { text: string; path: PublicApiPath };
 
 /** A unit of measurement. */
 export type Unit = StrFragment | StrFragment[]; // this will change in the future
@@ -38,7 +38,7 @@ export interface WikidataDetail {
 }
 
 export interface QtyKindDetail {
-  parent?: CanonicalPath;
+  parent?: PublicApiPath;
   unit_si_coherent?: Unit;
   tags?: string[];
   wikidata?: WikidataDetail[];
@@ -47,16 +47,16 @@ export interface QtyKindDetail {
 }
 
 /** The root data structure loaded from the `objects.json` file. */
-export type QtyKindData = Record<CanonicalPath, QtyKindDetail>;
+export type QtyKindData = Record<PublicApiPath, QtyKindDetail>;
 
 export interface Quantity {
   value: string; // for now
   unit: Unit | null;
 }
 
-export type ConstantsData = Record<CanonicalPath, Quantity>;
+export type ConstantsData = Record<PublicApiPath, Quantity>;
 
-export type UnitsData = Record<CanonicalPath, Unit>;
+export type UnitsData = Record<PublicApiPath, Unit>;
 
 export interface IsqxData {
   qtyKinds: QtyKindData;
@@ -73,7 +73,7 @@ export interface IsqxData {
  * It contains layout information from D3 and a reference to its original data.
  */
 export interface GraphNode {
-  canonicalPath: CanonicalPath;
+  publicApiPath: PublicApiPath;
   details: QtyKindDetail;
   x: number;
   y: number;

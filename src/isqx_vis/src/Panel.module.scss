@@ -17,6 +17,7 @@
     padding: 0.25rem 0.5rem;
     font-size: 14px;
     border: none;
+
     &:hover {
       background: var(--bg-button-hover);
     }
@@ -55,6 +56,14 @@
     }
   }
 
+  .publicApiPath {
+    color: var(--text-muted);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+    margin-top: 0.1rem;
+  }
+
   .symbols {
     font-size: 1.1em;
   }
@@ -87,6 +96,7 @@
   a {
     color: var(--accent-link, #a5b8c4);
     text-decoration: none;
+
     &:hover {
       text-decoration: underline;
     }

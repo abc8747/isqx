@@ -1,5 +1,5 @@
 import { createContext, useContext } from "solid-js";
-import type { CanonicalPath } from "./types";
+import type { PublicApiPath } from "./types";
 
-export const JumpContext = createContext<(path: CanonicalPath) => void>();
+export const JumpContext = createContext<(path: PublicApiPath) => void>();
 export const useJumper = () => useContext(JumpContext);

@@ -1,8 +1,8 @@
-import type { CanonicalPath, GraphNode } from "./types";
+import type { GraphNode, PublicApiPath } from "./types";
 import { niceName } from "./utils";
 
 export type SearchEntry = {
-  canonicalPath: CanonicalPath;
+  publicApiPath: PublicApiPath;
   index: number;
   name: string;
   normalizedName: string;
@@ -15,13 +15,13 @@ export type SearchResult = SearchEntry & {
 
 export const buildSearchEntries = (nodes: GraphNode[]): SearchEntry[] => {
   return nodes.map((node, index) => {
-    const name = niceName(node.canonicalPath);
+    const name = niceName(node.publicApiPath);
     return {
-      canonicalPath: node.canonicalPath,
+      publicApiPath: node.publicApiPath,
       index,
       name,
       normalizedName: normalizeSearchText(name),
-      normalizedPath: normalizeSearchText(node.canonicalPath)
+      normalizedPath: normalizeSearchText(node.publicApiPath)
     };
   });
 };
@@ -76,7 +76,8 @@ const scoreSearchEntry = (
 
   const tokenCoverage = queryTokens.every(
     token =>
-      entry.normalizedName.includes(token) || entry.normalizedPath.includes(token)
+      entry.normalizedName.includes(token) ||
+      entry.normalizedPath.includes(token)
   );
 
   if (

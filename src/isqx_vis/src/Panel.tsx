@@ -8,16 +8,16 @@ import type {
   SymbolDetail,
   EquationDetail,
   WikidataDetail,
-  CanonicalPath
+  PublicApiPath
 } from "./types";
-import { niceName, findCanonicalPathInDescription } from "./utils";
+import { niceName, findPublicApiPathInDescription } from "./utils";
 import styles from "./Panel.module.scss";
 import { useJumper } from "./JumpContext";
 
 const KaTeX = lazy(() => import("./KaTeX"));
 
 const CrossRef: ParentComponent<{
-  targetPath: CanonicalPath;
+  targetPath: PublicApiPath;
 }> = props => {
   const jumpToNode = useJumper();
   const handleClick = (e: MouseEvent) => {
@@ -147,8 +147,8 @@ const IncomingLinksSection: Component<{
           sourceNode.details.equations?.filter(eq =>
             eq.where?.some(
               clause =>
-                findCanonicalPathInDescription(clause.description) ===
-                props.node.canonicalPath
+                findPublicApiPathInDescription(clause.description) ===
+                props.node.publicApiPath
             )
           ) ?? [];
 
@@ -159,10 +159,10 @@ const IncomingLinksSection: Component<{
         };
       })
       .filter(Boolean) as {
-        sourceNode: GraphNode;
-        sourceIndex: number;
-        equations: EquationDetail[];
-      }[];
+      sourceNode: GraphNode;
+      sourceIndex: number;
+      equations: EquationDetail[];
+    }[];
   });
 
   return (
@@ -178,8 +178,8 @@ const IncomingLinksSection: Component<{
                   "border-left-color": props.store.colorMap[sourceIndex]
                 }}
               >
-                <CrossRef targetPath={sourceNode.canonicalPath}>
-                  {niceName(sourceNode.canonicalPath)}
+                <CrossRef targetPath={sourceNode.publicApiPath}>
+                  {niceName(sourceNode.publicApiPath)}
                 </CrossRef>
                 <For each={equations}>
                   {eq => (
@@ -234,7 +234,7 @@ const NodeDetail: Component<{
   return (
     <div class={styles.nodeDetail} style={{ "border-left-color": color() }}>
       <div class={styles.nodeHeader}>
-        <h3 onClick={props.onToggle}>{niceName(props.node.canonicalPath)}</h3>
+        <h3 onClick={props.onToggle}>{niceName(props.node.publicApiPath)}</h3>
         <div class={styles.symbols}>
           <For each={details().symbols}>
             {(symbol, i) => (
@@ -246,6 +246,7 @@ const NodeDetail: Component<{
           </For>
         </div>
       </div>
+      <div class={styles.publicApiPath}>{props.node.publicApiPath}</div>
       <Show when={props.isExpanded}>
         <EquationsSection equations={details().equations} />
         <IncomingLinksSection
