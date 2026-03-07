@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import inspect
 import json
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Union
@@ -22,12 +23,14 @@ from griffe import (
     Alias,
     Docstring,
     Extension,
+    GriffeLoader,
     Inspector,
     Object,
     ObjectNode,
     Visitor,
     dynamic_import,
     get_logger,
+    load_extensions,
 )
 from griffe._internal.expressions import (
     Expr,
@@ -70,16 +73,21 @@ from . import PATH_PLUGIN
 if TYPE_CHECKING:
     from typing import Generator
 
-    from griffe import GriffeLoader, Module
+    from griffe import Module
     from griffe._internal.models import Attribute
 
     from .. import AnnotatedMetadata, NamedExpr, Number
     from .._fmt import _BasicFormatterState
     from ..details import Detail, DetailKey, Details, RefDetail, WhereValue
-    from .plugin import IsqxPluginConfig
 
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class IsqxExtensionConfig:
+    definitions: tuple[str, ...] = ()
+    details: tuple[str, ...] = ()
 
 
 def get_templates_path() -> Path:
@@ -161,12 +169,19 @@ class QtyKindDetail:
 
 class IsqxExtension(Extension):
     def __init__(
-        self, config: IsqxPluginConfig, objects_out_path: str | None = None
+        self,
+        config: Mapping[str, Any] | None = None,
     ):
-        self.config = config
+        self.config = (
+            IsqxExtensionConfig(
+                definitions=tuple(config.get("definitions", ())),
+                details=tuple(config.get("details", ())),
+            )
+            if config is not None
+            else IsqxExtensionConfig()
+        )
         self.definitions: Definitions = {}
         self.objects: dict[str, QtyKindDetail] = {}  # by path
-        self.objects_out_path = objects_out_path
         self.possible_parent_maps: dict[str, str] = {}  # child -> parent
         """Note that items in this map are not guaranteed to be isqx objects
         because griffe works with static analysis."""
@@ -205,7 +220,7 @@ class IsqxExtension(Extension):
     ) -> None:
         """Populate definitions from the current module being visited using
         runtime analysis, if it is matches the path under the configured
-        [definitions][isqx.mkdocs.plugin.IsqxPluginConfig.definitions].
+        definitions list.
 
         Note that if module `a` contains `FOO: Annotated[float, isqx.M] = 1.0`
         and module `b` contains `from a import FOO`, then `self.definitions`
@@ -283,55 +298,142 @@ class IsqxExtension(Extension):
             if v.tags is not None:
                 details.tags = tuple(str(t) for t in v.tags)  # str for now
 
-        if self.objects_out_path:
-            constants = {}
-            for path, definition in self.definitions.items():
-                if not isinstance(
-                    definition.value, (LazyProduct, *_ARGS_NUMBER)
-                ):
-                    continue
-                value = definition.value
-                value_str = str(
-                    value.to_approx()
-                    if isinstance(value, LazyProduct)
-                    else value
+    def write_objects(self, output_dir: str | Path) -> Path:
+        constants = {}
+        formatter = MkdocsFormatter(
+            _build_reverse_definitions(self.definitions)
+        )
+        for path, definition in self.definitions.items():
+            if not isinstance(definition.value, (LazyProduct, *_ARGS_NUMBER)):
+                continue
+            value = definition.value
+            value_str = str(
+                value.to_approx() if isinstance(value, LazyProduct) else value
+            )
+            unit_expr: IsqxExpr | None = None
+            if not (
+                (meta := definition.annotated_metadata)
+                and (unit_expr := meta.unit)
+            ):
+                logger.warning(
+                    f"no unit found for {path} in annotated metadata"
                 )
-                unit_expr: IsqxExpr | None = None
-                if not (
-                    (meta := definition.annotated_metadata)
-                    and (unit_expr := meta.unit)
-                ):
-                    logger.warning(
-                        f"no unit found for {path} in annotated metadata"
-                    )
-                    continue  # dimensionless quantities should be annotated anyways
-                constants[path] = Quantity(
-                    value=value_str,
-                    unit=(
-                        tuple(formatter.fmt(unit_expr))  # str for now
-                        if unit_expr is not None
-                        else None
-                    ),
-                )
+                continue  # dimensionless quantities should be annotated anyways
+            constants[path] = Quantity(
+                value=value_str,
+                unit=(
+                    tuple(formatter.fmt(unit_expr))
+                    if unit_expr is not None
+                    else None
+                ),
+            )
 
-            json_path = Path(self.objects_out_path) / "objects.json"
-            # do not serialize members that have `None` or empty tuple values to
-            # save space
-            output_data = {
-                "qtyKinds": {
-                    path: to_dict(details)
-                    for path, details in self.objects.items()
-                },
-                "constants": {
-                    path: to_dict(details)
-                    for path, details in constants.items()
-                },
-                "units": {},  # TODO
-            }
-            json_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(json_path, "w") as f:
-                json.dump(output_data, f)
-            logger.info(f"wrote objects to {json_path}")
+        json_path = Path(output_dir) / "objects.json"
+        output_data = {
+            "qtyKinds": {
+                path: to_dict(details) for path, details in self.objects.items()
+            },
+            "constants": {
+                path: to_dict(details) for path, details in constants.items()
+            },
+            "units": {},  # TODO
+        }
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(output_data, f)
+        logger.info(f"wrote objects to {json_path}")
+        return json_path
+
+
+def write_objects_from_config(
+    config_file_path: str,
+    output_dir: str | Path | None = None,
+) -> Path:
+    """Write `objects.json` explicitly after a Zensical docs build.
+
+    `objects.json` used to be emitted as a side effect of the Griffe walk
+    performed inside the mkdocstrings rendering path. That was fragile under
+    Zensical: each build starts by deleting the whole site directory, while warm
+    cached builds may skip the expensive markdown and API extraction stages.
+    The build still succeeds, but custom generated artifacts from those skipped
+    stages disappear from the final site.
+
+    Zensical currently regenerates a small fixed set of built in artifacts such
+    as `objects.inv`, but it does not expose a supported hook for repository
+    owned custom non-page artifacts like this file. Therefore `just docs-build`
+    must call this helper explicitly after `zensical build` so both cold and
+    warm builds deterministically recreate `site/assets/objects.json`.
+    """
+    from zensical.config import parse_config
+
+    config = parse_config(config_file_path)
+    ext_config = _get_extension_config_from_site_config(config)
+    extension = IsqxExtension(config=asdict(ext_config))
+
+    root_dir = Path(config_file_path).resolve().parent
+    search_paths = [
+        str(root_dir.joinpath(path).resolve())
+        for path in _get_python_handler_paths(config)
+    ]
+    loader = GriffeLoader(
+        extensions=load_extensions(extension),
+        search_paths=search_paths,
+    )
+
+    for package_name in _get_top_level_packages(ext_config):
+        loader.load(package_name, try_relative_path=False)
+
+    if output_dir is None:
+        output_dir = root_dir / config["site_dir"] / "assets"
+    assert output_dir is not None
+    return extension.write_objects(output_dir)
+
+
+def _get_extension_config_from_site_config(
+    config: Mapping[str, Any],
+) -> IsqxExtensionConfig:
+    extensions = (
+        config.get("plugins", {})
+        .get("mkdocstrings", {})
+        .get("config", {})
+        .get("handlers", {})
+        .get("python", {})
+        .get("options", {})
+        .get("extensions", ())
+    )
+    for extension in extensions:
+        if not isinstance(extension, Mapping):
+            continue
+        if "isqx.mkdocs.extension:IsqxExtension" not in extension:
+            continue
+        ext_config = extension.get("config", {})
+        return IsqxExtensionConfig(
+            definitions=tuple(ext_config.get("definitions", ())),
+            details=tuple(ext_config.get("details", ())),
+        )
+    raise ValueError("isqx mkdocstrings extension config not found")
+
+
+def _get_python_handler_paths(config: Mapping[str, Any]) -> tuple[str, ...]:
+    return tuple(
+        config.get("plugins", {})
+        .get("mkdocstrings", {})
+        .get("config", {})
+        .get("handlers", {})
+        .get("python", {})
+        .get("paths", ())
+    )
+
+
+def _get_top_level_packages(
+    config: IsqxExtensionConfig,
+) -> tuple[str, ...]:
+    packages = {
+        path.split(".", 1)[0] for path in (*config.definitions, *config.details)
+    }
+    if not packages:
+        raise ValueError("no packages configured for isqx object extraction")
+    return tuple(sorted(packages))
 
 
 def to_dict(obj: Any) -> dict[str, Any]:

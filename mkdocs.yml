@@ -19,6 +19,7 @@ nav:
 
 theme:
   name: material
+  custom_dir: src/isqx/mkdocs/assets
   features:
     - search.suggest
     - search.highlight
@@ -36,38 +37,49 @@ theme:
         name: Switch to light mode
   icon:
     repo: fontawesome/brands/github
+extra_javascript:
+  - path: js/katex.mjs
+    type: module
+  - https://unpkg.com/katex@0.16.25/dist/katex.min.js
+  - https://unpkg.com/katex@0.16.25/dist/contrib/auto-render.min.js
+  - https://unpkg.com/katex@0.16.25/dist/contrib/copy-tex.min.js
+extra_css:
+  - https://unpkg.com/katex@0.16.25/dist/katex.min.css
+  - css/detail-highlight.css
 plugins:
   - search
-  - social
-  - isqx:
-      definitions:
-        - isqx._iso80000
-        - isqx.aerospace
-        - isqx.usc
-        - isqx.chemistry
-      details:
-        - isqx.details.iso80000.SPACE_AND_TIME
-        - isqx.details.iso80000.MECHANICS
-        - isqx.details.iso80000.THERMODYNAMICS
-        - isqx.details.iso80000.ELECTROMAGNETISM
-        - isqx.details.iso80000.LIGHT_AND_RADIATION
-        - isqx.details.iso80000.ACOUSTICS
-        - isqx.details.iso80000.PHYSICAL_CHEMISTRY_AND_MOLECULAR_PHYSICS
-        - isqx.details.iso80000.ATOMIC_AND_NUCLEAR_PHYSICS
-        - isqx.details.iso80000.CHARACTERISTIC_NUMBERS
-        - isqx.details.iso80000.CONDENSED_MATTER_PHYSICS
-        - isqx.details.iso80000.INFORMATION_SCIENCE_AND_TECHNOLOGY
-        - isqx.details.chemistry.PHYSICAL_CHEMISTRY
-        - isqx.details.aerospace.AEROSPACE
   - mkdocstrings:
       default_handler: python
       handlers:
         python:
+          paths: [src]
           inventories:
             - https://docs.python.org/3/objects.inv
             - https://numpy.org/doc/stable/objects.inv
             - https://mkdocstrings.github.io/griffe/objects.inv
           options:
+            extensions:
+              - isqx.mkdocs.extension:IsqxExtension:
+                config:
+                  definitions:
+                    - isqx._iso80000
+                    - isqx.aerospace
+                    - isqx.usc
+                    - isqx.chemistry
+                  details:
+                    - isqx.details.iso80000.SPACE_AND_TIME
+                    - isqx.details.iso80000.MECHANICS
+                    - isqx.details.iso80000.THERMODYNAMICS
+                    - isqx.details.iso80000.ELECTROMAGNETISM
+                    - isqx.details.iso80000.LIGHT_AND_RADIATION
+                    - isqx.details.iso80000.ACOUSTICS
+                    - isqx.details.iso80000.PHYSICAL_CHEMISTRY_AND_MOLECULAR_PHYSICS
+                    - isqx.details.iso80000.ATOMIC_AND_NUCLEAR_PHYSICS
+                    - isqx.details.iso80000.CHARACTERISTIC_NUMBERS
+                    - isqx.details.iso80000.CONDENSED_MATTER_PHYSICS
+                    - isqx.details.iso80000.INFORMATION_SCIENCE_AND_TECHNOLOGY
+                    - isqx.details.chemistry.PHYSICAL_CHEMISTRY
+                    - isqx.details.aerospace.AEROSPACE
             # NOTE: bug in upstream, with `annotations_path: brief` top level SI unit definitions like `(KG * M * S**-2).alias("newton")` gets incorrectly rendered as `.alias("newton")`
             # https://github.com/mkdocstrings/python/blob/bac553d8bd87c2ca9a1cd67fc473e2686a4eedc2/src/mkdocstrings_handlers/python/templates/material/_base/expression.html.jinja#L92
             # this should have the check ` and expression.first.classname in ("ExprName", "ExprAttribute")`
@@ -112,7 +124,7 @@ markdown_extensions:
       style_plain_text: py3
   - pymdownx.magiclink
   - pymdownx.snippets:
-      base_path: [!relative $config_dir]
+      base_path: [.]
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -129,5 +141,3 @@ markdown_extensions:
       permalink: "¤"
   - pymdownx.arithmatex:
       generic: true
-hooks:
-  - scripts/docs.py

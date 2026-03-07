@@ -37,14 +37,15 @@ lint = ["ruff>=0.11.12"]
 test = ["pytest>=8.3.5", "pytest-cov>=6.1.1"]
 typing = ["mypy>=1.16.0"]
 docs = [
-    "mkdocs-material[imaging]>=9.6.14",
+    # we do not support docs building in py39 (zensical==0.0.2 is empty)
+    "zensical>=0.0.24; python_version >= '3.10'",
+    # still required for api docs: zensical currently delegates python api
+    # extraction/rendering to mkdocstrings' python handler, and our isqx
+    # enrichment plugs into that path via a griffe extension.
     "mkdocstrings-python>=1.16.11",
     "griffe>=1.14.0",
 ]
 wikidata = ["httpx>=0.28.1", "polars>=1.31.0"]
-
-[project.entry-points."mkdocs.plugins"]
-isqx = "isqx.mkdocs.plugin:IsqxPlugin"
 
 [project.entry-points."mkdocstrings.python.templates"]
 isqx = "isqx.mkdocs.extension:get_templates_path"

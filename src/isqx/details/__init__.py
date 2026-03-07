@@ -7,8 +7,8 @@ stored in a [dictionary of expressions to its details][isqx.details.Details]. A
 detail can contain multiple [equations][isqx.details.Equation] or [common
 symbols][isqx.details.Symbol].
 
-Our [mkdocs plugin][isqx.mkdocs.plugin] reads dictionaries from this module to
-"inject" information into docstrings.
+Our docs extraction layer reads dictionaries from this module to inject
+information into generated API docstrings.
 """
 
 from __future__ import annotations

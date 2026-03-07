@@ -1,7 +1,10 @@
 
+# Visualiser
+
 Here is an interactive visualisation of (most) quantity kinds. The standalone
 page can be found at [`/vis.html`](https://abc8747.github.io/isqx/vis.html?autoLoad).
 
+<!-- markdownlint-disable MD033 -->
 <iframe
   src="https://abc8747.github.io/isqx/vis.html?autoLoad"
   sandbox="allow-scripts allow-same-origin"
@@ -9,12 +12,13 @@ page can be found at [`/vis.html`](https://abc8747.github.io/isqx/vis.html?autoL
   title="ISQX Visualization"
   style="width: 100%; height: 768px; border: 1px solid var(--md-typeset-table-color);">
 </iframe>
+<!-- markdownlint-enable MD033 -->
 
 Shift click to select multiple nodes.
 
 ## Implementation
 
-Our [mkdocs/griffe plugin][isqx.mkdocs.plugin] uses of static and dynamic analysis to
+Our Zensical/mkdocstrings integration layer uses static and dynamic analysis to
 collect all quantity kinds, constants and units into a single `objects.json`.
 
 The visualiser is written in [solidjs](https://github.com/solidjs/solid) and D3.

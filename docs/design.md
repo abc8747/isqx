@@ -249,8 +249,8 @@ ignoring operations that are too hard to model.
 `isqx` tries to keep it simple by storing its definitions in a separate (and
 optional) [details dictionary][isqx.details.Details] under the [`isqx.details`][]
 module instead. Our documentation uses a custom `mkdocstrings-python` and
-`griffe` plugin to scan for expressions, generate cross-references. It is also
-emits an JSON file for the [visualiser](./vis.md).
+`griffe` extension layer to scan for expressions and generate cross-references.
+The same docs build also writes a JSON file for the [visualiser](./vis.md).
 
 ## Problem 3: Exact representation and formatting
 
@@ -335,8 +335,7 @@ The latter is adopted because:
 
 1. LSP support is far better: enables go-to-definition interactions.
    refactoring will be far easier.
-2. Our [mkdocs plugin][isqx.mkdocs.plugin] will be able to easily build
-   cross-references
+2. Our docs extraction layer can build cross-references easily.
 3. Extensibility: downstream users can easily append their own domain-specific
    definitions.
 4. Performance: avoids loading non-critical information on `import isqx`.

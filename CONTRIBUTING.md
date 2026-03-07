@@ -1,27 +1,19 @@
 # Development
 
 ```shell
-$ git clone https://github.com/abc8747/isqx.git
-$ cd isqx
-$ uv venv
-$ uv sync --dev
+git clone https://github.com/abc8747/isqx.git
+cd isqx
+uv venv
+uv sync --dev
 ```
 
-We use utility scripts under `scripts/` to lint, format and check for
+We use the `justfile` at the repository root to lint, format and check for
 typing issues. Dependencies are automatically managed by `uv`.
 
 ```shell
-$ ./scripts/make.py
-                                                                                
- Usage: make.py [OPTIONS] COMMAND [ARGS]...                                     
-                                                                                
-╭─ Commands ───────────────────────────────────────────────────────────────────╮
-│ copy-docs-file   Copy a file from `path_in` to `path_out` with warnings.     │
-│ check                                                                        │
-│ check-katex      Highlight underscores in katex                              │
-│ fix                                                                          │
-╰──────────────────────────────────────────────────────────────────────────────╯
-$ ./scripts/wikidata.py
+just check
+just fix
+./scripts/wikidata.py
                                                                                 
  Usage: wikidata.py [OPTIONS] COMMAND [ARGS]...                                 
                                                                                 
@@ -35,16 +27,19 @@ $ ./scripts/wikidata.py
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
-To build and serve the documentation:
+To build the documentation and sync the generated docs entrypoints:
 
 ```shell
-$ uv run mkdocs serve
+just docs-build
 ```
 
-Note that this loads in some custom extensions under `src/isqx/mkdocs` and
-**overwrites** `docs/index.md` with the one from the top level `README.md`.
+For a one-shot local preview, you can run:
 
-# Defining units and quantity kinds.
+```shell
+just preview
+```
+
+## Defining units and quantity kinds
 
 The ISO/IEC 80000 (`iso80000.py`) contains many useful core objects and is
 considered complete. If you would like to add new definitions for your own
@@ -100,7 +95,7 @@ from isqx.usc import BTU
 ENERGY_BTU = QtyKind(BTU)  # BAD!
 ```
 
-# Defining details
+## Defining details
 
 Details are entirely optional.
 
