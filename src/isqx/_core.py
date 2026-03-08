@@ -714,7 +714,9 @@ class OriginAt(HasTagValidation):
 # TODO: add tag `Rotation`? clockwise/counterclockwise
 # TODO: add tag `Direction`? into/out of system
 
-_RATIO = Dimensionless("ratio")
+RATIO = Dimensionless("ratio")
+"""A named public dimensionless leaf, not to be confused with the generic
+unit one, for use in logarithmic units like bel/neper."""
 
 
 def ratio(numerator: Expr, denominator: Expr | Quantity) -> Tagged:
@@ -724,7 +726,7 @@ def ratio(numerator: Expr, denominator: Expr | Quantity) -> Tagged:
     represent logarithmic units like [`isqx.DBW`][].
 
     See: https://en.wikipedia.org/wiki/Dimensionless_quantity#Ratios,_proportions,_and_angles"""
-    return _RATIO[_RatioBetween(numerator, denominator)]
+    return RATIO[_RatioBetween(numerator, denominator)]
 
 
 @dataclass(frozen=True, **slots)
@@ -739,7 +741,7 @@ class _RatioBetween(HasTagValidation):
         pass
 
     def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
-        if reference is not _RATIO:
+        if reference is not RATIO:
             raise CompositionError(
                 outer=_RatioBetween,
                 inner=reference,

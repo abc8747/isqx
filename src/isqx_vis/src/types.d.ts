@@ -10,14 +10,94 @@ export type NodeIndex = number;
 
 export type StrFragment = string | { text: string; path: PublicApiPath };
 
-/** A unit of measurement. */
-export type Unit = StrFragment | StrFragment[]; // this will change in the future
+export interface TaggedNode<Tag extends string, Data> {
+  tag: Tag;
+  data: Data;
+}
+
+export type UnitDeclTag =
+  | "base_unit"
+  | "base_dimension"
+  | "dimensionless"
+  | "alias"
+  | "translated"
+  | "derived";
+
+export type UnitScalar =
+  | TaggedNode<"int", { text: string; value: number }>
+  | TaggedNode<"float", { text: string; value: number }>
+  | TaggedNode<"decimal", { text: string; value: string }>
+  | TaggedNode<
+      "fraction",
+      { text: string; numerator: number; denominator: number }
+    >
+  | TaggedNode<"constant", { text: string; value: string }>
+  | TaggedNode<"literal", { text: string; value: string }>;
+
+export type UnitRef = {
+  path: PublicApiPath;
+  name: string;
+};
+
+export interface UnitFactorProduct {
+  base: UnitScalar;
+  exponent?: UnitScalar;
+}
+
+export type UnitFactor =
+  | TaggedNode<"number", { value: UnitScalar }>
+  | TaggedNode<"prefix", { name: string; value: UnitScalar }>
+  | TaggedNode<"lazy_product", { products: UnitFactorProduct[] }>;
+
+export interface UnitQuantity {
+  value: UnitFactor;
+  unit: UnitExpr;
+}
+
+export type UnitTag =
+  | TaggedNode<
+      "ratio_between",
+      {
+        numerator: UnitExpr;
+        denominatorExpr?: UnitExpr;
+        denominatorQuantity?: UnitQuantity;
+      }
+    >
+  | TaggedNode<"origin_at", { quantity?: UnitQuantity; value?: string }>
+  | TaggedNode<string, { text: string; value?: string; rank?: number }>;
+
+export type UnitExpr =
+  | TaggedNode<"ref", UnitRef>
+  | TaggedNode<"pow", { base: UnitExpr; exponent: UnitScalar }>
+  | TaggedNode<"mul", { terms: UnitExpr[] }>
+  | TaggedNode<"scaled", { factor: UnitFactor; unit: UnitExpr }>
+  | TaggedNode<"tagged", { unit: UnitExpr; tags: UnitTag[] }>
+  | TaggedNode<"log", { base: UnitScalar; unit: UnitExpr }>;
+
+export type UnitDecl =
+  | TaggedNode<"base_unit", { path: PublicApiPath; name: string }>
+  | TaggedNode<"base_dimension", { path: PublicApiPath; name: string }>
+  | TaggedNode<"dimensionless", { path: PublicApiPath; name: string }>
+  | TaggedNode<
+      "alias",
+      {
+        path: PublicApiPath;
+        name: string;
+        expr: UnitExpr;
+        allowPrefix?: boolean;
+      }
+    >
+  | TaggedNode<
+      "translated",
+      { path: PublicApiPath; name: string; expr: UnitExpr; offset: UnitScalar }
+    >
+  | TaggedNode<"derived", { path: PublicApiPath; expr: UnitExpr }>;
 
 /** A variable within the context of an equation. */
 export interface WhereClause {
   symbol: string;
   description: StrFragment | StrFragment[];
-  unit?: Unit;
+  unit?: UnitExpr;
 }
 
 export interface KaTeXWhere {
@@ -39,7 +119,7 @@ export interface WikidataDetail {
 
 export interface QtyKindDetail {
   parent?: PublicApiPath;
-  unit_si_coherent?: Unit;
+  unit_si_coherent?: UnitExpr;
   tags?: string[];
   wikidata?: WikidataDetail[];
   symbols?: SymbolDetail[];
@@ -51,17 +131,17 @@ export type QtyKindData = Record<PublicApiPath, QtyKindDetail>;
 
 export interface Quantity {
   value: string; // for now
-  unit: Unit | null;
+  unit: UnitExpr | null;
 }
 
 export type ConstantsData = Record<PublicApiPath, Quantity>;
 
-export type UnitsData = Record<PublicApiPath, Unit>;
+export type UnitsData = Record<PublicApiPath, UnitDecl>;
 
 export interface IsqxData {
   qtyKinds: QtyKindData;
   constants: ConstantsData;
-  units?: UnitsData; // empty for now until we figure out how to serialise things properly
+  units: UnitsData;
 }
 
 //
@@ -94,6 +174,7 @@ export interface GraphLink {
 /** The main reactive state of the application. */
 export interface AppState {
   data: QtyKindData | null;
+  units: UnitsData;
   nodes: GraphNode[];
   links: GraphLink[];
   linkMap: Map<number, GraphLink[]>;

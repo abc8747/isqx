@@ -59,27 +59,29 @@ plugins:
             - https://mkdocstrings.github.io/griffe/objects.inv
           options:
             extensions:
+              # NOTE: do not dedent `config` here. It must stay nested under
+              # `isqx.mkdocs.extension:IsqxExtension` or mkdocstrings drops it.
               - isqx.mkdocs.extension:IsqxExtension:
-                config:
-                  definitions:
-                    - isqx._iso80000
-                    - isqx.aerospace
-                    - isqx.usc
-                    - isqx.chemistry
-                  details:
-                    - isqx.details.iso80000.SPACE_AND_TIME
-                    - isqx.details.iso80000.MECHANICS
-                    - isqx.details.iso80000.THERMODYNAMICS
-                    - isqx.details.iso80000.ELECTROMAGNETISM
-                    - isqx.details.iso80000.LIGHT_AND_RADIATION
-                    - isqx.details.iso80000.ACOUSTICS
-                    - isqx.details.iso80000.PHYSICAL_CHEMISTRY_AND_MOLECULAR_PHYSICS
-                    - isqx.details.iso80000.ATOMIC_AND_NUCLEAR_PHYSICS
-                    - isqx.details.iso80000.CHARACTERISTIC_NUMBERS
-                    - isqx.details.iso80000.CONDENSED_MATTER_PHYSICS
-                    - isqx.details.iso80000.INFORMATION_SCIENCE_AND_TECHNOLOGY
-                    - isqx.details.chemistry.PHYSICAL_CHEMISTRY
-                    - isqx.details.aerospace.AEROSPACE
+                  config:
+                    definitions:
+                      - isqx._iso80000
+                      - isqx.aerospace
+                      - isqx.usc
+                      - isqx.chemistry
+                    details:
+                      - isqx.details.iso80000.SPACE_AND_TIME
+                      - isqx.details.iso80000.MECHANICS
+                      - isqx.details.iso80000.THERMODYNAMICS
+                      - isqx.details.iso80000.ELECTROMAGNETISM
+                      - isqx.details.iso80000.LIGHT_AND_RADIATION
+                      - isqx.details.iso80000.ACOUSTICS
+                      - isqx.details.iso80000.PHYSICAL_CHEMISTRY_AND_MOLECULAR_PHYSICS
+                      - isqx.details.iso80000.ATOMIC_AND_NUCLEAR_PHYSICS
+                      - isqx.details.iso80000.CHARACTERISTIC_NUMBERS
+                      - isqx.details.iso80000.CONDENSED_MATTER_PHYSICS
+                      - isqx.details.iso80000.INFORMATION_SCIENCE_AND_TECHNOLOGY
+                      - isqx.details.chemistry.PHYSICAL_CHEMISTRY
+                      - isqx.details.aerospace.AEROSPACE
             # NOTE: bug in upstream, with `annotations_path: brief` top level SI unit definitions like `(KG * M * S**-2).alias("newton")` gets incorrectly rendered as `.alias("newton")`
             # https://github.com/mkdocstrings/python/blob/bac553d8bd87c2ca9a1cd67fc473e2686a4eedc2/src/mkdocstrings_handlers/python/templates/material/_base/expression.html.jinja#L92
             # this should have the check ` and expression.first.classname in ("ExprName", "ExprAttribute")`

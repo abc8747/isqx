@@ -25,7 +25,6 @@ from fractions import Fraction
 from typing import Annotated
 
 from ._core import (
-    _RATIO,
     CARTESIAN,
     COMPLEX,
     DELTA,
@@ -48,6 +47,7 @@ from ._core import (
     ratio,
 )
 from ._core import PI as _PI
+from ._core import RATIO as _CORE_RATIO
 from ._core import E as _E
 
 #
@@ -283,12 +283,14 @@ EV = (CONST_ELEMENTARY_CHARGE * J).alias("electronvolt", allow_prefix=True)
 """Electronvolt, the kinetic [energy][isqx.ENERGY] acquired by an electron in
 passing through a  potential difference of 1 [volt][isqx.V] in vacuum."""
 
+RATIO = _CORE_RATIO  # need to restate it here because griffe cannot traverse into _core
+
 # logarithmic quantities [ISO 80000-3:2006] [SP811 8.7]
-BEL = Log(_RATIO, base=10).alias("bel", allow_prefix=True)
+BEL = Log(RATIO, base=10).alias("bel", allow_prefix=True)
 r"""Bel, a logarithmic unit of a generic ratio.
 When used for a power quantity, it is $L_B = \log_{10}(P/P_{ref})$.
 The decibel (dB) is more commonly used."""
-NEPER = Log(_RATIO, base=_E).alias("neper", allow_prefix=True)
+NEPER = Log(RATIO, base=_E).alias("neper", allow_prefix=True)
 r"""Neper, a logarithmic unit of a generic ratio.
 When used for a root-power quantity, it is $L_{Np} = \ln(F/F_{ref})$."""
 DB = DECI * BEL
@@ -532,7 +534,10 @@ PHASE_SPEED = SPEED["phase"]
 GROUP_SPEED = SPEED["group"]
 """Speed at which a wave's envelope propagates in space."""
 DAMPING_COEFFICIENT = QtyKind(S**-1, ("damping_coefficient",))
-LOGARITHMIC_DECREMENT = QtyKind(Dimensionless("logarithmic_decrement"))
+LOGARITHMIC_DECREMENT_UNIT = Dimensionless("logarithmic_decrement")
+"""A named public dimensionless leaf, not to be confused with the generic
+unit one, for use in the logarithmic decrement context."""
+LOGARITHMIC_DECREMENT = QtyKind(LOGARITHMIC_DECREMENT_UNIT)
 """Measure for the damping of an oscillator."""
 ATTENUATION = QtyKind(M**-1, ("attenuation",))
 PHASE_COEFFICIENT = QtyKind(RAD * M**-1, ("phase_coefficient",))
@@ -1128,8 +1133,8 @@ MOLAR_ABSORPTION_COEFFICIENT = QtyKind(M**2 * MOL**-1, ("molar_absorption",))
 #
 # acoustics [ISO 80000-9]
 #
-OCTAVE = Log(_RATIO, base=2).alias("octave")
-DECADE = Log(_RATIO, base=10).alias("decade")
+OCTAVE = Log(RATIO, base=2).alias("octave")
+DECADE = Log(RATIO, base=10).alias("decade")
 SPEED_OF_SOUND = SPEED["sound"]
 """See: https://en.wikipedia.org/wiki/Speed_of_sound"""
 SOUND_PRESSURE = QtyKind(PA, ("sound",))

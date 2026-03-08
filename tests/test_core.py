@@ -488,8 +488,8 @@ def test_convert_tagged_translated() -> None:
 
 
 def test_log_level_invalid() -> None:
-    from isqx import BEL, DB, DBV, HZ, KILO, Log, M, Quantity, V
-    from isqx._core import _RATIO, _RatioBetween
+    from isqx import BEL, DB, DBV, HZ, KILO, RATIO, Log, M, Quantity, V
+    from isqx._core import _RatioBetween
 
     # NOTE: we allow logarithmic units to be composed with others,
     # TODO: in the future harden `convert` so we dont mess it up
@@ -514,7 +514,7 @@ def test_log_level_invalid() -> None:
     with pytest.raises(
         CompositionError, match="cannot be applied multiple times"
     ):
-        _ = _RATIO[rb_tag, rb_tag]
+        _ = RATIO[rb_tag, rb_tag]
 
 
 def test_convert_logarithmic() -> None:

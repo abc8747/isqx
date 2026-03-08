@@ -17,7 +17,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar
 
 from griffe import (
     Alias,
@@ -47,14 +47,12 @@ from typing_extensions import TypeAlias, TypeGuard
 
 from .. import (
     Anchor,
-    BasicFormatter,
     Dimensionless,
     LazyProduct,
     QtyKind,
     Scaled,
     StrFragment,
     Tagged,
-    kind,
     module_attribute_metadata,
 )
 from .. import (
@@ -70,6 +68,13 @@ from ..details import (
     _RefSelf,
 )
 from . import PATH_PLUGIN
+from .unit_json import (
+    UnitExprJson,
+    UnitRegistry,
+    build_unit_decl_table,
+    serialize_unit_decls,
+    serialize_unit_expr,
+)
 
 if TYPE_CHECKING:
     from typing import Generator
@@ -77,8 +82,7 @@ if TYPE_CHECKING:
     from griffe import Module
     from griffe._internal.models import Attribute
 
-    from .. import AnnotatedMetadata, NamedExpr, Number
-    from .._fmt import _BasicFormatterState
+    from .. import AnnotatedMetadata, Number
     from ..details import Detail, DetailKey, Details, WhereValue
 
 
@@ -100,20 +104,14 @@ _ARGS_DEFINITION = (LazyProduct, *_ARGS_NUMBER, *_ARGS_EXPR, QtyKind)
 # NOTE: equilibrium constants are factory functions that return a QtyKind.
 # right now we skip over them!
 
-Unit: TypeAlias = Union[tuple[StrFragment, ...], None]
-"""The unit of measurement *rendered* as string fragments."""
-# Mul(M, S) is represented as (Anchor("M", "isqx.M"), "\cdot", Anchor("S", "isqx.S"))
-# in the future, we want to return a tagged union (the direct representation
-# of the unit). for now, this is good enough.
-# we also want to get rid of the None.
-
 
 # see: https://mkdocstrings.github.io/griffe/guide/users/how-to/selectively-inspect/
 @dataclass(frozen=True)
 class Where:
     symbol: str
     description: StrFragment | tuple[StrFragment, ...]
-    unit: Unit  # for now
+    # some where-clause entries are pure prose or Anchors, so it can be None
+    unit: UnitExprJson | None
 
 
 @dataclass(frozen=True)
@@ -140,7 +138,9 @@ class WikidataDetail:
 @dataclass(frozen=True)
 class Quantity:
     value: str  # for now: in the future we should support lazy products
-    unit: Unit  # for now
+    # constants that make it into objects.json have already passed annotated
+    # unit validation in write_objects, so this payload is always present.
+    unit: UnitExprJson
 
 
 DefinitionPath: TypeAlias = str
@@ -162,7 +162,9 @@ class QtyKindDetail:
     """
 
     parent: str | None = None
-    unit_si_coherent: Unit = None  # str for now
+    # details are accumulated before we know whether a path resolves to a
+    # QtyKind definition, so keeping it optional at staging-model
+    unit_si_coherent: UnitExprJson | None = None
     tags: tuple[str, ...] = field(default_factory=tuple)  # str for now
     wikidata: list[WikidataDetail] = field(default_factory=list)
     symbols: list[SymbolDetail] = field(default_factory=list)
@@ -278,16 +280,36 @@ class IsqxExtension(Extension):
             public_api_candidates=self.public_api_candidates,
         )
         logger.info(f"loaded {len(self.definitions)} definitions")
-        reverse_definitions = _build_reverse_definitions(self.definitions)
-        formatter = MkdocsFormatter(reverse_definitions)
+        path_resolver = _PathResolver(
+            alias_targets=self.alias_targets,
+            public_api_candidates=self.public_api_candidates,
+        )
+        public_definitions = _build_public_unit_paths(
+            self.definitions,
+            path_resolver,
+        )
+        unit_decls = build_unit_decl_table(
+            {
+                path: definition.value
+                for path, definition in self.definitions.items()
+                if isinstance(definition.value, _ARGS_EXPR)
+            },
+            public_definitions=public_definitions,
+        )
+        serialized_units = serialize_unit_decls(unit_decls=unit_decls)
 
         for defs_path in self.config.details:
             for path, item in _process_details_module(
-                defs_path, loader, formatter, reverse_definitions
+                defs_path,
+                loader,
+                self.definitions,
+                path_resolver,
+                unit_decls,
             ):
                 objects = self.objects.setdefault(path, QtyKindDetail())
                 attr_target: Attribute = loader.modules_collection[path]
                 isqx_extras = _get_or_init_isqx_extras(attr_target)
+                isqx_extras["units"] = serialized_units
 
                 if isinstance(item, WikidataDetail):
                     objects.wikidata.append(item)
@@ -312,9 +334,10 @@ class IsqxExtension(Extension):
             definition = self.definitions[path]
             if not isinstance(v := definition.value, QtyKind):
                 continue
-            details.unit_si_coherent = tuple(
-                formatter.fmt(v.unit_si_coherent)
-            )  # str for now
+            details.unit_si_coherent = serialize_unit_expr(
+                v.unit_si_coherent,
+                unit_decls=unit_decls,
+            )
             if v.tags is not None:
                 details.tags = tuple(str(t) for t in v.tags)  # str for now
 
@@ -323,8 +346,17 @@ class IsqxExtension(Extension):
             alias_targets=self.alias_targets,
             public_api_candidates=self.public_api_candidates,
         )
-        formatter = MkdocsFormatter(
-            _build_reverse_definitions(self.definitions)
+        public_definitions = _build_public_unit_paths(
+            self.definitions,
+            path_resolver,
+        )
+        unit_decls = build_unit_decl_table(
+            {
+                path: definition.value
+                for path, definition in self.definitions.items()
+                if isinstance(definition.value, _ARGS_EXPR)
+            },
+            public_definitions=public_definitions,
         )
         constants_by_definition_path: dict[str, Quantity] = {}
         for path, definition in self.definitions.items():
@@ -334,21 +366,17 @@ class IsqxExtension(Extension):
             value_str = str(
                 value.to_approx() if isinstance(value, LazyProduct) else value
             )
-            unit_expr: IsqxExpr | None = None
-            if not (
-                (meta := definition.annotated_metadata)
-                and (unit_expr := meta.unit)
-            ):
+            meta = definition.annotated_metadata
+            if meta is None or meta.unit is None:
                 logger.warning(
                     f"no unit found for {path} in annotated metadata"
                 )
                 continue  # dimensionless quantities should be annotated anyways
             constants_by_definition_path[path] = Quantity(
                 value=value_str,
-                unit=(
-                    tuple(formatter.fmt(unit_expr))
-                    if unit_expr is not None
-                    else None
+                unit=serialize_unit_expr(
+                    meta.unit,
+                    unit_decls=unit_decls,
                 ),
             )
 
@@ -368,6 +396,7 @@ class IsqxExtension(Extension):
                 path_resolver,
             ),
         )
+        units = serialize_unit_decls(unit_decls=unit_decls)
 
         json_path = Path(output_dir) / "objects.json"
         output_data = {
@@ -377,7 +406,7 @@ class IsqxExtension(Extension):
             "constants": {
                 path: to_dict(details) for path, details in constants.items()
             },
-            "units": {},  # TODO
+            "units": units,
         }
         json_path.parent.mkdir(parents=True, exist_ok=True)
         with open(json_path, "w", encoding="utf-8") as f:
@@ -445,9 +474,15 @@ def _get_extension_config_from_site_config(
     for extension in extensions:
         if not isinstance(extension, Mapping):
             continue
-        if "isqx.mkdocs.extension:IsqxExtension" not in extension:
+        key = "isqx.mkdocs.extension:IsqxExtension"
+        if key not in extension:
             continue
-        ext_config = extension.get("config", {})
+        ext_value = extension.get(key)
+        ext_config = (
+            ext_value.get("config", {})
+            if isinstance(ext_value, Mapping)
+            else {}
+        )
         return IsqxExtensionConfig(
             definitions=tuple(ext_config.get("definitions", ())),
             details=tuple(ext_config.get("details", ())),
@@ -489,14 +524,6 @@ class Definition(NamedTuple):
 Definitions: TypeAlias = dict[DefinitionPath, Definition]
 
 
-class _ReverseDefinition(NamedTuple):
-    path: DefinitionPath
-    annotated_metadata: AnnotatedMetadata | None
-
-
-_ReverseDefinitions: TypeAlias = dict[int, _ReverseDefinition]
-"""A mapping of the `builtins.id(value)` to the reverse definition."""
-
 #
 # public api resolution
 #
@@ -506,6 +533,22 @@ def _public_api_path_preference_key(path: str) -> tuple[int, int, str]:
     parts = path.split(".")
     private_segments = sum(1 for part in parts[1:] if part.startswith("_"))
     return private_segments, len(parts), path
+
+
+def _is_public_api_path(path: str) -> bool:
+    return all(not part.startswith("_") for part in path.split(".")[1:])
+
+
+def _build_public_unit_paths(
+    definitions: Definitions,
+    path_resolver: _PathResolver,
+) -> dict[DefinitionPath, PublicApiPath]:
+    public_definitions: dict[DefinitionPath, PublicApiPath] = {}
+    for path in definitions:
+        public_path = path_resolver.to_public_api_path(path)
+        if _is_public_api_path(public_path):
+            public_definitions[path] = public_path
+    return public_definitions
 
 
 def _collect_alias_candidates(
@@ -604,11 +647,17 @@ class _PathResolver:
 
     def to_public_api_path(self, path: str) -> PublicApiPath:
         definition_path = self.to_definition_path(path)
-        candidates = {
-            definition_path,
-            *self.public_api_candidates.get(definition_path, ()),
-        }
-        return min(candidates, key=_public_api_path_preference_key)
+        if _is_public_api_path(definition_path):
+            return definition_path
+
+        public_candidates = [
+            candidate
+            for candidate in self.public_api_candidates.get(definition_path, ())
+            if _is_public_api_path(candidate)
+        ]
+        if public_candidates:
+            return min(public_candidates, key=_public_api_path_preference_key)
+        return definition_path
 
 
 def _remap_fragment(
@@ -644,11 +693,7 @@ def _remap_where(
             where.description,
             path_resolver,
         ),
-        unit=(
-            _remap_fragment_collection(where.unit, path_resolver)
-            if where.unit is not None
-            else None
-        ),
+        unit=where.unit,
     )
 
 
@@ -680,11 +725,7 @@ def _remap_qty_kind_detail(
             if detail.parent is not None
             else None
         ),
-        unit_si_coherent=(
-            _remap_fragment_collection(detail.unit_si_coherent, path_resolver)
-            if detail.unit_si_coherent is not None
-            else None
-        ),
+        unit_si_coherent=detail.unit_si_coherent,
         symbols=[
             _remap_katex_where(symbol, path_resolver)
             for symbol in detail.symbols
@@ -710,40 +751,7 @@ def _remap_quantity(
     quantity: Quantity,
     path_resolver: _PathResolver,
 ) -> Quantity:
-    return replace(
-        quantity,
-        unit=(
-            _remap_fragment_collection(quantity.unit, path_resolver)
-            if quantity.unit is not None
-            else None
-        ),
-    )
-
-
-#
-# unit formatting
-#
-
-
-class MkdocsFormatter(BasicFormatter):
-    def __init__(
-        self,
-        reverse_definitions: _ReverseDefinitions,
-    ):
-        self.reverse_definitions = reverse_definitions
-        super().__init__(verbose=False)
-
-    def visit_named(
-        self, expr: NamedExpr, state: _BasicFormatterState
-    ) -> Generator[StrFragment, None, None]:
-        name_formatted: str = next(super().visit_named(expr, state))  # type: ignore
-        if reverse_def := self.reverse_definitions.get(id(expr)):
-            yield Anchor(
-                text=name_formatted,
-                path=reverse_def.path,
-            )
-        else:
-            yield name_formatted
+    return quantity
 
 
 #
@@ -794,8 +802,9 @@ def parse_where(
     where_st: ExprDict,
     *,
     self_path: str,
-    reverse_definitions: _ReverseDefinitions,
-    formatter: MkdocsFormatter,
+    definitions: Definitions,
+    path_resolver: _PathResolver,
+    unit_decls: UnitRegistry,
     mut_self_symbols: list[str],
 ) -> Generator[Where, None, None]:
     if detail_rt.where is None:
@@ -809,25 +818,46 @@ def parse_where(
         frags_for_unit_inference = (
             w_rt_v if isinstance(w_rt_v, tuple) else (w_rt_v,)
         )
-        for frag in frags_for_unit_inference:
+        frags_st_for_unit_inference = (
+            w_st_v.elements
+            if isinstance(w_rt_v, tuple) and isinstance(w_st_v, ExprTuple)
+            else (w_st_v,)
+        )
+        for frag, frag_st in zip(
+            frags_for_unit_inference,
+            frags_st_for_unit_inference,
+        ):
             if isinstance(frag, (str, Anchor)):
                 continue
             if isinstance(frag, _RefSelf):
                 mut_self_symbols.append(w_rt_k)
                 if _is_detail_key(key_rt):
-                    unit_expr = _get_unit_expr(key_rt, reverse_definitions)
+                    unit_expr = _get_unit_expr(
+                        key_rt,
+                        definition_path=path_resolver.to_definition_path(
+                            self_path
+                        ),
+                        definitions=definitions,
+                    )
             else:
-                unit_expr = _get_unit_expr(frag, reverse_definitions)
+                unit_expr = _get_unit_expr(
+                    frag,
+                    definition_path=path_resolver.to_definition_path(
+                        _get_fragment_definition_path(frag, frag_st)
+                    ),
+                    definitions=definitions,
+                )
             if unit_expr is not None:
-                break  # only infer unit from the first fragment
+                break
 
-        unit: Unit
+        unit: UnitExprJson | None
         if unit_expr is None:
             unit = None
-        elif kind(unit_expr) == "dimensionless":
-            unit = ("dimensionless",)
         else:
-            unit = tuple(s for s in formatter.fmt(unit_expr))  # str  for now
+            unit = serialize_unit_expr(
+                unit_expr,
+                unit_decls=unit_decls,
+            )
 
         yield Where(
             symbol=w_rt_k,
@@ -840,21 +870,6 @@ def _is_detail_key(
     value: DetailKey | Callable[..., DetailKey],
 ) -> TypeGuard[DetailKey]:
     return isinstance(value, _ARGS_DETAIL_KEY)
-
-
-def _build_reverse_definitions(definitions: Definitions) -> _ReverseDefinitions:
-    reverse_definitions: _ReverseDefinitions = {}
-    for path, definition in definitions.items():
-        i = id(definition.value)
-        if i in reverse_definitions:
-            logger.warning(
-                f"duplicate definition id for {path} and {reverse_definitions[i].path}"
-            )
-            continue
-        reverse_definitions[i] = _ReverseDefinition(
-            path, definition.annotated_metadata
-        )
-    return reverse_definitions
 
 
 def _get_or_init_isqx_extras(attr_target: Attribute) -> dict[str, Any]:
@@ -873,8 +888,9 @@ def _process_katex_where_detail(
     detail_st: str | Expr,
     key_rt: DetailKey | Callable[..., DetailKey],
     self_path: str,
-    formatter: MkdocsFormatter,
-    reverse_definitions: _ReverseDefinitions,
+    definitions: Definitions,
+    path_resolver: _PathResolver,
+    unit_decls: UnitRegistry,
 ) -> tuple[SymbolDetail | EquationDetail, list[str]]:
     _katex_st_value, where_st_value = parse_katex_where_static(
         detail_rt, detail_st
@@ -887,8 +903,9 @@ def _process_katex_where_detail(
                 detail_rt,
                 where_st_value,
                 self_path=self_path,
-                formatter=formatter,
-                reverse_definitions=reverse_definitions,
+                definitions=definitions,
+                path_resolver=path_resolver,
+                unit_decls=unit_decls,
                 mut_self_symbols=self_symbols,
             )
         )
@@ -903,7 +920,7 @@ def _process_katex_where_detail(
                 tuple(a) if (a := detail_rt.assumptions) is not None else None
             ),
         ), self_symbols
-    elif isinstance(detail_rt, Symbol):
+    if isinstance(detail_rt, Symbol):
         return SymbolDetail(
             katex=detail_rt.katex,
             where=where,
@@ -917,8 +934,9 @@ def _process_definitions(
     defs_st: Expr | str,
     key_rt: DetailKey | Callable[..., DetailKey],
     self_path: str,
-    formatter: MkdocsFormatter,
-    reverse_definitions: _ReverseDefinitions,
+    definitions: Definitions,
+    path_resolver: _PathResolver,
+    unit_decls: UnitRegistry,
 ) -> Generator[WikidataDetail | SymbolDetail | EquationDetail, None, None]:
     definitions_rt = defs_rt if isinstance(defs_rt, tuple) else (defs_rt,)
     definitions_st = (
@@ -934,8 +952,9 @@ def _process_definitions(
                 detail_st,
                 key_rt,
                 self_path,
-                formatter,
-                reverse_definitions,
+                definitions,
+                path_resolver,
+                unit_decls,
             )
             yield item
             if self_symbols:
@@ -951,8 +970,9 @@ def _process_definitions(
 def _process_details_module(
     defs_path: str,
     loader: GriffeLoader,
-    formatter: MkdocsFormatter,
-    reverse_definitions: _ReverseDefinitions,
+    definitions: Definitions,
+    path_resolver: _PathResolver,
+    unit_decls: UnitRegistry,
 ) -> Generator[
     tuple[str, WikidataDetail | SymbolDetail | EquationDetail], None, None
 ]:
@@ -971,10 +991,25 @@ def _process_details_module(
             defs_st,
             key_rt,
             self_path,
-            formatter,
-            reverse_definitions,
+            definitions,
+            path_resolver,
+            unit_decls,
         ):
             yield (self_path, item)
+
+
+def _get_fragment_definition_path(
+    frag_rt: WhereValue,
+    frag_st: Expr | str,
+) -> str:
+    if isinstance(frag_rt, (str, Anchor, _RefSelf)):
+        raise ValueError("fragment does not reference a definition path")
+    assert isinstance(frag_st, (ExprAttribute, ExprName)), (
+        "expected value of the where clause to be a reference to a pre-defined "
+        f"quantity, but got {frag_st} (an inline expression)\n"
+        "= help: define the quantity first and then use it in the where clause"
+    )
+    return frag_st.canonical_path
 
 
 def _parse_fragments(
@@ -1009,7 +1044,10 @@ def _parse_fragment(
 
 
 def _get_unit_expr(
-    meaning: DetailKey, reverse_definitions: _ReverseDefinitions
+    meaning: DetailKey,
+    *,
+    definition_path: str,
+    definitions: Definitions,
 ) -> IsqxExpr | None:
     if isinstance(meaning, QtyKind):
         return meaning.unit_si_coherent
@@ -1024,10 +1062,12 @@ def _get_unit_expr(
         # TODO: revisit the correctness
         return meaning
     elif isinstance(meaning, (LazyProduct, *_ARGS_NUMBER)):
-        if (
-            reverse_def := reverse_definitions.get(id(meaning))
-        ) and reverse_def.annotated_metadata:
-            return reverse_def.annotated_metadata.unit
+        definition = definitions.get(definition_path)
+        if definition is None:
+            logger.warning(f"no definition found for {definition_path}")
+            return None
+        if definition.annotated_metadata is not None:
+            return definition.annotated_metadata.unit
         else:
             logger.warning(f"no unit found for {meaning} in registry")
             return None

@@ -23,6 +23,7 @@ const LOCALSTORAGE_KEY = "isqx-vis-data";
 const App: Component = () => {
   const [store, setStore] = createStore<AppState>({
     data: null,
+    units: {},
     nodes: [],
     links: [],
     linkMap: new Map(),
@@ -137,9 +138,11 @@ const App: Component = () => {
     const data = rawData();
     if (!data) {
       setStore("data", null);
+      setStore("units", {});
       return;
     }
     setStore("data", data.qtyKinds);
+    setStore("units", data.units);
     if (!data) return;
     const { nodes, links, linkMap } = processGraphData(data.qtyKinds);
     const numNodes = nodes.length || 1;

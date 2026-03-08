@@ -16,6 +16,102 @@
 {%- endif -%}
 {%- endmacro -%}
 
+{%- macro render_unit_name(unit, units) -%}
+{%- set name = unit.name -%}
+{%- if unit.path -%}
+<autoref identifier="{{ unit.path }}">{{ name }}</autoref>
+{%- else -%}
+{{- name -}}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_unit_scalar(scalar) -%}
+{{- scalar.data.text -}}
+{%- endmacro -%}
+
+{%- macro render_unit_factor(factor) -%}
+{%- if factor.tag == "prefix" -%}
+{{- factor.data.name -}}
+{%- elif factor.tag == "lazy_product" -%}
+{%- for product in factor.data.products -%}
+{{- render_unit_scalar(product.base) -}}
+{%- if product.exponent -%}<sup>{{ render_unit_scalar(product.exponent) }}</sup>{%- endif -%}
+{%- if not loop.last %} · {% endif -%}
+{%- endfor -%}
+{%- else -%}
+{{- render_unit_scalar(factor.data.value) -}}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_unit_tag(tag, units) -%}
+{%- if tag.tag == "ratio_between" -%}
+<code>{{ render_unit(tag.data.numerator, units) }}</code> to
+<code>
+{%- if tag.data.denominatorQuantity -%}
+{{- render_unit_factor(tag.data.denominatorQuantity.value) }} {{ render_unit(tag.data.denominatorQuantity.unit, units) -}}
+{%- else -%}
+{{- render_unit(tag.data.denominatorExpr, units) -}}
+{%- endif -%}
+</code>
+{%- elif tag.tag == "origin_at" -%}
+relative to <code>
+{%- if tag.data.quantity -%}
+{{- render_unit_factor(tag.data.quantity.value) }} {{ render_unit(tag.data.quantity.unit, units) -}}
+{%- else -%}
+{{- tag.data.value -}}
+{%- endif -%}
+</code>
+{%- else -%}
+{{- tag.data.text -}}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_unit(unit, units, parent_precedence=0) -%}
+{%- set variant = unit.tag -%}
+{%- set payload = unit.data -%}
+{%- if variant == "mul" -%}
+{%- set precedence = 1 -%}
+{%- elif variant == "scaled" -%}
+{%- set precedence = 2 -%}
+{%- elif variant == "log" -%}
+{%- set precedence = 3 -%}
+{%- elif variant == "tagged" -%}
+{%- set precedence = 4 -%}
+{%- elif variant == "pow" -%}
+{%- set precedence = 5 -%}
+{%- else -%}
+{%- set precedence = 6 -%}
+{%- endif -%}
+{%- if parent_precedence >= precedence %}({% endif -%}
+{%- if variant == "ref" -%}
+{{- render_unit_name(payload, units) -}}
+{%- elif variant == "pow" -%}
+{{- render_unit(payload.base, units, precedence) -}}<sup>{{ render_unit_scalar(payload.exponent) }}</sup>
+{%- elif variant == "mul" -%}
+{%- for term in payload.terms -%}
+{{- render_unit(term, units, precedence) -}}
+{%- if not loop.last %} · {% endif -%}
+{%- endfor -%}
+{%- elif variant == "scaled" -%}
+{{- render_unit_factor(payload.factor) }} · {{ render_unit(payload.unit, units, precedence) -}}
+{%- elif variant == "tagged" -%}
+{{- render_unit(payload.unit, units, precedence) -}}[
+{%- for tag in payload.tags -%}
+{{- render_unit_tag(tag, units) -}}
+{%- if not loop.last %}, {% endif -%}
+{%- endfor -%}
+]
+{%- elif variant == "log" -%}
+{%- if payload.base.tag == "constant" and payload.base.data.value == "E" -%}
+ln
+{%- else -%}
+log<sub>{{ render_unit_scalar(payload.base) }}</sub>
+{%- endif -%}
+({{ render_unit(payload.unit, units, precedence) }})
+{%- endif -%}
+{%- if parent_precedence >= precedence %}){% endif -%}
+{%- endmacro -%}
+
 {%- macro show_wikidata(obj) -%}
 {%- if obj.extra.mkdocstrings.isqx and obj.extra.mkdocstrings.isqx.wikidata -%}
 <div class="isqx-wikidata">
@@ -38,7 +134,7 @@
     <span class="isqx-symbol-where">
         ({%- for w in symbol.where -%}
         $ {{w.symbol}} $ = {{ render_fragments(w.description) }}
-        {%- if w.unit %} ({{ render_fragments(w.unit) }}){% endif -%}
+        {%- if w.unit %} ({{ render_unit(w.unit, obj.extra.mkdocstrings.isqx.units) }}){% endif -%}
         {%- if not loop.last %}, {%- endif -%}
         {%- endfor -%})
     </span>
@@ -72,7 +168,7 @@
             <div class="isqx-equals">=</div>
             <div class="isqx-description">
                 {{ render_fragments(w.description) }}
-                {%- if w.unit %} ({{ render_fragments(w.unit) }}){% endif -%}
+                {%- if w.unit %} ({{ render_unit(w.unit, obj.extra.mkdocstrings.isqx.units) }}){% endif -%}
             </div>
         </div>
         {%- endfor -%}
