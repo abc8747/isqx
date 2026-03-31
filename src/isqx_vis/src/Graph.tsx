@@ -7,13 +7,15 @@ import styles from "./Graph.module.scss";
 import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from "./graph";
 import {
   LABEL_LINE_HEIGHT,
+  buildNodeLabelLayout,
+  getAmbientVisibleLabelIndices,
   getActiveLinks,
   getActiveNodeIndexSet,
+  getFocusedVisibleLabelIndices,
   getFocusedNodeIndex,
   getNodeViewStates,
-  getVisibleLabelIndices,
-  getWrappedNodeLabels,
-  hasFocus
+  hasFocus,
+  quantizeZoomScale
 } from "./graphView";
 
 const Graph: Component<{
@@ -74,12 +76,25 @@ const Graph: Component<{
       nodes => {
         if (!svgRef) return;
 
+        let rafId: number | null = null;
+        let pendingTransform: d3.ZoomTransform | null = null;
+
+        const flushZoomTransform = () => {
+          rafId = null;
+          if (!pendingTransform) return;
+
+          const { k, x, y } = pendingTransform;
+          pendingTransform = null;
+          setUi("view", { k, x, y });
+        };
+
         const zoom = d3
           .zoom<SVGSVGElement, unknown>()
           .scaleExtent([0.1, 10])
           .on("zoom", e => {
-            const { k, x, y } = e.transform;
-            setUi("view", { k, x, y });
+            pendingTransform = e.transform;
+            if (rafId !== null) return;
+            rafId = window.requestAnimationFrame(flushZoomTransform);
           });
 
         const selection = d3.select(svgRef).call(zoom);
@@ -120,6 +135,12 @@ const Graph: Component<{
             selection.call(zoom.transform, transform);
           }
         });
+
+        onCleanup(() => {
+          if (rafId !== null) {
+            window.cancelAnimationFrame(rafId);
+          }
+        });
       }
     )
   );
@@ -138,19 +159,28 @@ const Graph: Component<{
     });
   };
 
-  const nodeLabelWrapped = createMemo(() =>
-    getWrappedNodeLabels(props.store.nodes)
+  const nodeLabelLayout = createMemo(() =>
+    buildNodeLabelLayout(props.store.nodes)
   );
 
+  const nodeLabelWrapped = createMemo(() => nodeLabelLayout().wrappedLabels);
+
+  const ambientZoomScale = createMemo(() => quantizeZoomScale(ui.view.k));
+
   const visibleLabelIndices = createMemo(() => {
-    return getVisibleLabelIndices({
-      nodes: props.store.nodes,
-      labels: nodeLabelWrapped(),
-      activeNodeIndices: activeNodeIndexSet(),
-      selectedNodeIndices: selectedIndices(),
-      highlightedNodeIndex: ui.highlightedNodeIndex,
-      focusActive: isFocusActive(),
-      zoomScale: props.store.ui.view.k
+    const layout = nodeLabelLayout();
+    if (isFocusActive()) {
+      return getFocusedVisibleLabelIndices({
+        layout,
+        activeNodeIndices: activeNodeIndexSet(),
+        selectedNodeIndices: selectedIndices(),
+        highlightedNodeIndex: ui.highlightedNodeIndex
+      });
+    }
+
+    return getAmbientVisibleLabelIndices({
+      layout,
+      zoomScale: ambientZoomScale()
     });
   });
 
@@ -185,7 +215,6 @@ const Graph: Component<{
                 focusedNodeIndex={focusedNodeIndex()}
                 selectedIndices={selectedIndices()}
                 nodes={props.store.nodes}
-                k={props.store.ui.view.k}
               />
             )}
           </For>
@@ -210,7 +239,7 @@ const Graph: Component<{
                         ? nodeColor()
                         : "none"
                   }
-                  stroke-width={4 / ui.view.k}
+                  stroke-width={4}
                   class={styles.node}
                   classList={{
                     [styles.dimmed]: nodeState().isDimmed,
@@ -268,7 +297,6 @@ const LinkPath: Component<{
   focusedNodeIndex: number | null;
   selectedIndices: Set<number>;
   nodes: GraphNode[];
-  k: number;
 }> = props => {
   const pathData = createMemo(() => getPath(props.link, props.nodes));
 
@@ -311,7 +339,7 @@ const LinkPath: Component<{
       d={pathData()}
       class={linkStyle().class}
       marker-mid={linkStyle().marker ?? undefined}
-      stroke-width={3 / props.k}
+      stroke-width={3}
     />
   );
 };

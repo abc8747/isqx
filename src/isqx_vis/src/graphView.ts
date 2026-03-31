@@ -6,6 +6,9 @@ const LABEL_CHAR_WIDTH = 0.62; // em
 const LABEL_HORIZONTAL_PADDING = 0.75; // em
 const LABEL_VERTICAL_PADDING = 0.45; // em
 const LABEL_GRID_SIZE = 64;
+const MIN_LABEL_SCREEN_RADIUS = 36;
+const MAX_LABEL_SCREEN_RADIUS = 224;
+const ZOOM_BUCKETS_PER_OCTAVE = 6;
 
 export type WrappedNodeLabel = {
   lines: string[];
@@ -31,10 +34,15 @@ type LabelBounds = {
 
 type LabelCandidate = {
   index: number;
-  priority: number;
   radius: number;
   value: number;
   bounds: LabelBounds;
+};
+
+export type NodeLabelLayout = {
+  wrappedLabels: WrappedNodeLabel[];
+  candidatesByIndex: LabelCandidate[];
+  candidatesByImportance: LabelCandidate[];
 };
 
 export const hasFocus = (
@@ -127,67 +135,110 @@ export const getWrappedNodeLabels = (nodes: GraphNode[]) => {
   });
 };
 
-export const isNodeLabelLegible = (node: GraphNode, zoomScale: number) => {
-  const screenRadius = node.radius * zoomScale;
-  return screenRadius > 36 && screenRadius < 224;
+const sortByImportance = (a: LabelCandidate, b: LabelCandidate) => {
+  if (a.radius !== b.radius) return b.radius - a.radius;
+  if (a.value !== b.value) return b.value - a.value;
+  return a.index - b.index;
 };
 
-export const getVisibleLabelIndices = ({
-  nodes,
-  labels,
-  activeNodeIndices,
-  selectedNodeIndices,
-  highlightedNodeIndex,
-  focusActive,
+const isLabelLegibleAtScale = (radius: number, zoomScale: number) => {
+  const screenRadius = radius * zoomScale;
+  return (
+    screenRadius > MIN_LABEL_SCREEN_RADIUS &&
+    screenRadius < MAX_LABEL_SCREEN_RADIUS
+  );
+};
+
+export const quantizeZoomScale = (zoomScale: number) => {
+  if (zoomScale <= 0) return 0;
+  const zoomOctave = Math.log2(zoomScale);
+  const bucket =
+    Math.round(zoomOctave * ZOOM_BUCKETS_PER_OCTAVE) /
+    ZOOM_BUCKETS_PER_OCTAVE;
+  return 2 ** bucket;
+};
+
+export const buildNodeLabelLayout = (nodes: GraphNode[]): NodeLabelLayout => {
+  const wrappedLabels = getWrappedNodeLabels(nodes);
+  const candidatesByIndex = nodes.map((node, index) => ({
+    index,
+    radius: node.radius,
+    value: node.value,
+    bounds: getLabelBounds(node, wrappedLabels[index])
+  }));
+
+  const candidatesByImportance = [...candidatesByIndex].sort(sortByImportance);
+  return {
+    wrappedLabels,
+    candidatesByIndex,
+    candidatesByImportance
+  };
+};
+
+export const getAmbientVisibleLabelIndices = ({
+  layout,
   zoomScale
 }: {
-  nodes: GraphNode[];
-  labels: WrappedNodeLabel[];
-  activeNodeIndices: Set<number>;
-  selectedNodeIndices: Set<number>;
-  highlightedNodeIndex: NodeIndex | null;
-  focusActive: boolean;
+  layout: NodeLabelLayout;
   zoomScale: number;
 }) => {
-  const candidates: LabelCandidate[] = [];
-
-  for (let index = 0; index < nodes.length; index++) {
-    const node = nodes[index];
-    const label = labels[index];
-    const isHighlighted = highlightedNodeIndex === index;
-    const isSelected = selectedNodeIndices.has(index);
-    const isPriority = isHighlighted || isSelected;
-    const isEligible = focusActive
-      ? activeNodeIndices.has(index)
-      : isNodeLabelLegible(node, zoomScale);
-
-    if (!label || (!isEligible && !isPriority)) continue;
-
-    candidates.push({
-      index,
-      priority: isHighlighted ? 0 : isSelected ? 1 : focusActive ? 2 : 3,
-      radius: node.radius,
-      value: node.value,
-      bounds: getLabelBounds(node, label)
-    });
-  }
-
-  candidates.sort((a, b) => {
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    if (a.radius !== b.radius) return b.radius - a.radius;
-    if (a.value !== b.value) return b.value - a.value;
-    return a.index - b.index;
-  });
-
   const visible = new Set<number>();
   const grid = new Map<string, LabelBounds[]>();
 
-  for (const candidate of candidates) {
-    const forceVisible = candidate.priority <= 1;
+  for (const candidate of layout.candidatesByImportance) {
+    if (!isLabelLegibleAtScale(candidate.radius, zoomScale)) continue;
+    if (gridHasOverlap(grid, candidate.bounds)) continue;
+
+    visible.add(candidate.index);
+    gridInsert(grid, candidate.bounds);
+  }
+
+  return visible;
+};
+
+export const getFocusedVisibleLabelIndices = ({
+  layout,
+  activeNodeIndices,
+  selectedNodeIndices,
+  highlightedNodeIndex
+}: {
+  layout: NodeLabelLayout;
+  activeNodeIndices: Set<number>;
+  selectedNodeIndices: Set<number>;
+  highlightedNodeIndex: NodeIndex | null;
+}) => {
+  const visible = new Set<number>();
+  const grid = new Map<string, LabelBounds[]>();
+
+  const placeLabel = (candidate: LabelCandidate, forceVisible: boolean) => {
+    if (visible.has(candidate.index)) return;
     if (forceVisible || !gridHasOverlap(grid, candidate.bounds)) {
       visible.add(candidate.index);
       gridInsert(grid, candidate.bounds);
     }
+  };
+
+  if (highlightedNodeIndex !== null) {
+    const highlightedCandidate = layout.candidatesByIndex[highlightedNodeIndex];
+    if (highlightedCandidate) {
+      placeLabel(highlightedCandidate, true);
+    }
+  }
+
+  for (const candidate of layout.candidatesByImportance) {
+    if (
+      selectedNodeIndices.has(candidate.index) &&
+      candidate.index !== highlightedNodeIndex
+    ) {
+      placeLabel(candidate, true);
+    }
+  }
+
+  for (const candidate of layout.candidatesByImportance) {
+    if (candidate.index === highlightedNodeIndex) continue;
+    if (selectedNodeIndices.has(candidate.index)) continue;
+    if (!activeNodeIndices.has(candidate.index)) continue;
+    placeLabel(candidate, false);
   }
 
   return visible;
