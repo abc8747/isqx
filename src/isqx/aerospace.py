@@ -8,9 +8,8 @@ See: [isqx._citations.ICAO][]
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated
 
 from ._core import (
     DELTA,
@@ -19,11 +18,11 @@ from ._core import (
     QtyKind,
     Quantity,
     ratio,
-    slots,
 )
 from ._iso80000 import (
     ALTITUDE,
     AREA,
+    DENSITY,
     DISTANCE,
     DRAG,
     DRAG_COEFFICIENT,
@@ -44,6 +43,7 @@ from ._iso80000 import (
     RAD,
     RAD_PERS,
     SPECIFIC_ENERGY,
+    STATIC_PRESSURE,
     TEMPERATURE,
     VELOCITY,
     K,
@@ -234,12 +234,15 @@ TEMPERATURE_DEVIATION_ISA = STATIC_TEMPERATURE[
 TOTAL_PRESSURE = PRESSURE["total"]
 IMPACT_PRESSURE = DYNAMIC_PRESSURE["impact"]
 
-PRESSURE_RATIO = Dimensionless("pressure_ratio")
-"""Ratio of static pressure to standard sea level pressure."""
-TEMPERATURE_RATIO = Dimensionless("temperature_ratio")
-"""Ratio of static temperature to standard sea level temperature."""
-DENSITY_RATIO = Dimensionless("density_ratio")
-"""Ratio of air density to standard sea level density."""
+TEMPERATURE_RATIO = ratio(
+    STATIC_TEMPERATURE(K), Quantity(CONST_TEMPERATURE_ISA, K)
+)
+CONST_PRESSURE_ISA: Annotated[int, STATIC_PRESSURE(PA)] = 101325
+PRESSURE_RATIO = ratio(STATIC_PRESSURE(PA), Quantity(CONST_PRESSURE_ISA, PA))
+CONST_DENSITY_ISA: Annotated[Decimal, DENSITY(KG * M**-3)] = Decimal("1.225")
+DENSITY_RATIO = ratio(
+    DENSITY(KG * M**-3), Quantity(CONST_DENSITY_ISA, KG * M**-3)
+)
 
 # linear velocity
 AIRSPEED = QtyKind(M_PERS, ("airspeed",))
@@ -302,7 +305,10 @@ POWER_SPECIFIC_FUEL_CONSUMPTION = QtyKind(
 """Fuel mass flow rate per unit power."""
 FUEL_SPECIFIC_ENERGY = SPECIFIC_ENERGY["fuel"]
 EXHAUST_VELOCITY = VELOCITY["exhaust"]
-BYPASS_RATIO = Dimensionless("bypass_ratio")
+BYPASS_RATIO = ratio(
+    ENGINE_MASS_FLOW_RATE["bypass"].si_coherent(),
+    ENGINE_MASS_FLOW_RATE["core"].si_coherent(),
+)
 # TODO: make efficieny kinds more specific
 PROPULSIVE_EFFICIENCY = Dimensionless("efficiency_propulsive")
 PROPELLER_EFFICIENCY = Dimensionless("efficiency_propeller")
@@ -317,12 +323,6 @@ ADVANCE_RATIO = Dimensionless("advance_ratio")
 #
 # navigation
 #
-
-
-@dataclass(frozen=True, **slots)
-class Aerodrome:
-    ident: str
-    ident_kind: Literal["icao", "iata"] | str
 
 
 PRESSURE_ALTIMETER = QtyKind(PA, ("altimeter",))
