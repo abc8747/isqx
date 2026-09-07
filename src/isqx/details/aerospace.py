@@ -47,6 +47,9 @@ AEROSPACE: Details = {
         ),
         Symbol("MAC"),
     ),
+    aerospace.MEAN_AERODYNAMIC_CHORD_LEADING_EDGE_POSITION: Symbol(
+        r"x_{LEMAC}"
+    ),
     aerospace.WING_AREA: (Symbol("S"), Symbol(r"S_{ref}")),
     aerospace.WETTED_AREA: (Symbol(r"S_{wet}"), Wikidata("Q3505294")),
     aerospace.ASPECT_RATIO: (
@@ -168,25 +171,88 @@ AEROSPACE: Details = {
             },
         ),
     ),
+    # weight and balance
+    aerospace.BASIC_WEIGHT: Symbol("BW"),
+    aerospace.OPERATING_EMPTY_WEIGHT: Symbol("OEW"),
+    aerospace.DRY_OPERATING_WEIGHT: Symbol("DOW"),
+    aerospace.TRAFFIC_LOAD: Symbol("TL"),
+    aerospace.MAXIMUM_ZERO_FUEL_WEIGHT: Symbol("MZFW"),
+    aerospace.MAXIMUM_RAMP_WEIGHT: Symbol("MRW"),
+    aerospace.MAXIMUM_TAKEOFF_WEIGHT: Symbol("MTOW"),
+    aerospace.REGULATED_TAKEOFF_WEIGHT: Symbol("RTOW"),
+    aerospace.MAXIMUM_LANDING_WEIGHT: Symbol("MLW"),
+    aerospace.ZERO_FUEL_WEIGHT: (
+        Symbol("ZFW"),
+        Equation(
+            r"ZFW = DOW + TL",
+            {
+                "ZFW": SELF,
+                "DOW": aerospace.DRY_OPERATING_WEIGHT,
+                "TL": aerospace.TRAFFIC_LOAD,
+            },
+        ),
+    ),
+    aerospace.RAMP_WEIGHT: Equation(
+        r"RW = ZFW + m_{f,total}",
+        {
+            "RW": SELF,
+            "ZFW": aerospace.ZERO_FUEL_WEIGHT,
+            r"m_{f,total}": ("total", aerospace.FUEL_MASS),
+        },
+    ),
+    aerospace.TAKEOFF_WEIGHT: (
+        Symbol("TOW"),
+        Equation(
+            r"TOW = ZFW + m_{f,TO}",
+            {
+                "TOW": SELF,
+                "ZFW": aerospace.ZERO_FUEL_WEIGHT,
+                r"m_{f,TO}": ("takeoff", aerospace.FUEL_MASS),
+            },
+        ),
+    ),
+    aerospace.LANDING_WEIGHT: (
+        Symbol("LW"),
+        Symbol("LAW", remarks="loadsheet"),
+        Equation(
+            r"LW = TOW - m_{f,trip}",
+            {
+                "LW": SELF,
+                "TOW": aerospace.TAKEOFF_WEIGHT,
+                r"m_{f,trip}": ("trip", aerospace.FUEL_MASS),
+            },
+        ),
+    ),
+    aerospace.CENTER_OF_GRAVITY_MAC: Equation(
+        r"MAC_{CG} = \frac{x_{CG} - x_{LEMAC}}{\bar{c}}",
+        {
+            r"MAC_{CG}": SELF,
+            r"x_{CG}": aerospace.CENTER_OF_GRAVITY,
+            r"x_{LEMAC}": aerospace.MEAN_AERODYNAMIC_CHORD_LEADING_EDGE_POSITION,
+            r"\bar{c}": aerospace.MEAN_AERODYNAMIC_CHORD,
+        },
+    ),
     # design
     aerospace.WING_LOADING: (
         Wikidata("Q887216"),
         Equation(
-            r"W/S = \frac{W}{S}",
+            r"W/S = \frac{mg}{S}",
             {
                 "W/S": SELF,
-                "W": aerospace.GROSS,
+                "m": aerospace.AIRCRAFT_MASS,
+                "g": _iso80000.CONST_STANDARD_GRAVITY,
                 "S": aerospace.WING_AREA,
             },
         ),
     ),
     aerospace.THRUST_LOADING: (
         Equation(
-            r"T/W = \frac{T}{W}",
+            r"T/W = \frac{T}{mg}",
             {
                 "T/W": SELF,
                 "T": _iso80000.THRUST,
-                "W": aerospace.GROSS,
+                "m": aerospace.AIRCRAFT_MASS,
+                "g": _iso80000.CONST_STANDARD_GRAVITY,
             },
         ),
     ),

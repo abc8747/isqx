@@ -117,7 +117,7 @@ MPerSCruiseTas = t.Annotated[_T, aero.TRUE_AIRSPEED["cruise"](isqx.M_PERS)]
 LOverD = t.Annotated[_T, isqx.ratio(isqx.LIFT(isqx.N), isqx.DRAG(isqx.N))]
 SIsp = t.Annotated[_T, isqx.TIME["specific_impulse"](isqx.S)]
 WiOverWf = t.Annotated[
-    _T, isqx.ratio(aero.TAKEOFF_MASS(isqx.KG), aero.LANDING_MASS(isqx.KG))
+    _T, isqx.ratio(aero.TAKEOFF_WEIGHT(isqx.KG), aero.LANDING_WEIGHT(isqx.KG))
 ]
 Range = t.Annotated[_T, isqx.DISTANCE(isqx.M)]
 

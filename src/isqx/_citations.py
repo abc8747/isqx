@@ -195,6 +195,31 @@ WMA1985 = r"""```bibtex
 }
 ```"""
 # aerospace
+FAA_AC_120_27F = r"""```bibtex
+@misc{faa_ac_120_27f,
+    author = {{Federal Aviation Administration}},
+    title = {AC 120-27F: Aircraft Weight and Balance Control},
+    year = {2019},
+    url = {https://www.faa.gov/documentLibrary/media/Advisory_Circular/AC_120-27F.pdf}
+}
+```"""
+EASA_EAR_OPS = r"""```bibtex
+@misc{easa_ear_ops,
+    author = {{European Union Aviation Safety Agency}},
+    title = {Easy Access Rules for Air Operations},
+    organization = {EASA},
+    url = {https://www.easa.europa.eu/en/document-library/easy-access-rules/easy-access-rules-air-operations}
+}
+```"""
+EU_2021_1296 = r"""```bibtex
+@misc{eu_2021_1296,
+    author = {{European Commission}},
+    title = {Commission Implementing Regulation (EU) 2021/1296},
+    year = {2021},
+    organization = {Official Journal of the European Union},
+    url = {https://eur-lex.europa.eu/eli/reg_impl/2021/1296/oj}
+}
+```"""
 ICAO = r"""```bibtex
 @misc{icao,
     author = {{ICAO}},

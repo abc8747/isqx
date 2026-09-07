@@ -8,16 +8,23 @@ See: [isqx._citations.ICAO][]
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Annotated
 
 from ._core import (
     DELTA,
+    CompositionError,
     Dimensionless,
+    Expr,
+    HasTagValidation,
     OriginAt,
     QtyKind,
     Quantity,
+    Tag,
+    dimension,
     ratio,
+    slots,
 )
 from ._iso80000 import (
     ALTITUDE,
@@ -46,6 +53,7 @@ from ._iso80000 import (
     STATIC_PRESSURE,
     TEMPERATURE,
     VELOCITY,
+    VOLUME,
     K,
     L,
     M,
@@ -81,6 +89,7 @@ GEODETIC_HEIGHT = QtyKind(M, ("height", "geodetic"))
 """Height above the reference ellipsoid."""
 HEIGHT_ABOVE_GROUND_LEVEL = QtyKind(M, ("height", "above_ground_level"))
 """Height above ground level (radio altimeter)."""
+# do we define AAL (above aerodrome level)?
 
 L_OVER_D = ratio(LIFT(N), DRAG(N))
 
@@ -98,10 +107,14 @@ WINGSPAN = LENGTH["wingspan"]
 CHORD = LENGTH["chord"]
 MEAN_AERODYNAMIC_CHORD = CHORD["mean_aerodynamic"]
 """Mean aerodynamic chord (MAC)."""
+MEAN_AERODYNAMIC_CHORD_LEADING_EDGE_POSITION = CHORD[
+    "mean_aerodynamic", "leading_edge"
+]
+"""Longitudinal position of the leading edge of the mean aerodynamic chord."""
 MEAN_GEOMETRIC_CHORD = CHORD["mean_geometric"]
 """Mean geometric chord (Standard Mean Chord)."""
 WING_AREA = AREA["wing"]
-"""Reference wing area."""
+"""Reference wing area."""  # TODO Wimpress and W(airbus)
 WETTED_AREA = AREA["wetted"]
 PLANFORM_AREA = AREA["planform"]
 FRONTAL_AREA = AREA["frontal"]
@@ -150,20 +163,173 @@ LIFT_SLOPE = Dimensionless("lift_slope")
 CIRCULATION = QtyKind(M**2 * S**-1, ("circulation",))
 
 #
-# aircraft design
+# mass buildup
+# NOTE: technically 'aircraft weight' should be named 'aircraft mass'
+# but we choose to adopt standard operational abbreviations (OEW, DOW, ZFW, etc.).
 #
 
 AIRCRAFT_MASS = MASS["aircraft"]
-GROSS = AIRCRAFT_MASS["gross"]
-CARGO_CAPACITY = AIRCRAFT_MASS["cargo_capacity"]
-FUEL_CAPACITY = AIRCRAFT_MASS["fuel_capacity"]
-TAKEOFF_MASS = AIRCRAFT_MASS["takeoff"]
-LANDING_MASS = AIRCRAFT_MASS["landing"]
-MAXIMUM_TAKEOFF_WEIGHT = TAKEOFF_MASS["maximum"]
-ZERO_FUEL_WEIGHT = AIRCRAFT_MASS["zero_fuel_weight"]
+STANDARD_ITEMS_WEIGHT = AIRCRAFT_MASS["standard_items"]
+"""Mass of *standard items* used in aircraft weight-and-balance.
+
+Equipment and fluids that are not integral to a particular aircraft and do not
+vary between aircraft of the same type. Examples include unusable fuel and
+fluids, engine oil, toilet fluid, emergency equipment, galley structure, and
+supplementary electronic equipment ([FAA AC 120-27F, Appendix A.31][isqx._citations.FAA_AC_120_27F]).
+"""
+BASIC_WEIGHT = AIRCRAFT_MASS["basic"]
+"""Basic weight, a load-control starting weight. Also known as Basic Empty
+Weight or Fleet Empty Weight.
+
+Includes fixed equipment, system fluids, unusable fuel, and configuration
+equipment including galley structure ([IATA AIDM](https://airtechzone.iata.org/aidm_model/25.2/index.htm?goto=5:1:2:8054)).
+It is the aircraft empty weight adjusted for variations in
+[standard items][isqx.aerospace.STANDARD_ITEMS_WEIGHT]
+([FAA AC 120-27F, Appendix A.2][isqx._citations.FAA_AC_120_27F]).
+"""
+OPERATING_ITEMS_WEIGHT = AIRCRAFT_MASS["operating_items"]
+"""Aggregate mass of operating items (OI) included in [dry operating weight][isqx.aerospace.DRY_OPERATING_WEIGHT].
+
+Personnel, equipment, and supplies necessary for a particular
+operation but not included in the [basic empty weight][isqx.aerospace.BASIC_WEIGHT].
+These items may vary for a particular aircraft.
+([FAA AC 120-27F, Appendix A.23][isqx._citations.FAA_AC_120_27F])
+
+[EASA Air Operations][isqx._citations.EASA_EAR_OPS] requires the operator to
+determine the mass of operating items and crew members included in dry
+operating mass.
+"""
 OPERATING_EMPTY_WEIGHT = AIRCRAFT_MASS["operating_empty"]
+"""Operating empty weight (OEW).
+
+The [basic weight][isqx.aerospace.BASIC_WEIGHT] plus [operating items][isqx.aerospace.OPERATING_EMPTY_WEIGHT]
+excluding usable fuel and payload.
+
+Whether crew/crew baggage and catering/service items are included depends on the
+manufacturer or operator.
+
+This term is typically used interchangeably with the [dry operating weight][isqx.aerospace.DRY_OPERATING_WEIGHT]
+"""
+DRY_OPERATING_WEIGHT = AIRCRAFT_MASS["dry_operating"]
+"""Dry operating weight/mass (DOW).
+
+Total mass of the aircraft **ready for a specific type of operation**, excluding
+usable fuel and traffic load
+([EASA Air Operations, Annex I, 2025/133(41)][isqx._citations.EASA_EAR_OPS]).
+
+This term is typically used interchangeably with the [operating empty weight][isqx.aerospace.OPERATING_EMPTY_WEIGHT].
+It typically includes crew/crew baggage, catering/service equipment, potable
+water and other operator-specific items ([IATA AIDM](https://airtechzone.iata.org/aidm_model/25.2/index.htm?goto=5:1:2:8054)).
+"""
 PAYLOAD = AIRCRAFT_MASS["payload"]
-EMPTY_WEIGHT = AIRCRAFT_MASS["empty"]
+"""Mass carried as payload. Typically includes weight of occupants, cargo and
+baggage (FAA-H-8083-1B, GAMA)."""
+TRAFFIC_LOAD = AIRCRAFT_MASS["traffic_load"]
+"""Operational traffic load.
+
+Load carried in addition to dry operating mass, including passengers, baggage,
+freight/cargo and, where applicable, ballast or other non-revenue load
+([EASA Air Operations, Annex I, 2025/133(120)][isqx._citations.EASA_EAR_OPS]).
+"""
+CARGO_CAPACITY = AIRCRAFT_MASS["cargo_capacity"]
+
+ZERO_FUEL_WEIGHT = AIRCRAFT_MASS["zero_fuel"]
+"""Total aircraft mass excluding usable fuel (ZFW)."""
+MAXIMUM_ZERO_FUEL_WEIGHT = ZERO_FUEL_WEIGHT["maximum"]
+RAMP_WEIGHT = AIRCRAFT_MASS["ramp"]
+"""Aircraft mass before taxi, normally including the fuel expected to be consumed before takeoff."""
+MAXIMUM_RAMP_WEIGHT = RAMP_WEIGHT["maximum"]
+TAKEOFF_WEIGHT = AIRCRAFT_MASS["takeoff"]
+"""Aircraft mass at the start of the takeoff roll."""
+MAXIMUM_TAKEOFF_WEIGHT = TAKEOFF_WEIGHT["maximum"]
+REGULATED_TAKEOFF_WEIGHT = TAKEOFF_WEIGHT["regulated"]
+LANDING_WEIGHT = AIRCRAFT_MASS["landing"]
+MAXIMUM_LANDING_WEIGHT = LANDING_WEIGHT["maximum"]
+
+#
+# CAT.OP.MPA.181 fuel planning
+#
+
+FUEL_MASS = MASS["aircraft", "fuel"]
+"""Mass of aircraft fuel."""
+FUEL_VOLUME = VOLUME["aircraft", "fuel"]
+"""Volume of aircraft fuel."""
+FUEL_DENSITY = DENSITY["aircraft", "fuel"]
+"""Fuel mass per unit volume."""
+FUEL_MASS_FLOW_RATE = MASS_FLOW_RATE["aircraft", "fuel"]
+"""Rate of fuel-mass consumption."""
+
+
+@dataclass(frozen=True, **slots)
+class _FuelRole(HasTagValidation):
+    """Semantic role applied to an aircraft fuel mass or fuel volume."""
+
+    name: str
+
+    def __hash__(self) -> int:  # required for py39
+        return hash((self.__class__.__name__, self.name))
+
+    def __validate_tag__(self, reference: Expr, tags: tuple[Tag, ...]) -> None:
+        if "aircraft" not in tags or "fuel" not in tags:
+            raise CompositionError(
+                outer=_FuelRole,
+                inner=reference,
+                msg="fuel roles require an aircraft-fuel expression",
+                help="apply the role to FUEL_MASS or FUEL_VOLUME",
+            )
+        if dimension(reference) not in (dimension(KG), dimension(L)):
+            raise CompositionError(
+                outer=_FuelRole,
+                inner=reference,
+                msg="fuel roles apply only to mass or volume quantities",
+                help="apply the role to FUEL_MASS or FUEL_VOLUME",
+            )
+        if sum(isinstance(tag, _FuelRole) for tag in tags) > 1:
+            raise CompositionError(
+                outer=_FuelRole,
+                inner=self,
+                msg="a fuel quantity cannot have multiple fuel roles",
+            )
+
+
+# to be used with FUEL_MASS[...] or FUEL_VOLUME[...].
+TAXI_FUEL = _FuelRole("taxi_fuel")
+"""Fuel expected to be used before takeoff ([CAT.OP.MPA.181(c)(1)][isqx._citations.EU_2021_1296])."""
+TRIP_FUEL = _FuelRole("trip_fuel")
+"""Fuel required from takeoff, or an in-flight replanning point, to landing at the destination aerodrome ([CAT.OP.MPA.181(c)(2)][isqx._citations.EU_2021_1296])."""
+# not defining a "reserve fuel"
+CONTINGENCY_FUEL = _FuelRole("contingency_fuel")
+"""Fuel required to compensate for unforeseen factors ([CAT.OP.MPA.181(c)(3)][isqx._citations.EU_2021_1296])."""
+ALTERNATE_FUEL = _FuelRole("alternate_fuel")
+"""Fuel required from the destination to the destination alternate, or the prescribed destination holding amount when no alternate is required ([CAT.OP.MPA.181(c)(4)][isqx._citations.EU_2021_1296])."""
+FINAL_RESERVE_FUEL = _FuelRole("final_reserve_fuel")
+"""Fuel calculated at holding speed at 1500 ft above aerodrome elevation, subject to the prescribed reciprocating- or turbine-engine minimum duration ([CAT.OP.MPA.181(c)(5)][isqx._citations.EU_2021_1296])."""
+ADDITIONAL_FUEL = _FuelRole("additional_fuel")
+"""Fuel required for the critical fuel en-route-alternate scenario after a consumption-increasing aircraft failure when the other specified components are insufficient ([CAT.OP.MPA.181(c)(6)][isqx._citations.EU_2021_1296])."""
+EXTRA_FUEL = _FuelRole("extra_fuel")
+"""Fuel carried for anticipated delays or specific operational constraints ([CAT.OP.MPA.181(c)(7)][isqx._citations.EU_2021_1296])."""
+DISCRETIONARY_FUEL = _FuelRole("discretionary_fuel")
+"""Fuel required at the commander's discretion ([CAT.OP.MPA.181(c)(8)][isqx._citations.EU_2021_1296])."""
+
+TANKERING_FUEL = _FuelRole("tankering_fuel")  # nonstandard
+"""Supplementary fuel carried for operational reasons (for example, to offset higher fuel price at the destination)."""
+
+# there are some operational fuel aggregates, such as:
+# takeoff fuel, fuel on board (FOB), minimum diversion fuel, destination hold fuel
+# but we do not define them here because of a lack of standardised definition
+
+AIRCRAFT_LOAD_INDEX = Dimensionless(
+    "aircraft_load_index"
+)  # TODO DOI = BI + \Delta I_op? LIZFW, fuel index?, LITOW, LILAW?
+"""Dimensionless load-distribution index used in weight-and-balance."""
+CENTER_OF_GRAVITY_MAC = Dimensionless(
+    "center_of_gravity_mean_aerodynamic_chord"
+)  # TODO: MACZFW, MACTOW, MACTOW
+"""Centre-of-gravity position as a fraction of mean aerodynamic chord."""
+
+#
+# aircraft design: misc
+#
 
 TANK_CAPACITY = QtyKind(L, ("aircraft", "tank_capacity"))  # ICAO 1.14
 ENDURANCE = QtyKind(HOUR, ("aircraft", "endurance"))  # ICAO 1.6
@@ -270,6 +436,10 @@ WIND_SPEED = QtyKind(M_PERS, ("wind",))
 """Wind speed."""
 SPEED_OF_SOUND = QtyKind(M_PERS, ("sound",))
 """Speed of sound."""
+DENSITY_FACTOR = Dimensionless("density_factor")
+"""Square root of local air density divided by a stated reference density."""
+COMPRESSIBILITY_FACTOR = Dimensionless("compressibility_factor")
+"""Dimensionless correction factor used when relating compressible-flow airspeeds."""
 
 FT_PER_MIN = FT * MIN**-1
 VERTICAL_RATE = QtyKind(M_PERS, ("vertical_rate",))
@@ -296,6 +466,7 @@ BRAKE_POWER = POWER["brake"]
 EQUIVALENT_SHAFT_POWER = SHAFT_POWER["equivalent"]
 
 ENGINE_MASS_FLOW_RATE = MASS_FLOW_RATE["engine"]
+SPECIFIC_THRUST = QtyKind(N * S * KG**-1, ("specific_thrust",))
 KG_PERS = KG * S**-1
 THRUST_SPECIFIC_FUEL_CONSUMPTION = QtyKind(KG_PERS * N**-1, ("engine",))
 """Fuel mass flow rate per unit thrust."""
